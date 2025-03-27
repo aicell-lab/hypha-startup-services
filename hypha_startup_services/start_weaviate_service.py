@@ -94,76 +94,91 @@ async def delete_collection(
 async def collection_data_insert_many(
     client: WeaviateAsyncClient,
     collection_name: str,
-    data: list[dict],
-    context: dict = None,
+    **kwargs,
 ):
-    """Insert many objects into the collection."""
-    assert context is not None
+    """Insert many objects into the collection.
+
+    Forwards all kwargs to collection.data.insert_many().
+    """
+    assert "context" in kwargs, "Context is required"
+    context = kwargs.pop("context")
     workspace = context.get("ws")
     collection = client.collections.get(
         full_collection_name(workspace, collection_name)
     )
-    return await collection.data.insert_many(data)
+    return await collection.data.insert_many(**kwargs)
 
 
 async def collection_query_near_vector(
     client: WeaviateAsyncClient,
     collection_name: str,
-    data: dict,
-    context: dict = None,
+    **kwargs,
 ):
-    """Query the collection using a vector."""
-    assert context is not None
+    """Query the collection using a vector.
+
+    Forwards all kwargs to collection.query.near_vector().
+    """
+    assert "context" in kwargs, "Context is required"
+    context = kwargs.pop("context")
     workspace = context.get("ws")
     collection = client.collections.get(
         full_collection_name(workspace, collection_name)
     )
-    return await collection.query.near_vector(data)
+    return await collection.query.near_vector(**kwargs)
 
 
 async def collection_query_fetch_objects(
     client: WeaviateAsyncClient,
     collection_name: str,
-    data: dict,
-    context: dict = None,
+    **kwargs,
 ):
-    """Query the collection using a vector."""
-    assert context is not None
+    """Query the collection to fetch objects.
+
+    Forwards all kwargs to collection.query.fetch_objects().
+    """
+    assert "context" in kwargs, "Context is required"
+    context = kwargs.pop("context")
     workspace = context.get("ws")
     collection = client.collections.get(
         full_collection_name(workspace, collection_name)
     )
-    return await collection.query.fetch_objects(data)
+    return await collection.query.fetch_objects(**kwargs)
 
 
 async def collection_query_hybrid(
     client: WeaviateAsyncClient,
     collection_name: str,
-    data: dict,
-    context: dict = None,
+    **kwargs,
 ):
-    """Query the collection using a vector."""
-    assert context is not None
+    """Query the collection using hybrid search.
+
+    Forwards all kwargs to collection.query.hybrid().
+    """
+    assert "context" in kwargs, "Context is required"
+    context = kwargs.pop("context")
     workspace = context.get("ws")
     collection = client.collections.get(
         full_collection_name(workspace, collection_name)
     )
-    return await collection.query.hybrid(data)
+    return await collection.query.hybrid(**kwargs)
 
 
 async def collection_query_near_text(
     client: WeaviateAsyncClient,
     collection_name: str,
-    data: dict,
-    context: dict = None,
+    **kwargs,
 ):
-    """Query the collection using a vector."""
-    assert context is not None
+    """Query the collection using near text search.
+
+    Forwards all kwargs to collection.query.near_text().
+    """
+    assert "context" in kwargs, "Context is required"
+    context = kwargs.pop("context")
     workspace = context.get("ws")
     collection = client.collections.get(
         full_collection_name(workspace, collection_name)
     )
-    return await collection.query.near_text(data)
+    return await collection.query.near_text(**kwargs)
 
 
 async def register_weaviate(server):

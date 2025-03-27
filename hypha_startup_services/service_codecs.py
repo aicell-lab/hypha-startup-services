@@ -4,7 +4,7 @@ This module provides encoder and decoder functions for Weaviate collection objec
 allowing them to be serialized and transferred through Hypha RPC.
 """
 
-from weaviate.collections import Collection
+from weaviate.collections import CollectionAsync
 from weaviate.collections.classes.config import (
     CollectionConfig,
     CollectionConfigSimple,
@@ -37,12 +37,13 @@ def encode_obj(
     }
 
 
-def encode_collection(collection: Collection) -> JsonObject:
+async def encode_collection(collection: CollectionAsync) -> JsonObject:
     """Encode a collection by encoding its config. The config contains all necessary information."""
 
+    config = await collection.config.get()
     return encode_obj(
         _rtype="weaviate-collection",
-        data=collection.config.get().to_dict(),
+        data=config.to_dict(),
         name=collection.name,
     )
 
@@ -120,7 +121,7 @@ def register_weaviate_codecs(server):
     server.register_codec(
         {
             "name": "weaviate-collection",
-            "type": Collection,
+            "type": CollectionAsync,
             "encoder": encode_collection,
             "decoder": decode_collection,
         }

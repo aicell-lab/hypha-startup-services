@@ -2,8 +2,11 @@
 
 import os
 import pytest_asyncio
+from dotenv import load_dotenv
 from hypha_rpc import connect_to_server
 from hypha_startup_services.service_codecs import register_weaviate_codecs
+
+load_dotenv()
 
 
 async def get_server(server_url: str):
