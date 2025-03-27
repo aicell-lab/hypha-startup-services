@@ -51,9 +51,7 @@ def decode_collection(encoded_collection: JsonObject) -> CollectionConfig:
     """Decode a serialized collection using its config."""
     assert encoded_collection["_rtype"] == "weaviate-collection"
 
-    data = encoded_collection["data"]
-
-    return CollectionConfig(**data)
+    return encoded_collection
 
 
 def encode_collection_config_simple(
