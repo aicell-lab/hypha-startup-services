@@ -1,11 +1,7 @@
-import os
-import argparse
-import asyncio
-from hypha_rpc import connect_to_server
 from dotenv import load_dotenv
 from weaviate.classes.config import Configure
 from hypha_startup_services.service_codecs import register_weaviate_codecs
-from weaviate_client import client, OLLAMA_ENDPOINT
+from hypha_startup_services.weaviate_client import client, OLLAMA_ENDPOINT
 
 load_dotenv()
 
@@ -105,14 +101,13 @@ async def insert_many(collection_name: str, data: list[dict], context: dict = No
 
 
 async def register_weaviate(server):
-    # Register all codecs using the helper function
     register_weaviate_codecs(server)
 
-    # Register the service
-    service_info = await server.register_service(
+    service_id = "weaviate"
+    await server.register_service(
         {
             "name": "Hypha Weaviate Service",
-            "id": "weaviate",
+            "id": service_id,
             "config": {
                 "visibility": "public",
                 "require_context": True,
@@ -128,32 +123,8 @@ async def register_weaviate(server):
             },
         }
     )
-    print("Service registered: ", service_info.id)
 
-
-async def register_to_existing_server(provided_url, port=None):
-    server_url = provided_url if port is None else f"{provided_url}:{port}"
-    token = os.environ.get("HYPHA_TOKEN")
-    assert token is not None, "HYPHA_TOKEN environment variable is not set"
-    server = await connect_to_server({"server_url": server_url, "token": token})
-    await register_weaviate(server)
-
-
-def connect_to_remote(args):
-    server_url = args.server_url
-    loop = asyncio.get_event_loop()
-    loop.create_task(register_to_existing_server(server_url))
-    loop.run_forever()
-
-
-def main():
-    parser = argparse.ArgumentParser(description="Aria tools launch commands.")
-
-    parser.add_argument("--server-url", type=str, default="https://hypha.aicell.io")
-
-    args = parser.parse_args()
-    connect_to_remote(args)
-
-
-if __name__ == "__main__":
-    main()
+    print(
+        "Service registered at",
+        f"{server.config.public_base_url}/{server.config.workspace}/services/{service_id}",
+    )

@@ -3,7 +3,7 @@
 import os
 import pytest_asyncio
 from hypha_rpc import connect_to_server
-from start_weaviate_service_codecs import register_weaviate_codecs
+from hypha_startup_services.service_codecs import register_weaviate_codecs
 
 
 async def get_server(server_url: str):
