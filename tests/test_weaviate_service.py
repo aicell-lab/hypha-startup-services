@@ -1,5 +1,4 @@
 import pytest
-from weaviate.collections.collection import Collection
 
 
 @pytest.mark.asyncio
@@ -33,7 +32,7 @@ async def test_create_collection(weaviate_service):
     }
 
     collection = await weaviate_service.collections.create(class_obj)
-    assert isinstance(collection, Collection)
+    assert isinstance(collection, dict)
 
 
 @pytest.mark.asyncio
@@ -43,8 +42,8 @@ async def test_get_collection(weaviate_service):
     collection = await weaviate_service.collections.get("Movie")
 
     assert collection is not None
-    assert isinstance(collection, Collection)
-    # assert collection.name == "Movie"
+    assert isinstance(collection, dict)
+    assert collection["class"] == "Movie"
 
 
 @pytest.mark.asyncio
@@ -53,12 +52,12 @@ async def test_list_collections(weaviate_service):
     await test_create_collection(weaviate_service)
 
     # List collections
-    collections = await weaviate_service.collections.list_all(simple=True)
+    collections = await weaviate_service.collections.list_all()
 
     assert len(collections) >= 1
     assert isinstance(collections, dict)
     assert all(
-        isinstance(coll_name, str) and isinstance(coll_obj, Collection)
+        isinstance(coll_name, str) and isinstance(coll_obj, dict)
         for coll_name, coll_obj in collections.items()
     )
     assert any(coll_name == "Movie" for coll_name in collections.keys())
@@ -70,7 +69,7 @@ async def test_delete_collection(weaviate_service):
 
     await weaviate_service.collections.delete("Movie")
 
-    collections = await weaviate_service.collections.list_all(simple=True)
+    collections = await weaviate_service.collections.list_all()
     assert not any("Movie" in coll_name for coll_name in collections.keys())
 
 
@@ -102,8 +101,6 @@ async def test_collection_data_insert_many(weaviate_service):
     )
 
     assert result is not None
-    assert "objects" in result
-    assert len(result["objects"]) == 2
 
     # Verify objects were inserted by fetching them back
     query_result = await weaviate_service.query.fetch_objects(
@@ -111,10 +108,8 @@ async def test_collection_data_insert_many(weaviate_service):
     )
 
     assert query_result is not None
-    assert "data" in query_result
-    assert "Get" in query_result["data"]
-    assert "Movie" in query_result["data"]["Get"]
-    assert len(query_result["data"]["Get"]["Movie"]) == 2
+    assert "objects" in query_result
+    assert len(query_result["objects"]) == 2
 
 
 @pytest.mark.asyncio
@@ -128,15 +123,16 @@ async def test_collection_query_near_vector(weaviate_service):
 
     # Query using kwargs
     result = await weaviate_service.query.near_vector(
-        collection_name="Movie", vector=test_vector, limit=1
+        collection_name="Movie",
+        near_vector=test_vector,
+        target_vector="title_vector",
+        limit=1,
     )
 
     assert result is not None
-    assert "data" in result
-    assert "Get" in result["data"]
-    assert "Movie" in result["data"]["Get"]
+    assert "objects" in result
     # Should return at least one result
-    assert len(result["data"]["Get"]["Movie"]) > 0
+    assert len(result["objects"]) > 0
 
 
 @pytest.mark.asyncio
@@ -151,11 +147,9 @@ async def test_collection_query_fetch_objects(weaviate_service):
     )
 
     assert result is not None
-    assert "data" in result
-    assert "Get" in result["data"]
-    assert "Movie" in result["data"]["Get"]
+    assert "objects" in result
     # Should return exactly one result due to limit=1
-    assert len(result["data"]["Get"]["Movie"]) == 1
+    assert len(result["objects"]) == 1
 
 
 @pytest.mark.asyncio
@@ -177,11 +171,9 @@ async def test_collection_query_hybrid(weaviate_service):
     )
 
     assert result is not None
-    assert "data" in result
-    assert "Get" in result["data"]
-    assert "Movie" in result["data"]["Get"]
+    assert "objects" in result
     # Should return results
-    assert len(result["data"]["Get"]["Movie"]) > 0
+    assert len(result["objects"]) > 0
 
 
 @pytest.mark.asyncio
@@ -190,14 +182,16 @@ async def test_collection_query_near_text(weaviate_service):
     # First insert test data
     await test_collection_data_insert_many(weaviate_service)
 
-    # Query using kwargs
     result = await weaviate_service.generate.near_text(
-        collection_name="Movie", concepts=["hacker", "reality"], limit=1
+        collection_name="Movie",
+        query="A sci-fi film",
+        single_prompt="Translate this into French: {title}",
+        target_vector="description_vector",
+        limit=2,
     )
 
     assert result is not None
-    assert "data" in result
-    assert "Get" in result["data"]
-    assert "Movie" in result["data"]["Get"]
+    assert "generate" in result
+    assert "objects" in result
     # Should return at least one result
-    assert len(result["data"]["Get"]["Movie"]) > 0
+    assert len(result["objects"]) > 0
