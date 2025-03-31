@@ -239,7 +239,7 @@ async def collection_generate_near_text(
     }
 
 
-async def register_weaviate(server):
+async def register_weaviate(server, service_id: str):
     register_weaviate_codecs(server)
     weaviate_url = "https://hypha-weaviate.scilifelab-2-dev.sys.kth.se"
     weaviate_grpc_url = "https://hypha-weaviate-grpc.scilifelab-2-dev.sys.kth.se"
@@ -252,7 +252,6 @@ async def register_weaviate(server):
         http_host, is_secure, grpc_host, is_grpc_secure
     )
 
-    service_id = "weaviate"
     await server.register_service(
         {
             "name": "Hypha Weaviate Service",
