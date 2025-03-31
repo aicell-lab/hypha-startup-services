@@ -21,7 +21,9 @@ def connect_to_remote(args):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Aria tools launch commands.")
+    parser = argparse.ArgumentParser(
+        description="Hypha startup services launch commands."
+    )
 
     parser.add_argument("--server-url", type=str, default="https://hypha.aicell.io")
     parser.add_argument(
