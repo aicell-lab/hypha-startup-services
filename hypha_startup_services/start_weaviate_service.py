@@ -234,7 +234,7 @@ async def collection_generate_near_text(
     )
     response = await collection.generate.near_text(**kwargs)
     return {
-        "generate": response.generate,
+        "generated": response.generated,
         "objects": response.objects,
     }
 

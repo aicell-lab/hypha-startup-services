@@ -3,7 +3,11 @@ import pytest
 
 @pytest.mark.asyncio
 async def test_create_collection(weaviate_service):
+    ollama_endpoint = "https://hypha-ollama.scilifelab-2-dev.sys.kth.se"
+    ollama_model = "llama3.2"  # For embeddings - using an available model
+
     await weaviate_service.collections.delete("Movie")
+
     class_obj = {
         "class": "Movie",
         "description": "A movie class",
@@ -29,6 +33,40 @@ async def test_create_collection(weaviate_service):
                 "description": "The year the movie was released",
             },
         ],
+        "vectorConfig": {
+            "title_vector": {
+                "vectorizer": {
+                    "text2vec-ollama": {
+                        "model": ollama_model,
+                        "apiEndpoint": ollama_endpoint,
+                    }
+                },
+                "sourceProperties": ["title"],
+                "vectorIndexType": "hnsw",  # Added this line
+                "vectorIndexConfig": {  # Optional but recommended for completeness
+                    "distance": "cosine"
+                },
+            },
+            "description_vector": {
+                "vectorizer": {
+                    "text2vec-ollama": {
+                        "model": ollama_model,
+                        "apiEndpoint": ollama_endpoint,
+                    }
+                },
+                "sourceProperties": ["description"],
+                "vectorIndexType": "hnsw",  # Added this line
+                "vectorIndexConfig": {  # Optional but recommended for completeness
+                    "distance": "cosine"
+                },
+            },
+        },
+        "moduleConfig": {
+            "generative-ollama": {
+                "model": ollama_model,
+                "apiEndpoint": ollama_endpoint,
+            }
+        },
     }
 
     collection = await weaviate_service.collections.create(class_obj)
@@ -119,7 +157,7 @@ async def test_collection_query_near_vector(weaviate_service):
     await test_collection_data_insert_many(weaviate_service)
 
     # Create test vector (this is just a mock vector for testing)
-    test_vector = [0.1] * 768  # Using a typical embedding dimension
+    test_vector = [0.1] * 3072  # Using a typical embedding dimension
 
     # Query using kwargs
     result = await weaviate_service.query.near_vector(
@@ -159,13 +197,14 @@ async def test_collection_query_hybrid(weaviate_service):
     await test_collection_data_insert_many(weaviate_service)
 
     # Create test vector (this is just a mock vector for testing)
-    test_vector = [0.1] * 768  # Using a typical embedding dimension
+    test_vector = [0.1] * 3072  # Using a typical embedding dimension
 
     # Query using kwargs for hybrid search
     result = await weaviate_service.query.hybrid(
         collection_name="Movie",
         query="Science Fiction",
         vector=test_vector,
+        target_vector="description_vector",
         alpha=0.5,  # Weight between text and vector search
         limit=2,
     )
@@ -191,7 +230,7 @@ async def test_collection_query_near_text(weaviate_service):
     )
 
     assert result is not None
-    assert "generate" in result
+    assert "generated" in result
     assert "objects" in result
     # Should return at least one result
     assert len(result["objects"]) > 0
