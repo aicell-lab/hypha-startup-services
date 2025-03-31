@@ -232,7 +232,7 @@ async def collection_generate_near_text(
     collection = client.collections.get(
         full_collection_name(workspace, collection_name)
     )
-    response = await collection.query.near_text(**kwargs)
+    response = await collection.generate.near_text(**kwargs)
     return {
         "generate": response.generate,
         "objects": response.objects,
