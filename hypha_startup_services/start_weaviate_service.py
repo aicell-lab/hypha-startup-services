@@ -269,6 +269,7 @@ async def register_weaviate(server, service_id: str):
             },
             "data": {
                 "insert_many": partial(collection_data_insert_many, client),
+                # TODO: add CRUD
             },
             "query": {
                 "near_vector": partial(collection_query_near_vector, client),
