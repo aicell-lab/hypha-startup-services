@@ -148,6 +148,143 @@ async def test_collection_data_insert_many(weaviate_service):
     assert query_result is not None
     assert "objects" in query_result
     assert len(query_result["objects"]) == 2
+    assert all(obj["collection"] == "Movie" for obj in query_result["objects"])
+
+
+@pytest.mark.asyncio
+async def test_collection_data_insert(weaviate_service):
+    """Test inserting a single object into a collection."""
+    # First create a collection
+    await test_create_collection(weaviate_service)
+
+    # Create test data
+    test_object = {
+        "title": "The Godfather",
+        "description": "The aging patriarch of an organized crime dynasty transfers control to his son",
+        "genre": "Crime",
+        "year": 1972,
+    }
+
+    # Insert data
+    uuid = await weaviate_service.data.insert(
+        collection_name="Movie", properties=test_object
+    )
+
+    assert uuid is not None
+
+    # Verify object was inserted by fetching it back
+    query_result = await weaviate_service.query.fetch_objects(
+        collection_name="Movie",
+        limit=1,
+    )
+
+    assert query_result is not None
+    assert "objects" in query_result
+    assert len(query_result["objects"]) == 1
+    assert query_result["objects"][0]["uuid"] == uuid
+    assert all(obj["collection"] == "Movie" for obj in query_result["objects"])
+
+
+@pytest.mark.asyncio
+async def test_collection_data_update(weaviate_service):
+    """Test updating an object in a collection."""
+    # First insert a test object
+    await test_create_collection(weaviate_service)
+
+    test_object = {
+        "title": "Pulp Fiction",
+        "description": "The lives of two mob hitmen, a boxer, a gangster's wife, and a pair of diner bandits intertwine",
+        "genre": "Crime",
+        "year": 1994,
+    }
+
+    uuid = await weaviate_service.data.insert(
+        collection_name="Movie", properties=test_object
+    )
+
+    # Update the object
+    updated_properties = {
+        "description": "Updated description for Pulp Fiction",
+        "year": 1995,  # Deliberately changing for test purposes
+    }
+
+    await weaviate_service.data.update(
+        collection_name="Movie", uuid=uuid, properties=updated_properties
+    )
+
+    # Verify the update
+    query_result = await weaviate_service.query.fetch_objects(
+        collection_name="Movie",
+        limit=1,
+    )
+
+    assert query_result is not None
+    assert "objects" in query_result
+    assert len(query_result["objects"]) == 1
+    assert query_result["objects"][0]["uuid"] == uuid
+    assert all(obj["collection"] == "Movie" for obj in query_result["objects"])
+
+
+@pytest.mark.asyncio
+async def test_collection_data_exists(weaviate_service):
+    """Test checking if an object exists in a collection."""
+    # First insert a test object
+    await test_create_collection(weaviate_service)
+
+    test_object = {
+        "title": "Fight Club",
+        "description": "An insomniac office worker and a devil-may-care soapmaker form an underground fight club",
+        "genre": "Drama",
+        "year": 1999,
+    }
+
+    uuid = await weaviate_service.data.insert(
+        collection_name="Movie", properties=test_object
+    )
+
+    # Check if object exists
+    exists = await weaviate_service.data.exists(collection_name="Movie", uuid=uuid)
+
+    assert exists is True
+
+    # Check if non-existent object returns False
+    fake_uuid = "00000000-0000-0000-0000-000000000000"
+    exists = await weaviate_service.data.exists(collection_name="Movie", uuid=fake_uuid)
+
+    assert exists is False
+
+
+@pytest.mark.asyncio
+async def test_collection_data_delete_by_id(weaviate_service):
+    """Test deleting an object by ID from a collection."""
+    # First insert a test object
+    await test_create_collection(weaviate_service)
+
+    test_object = {
+        "title": "Interstellar",
+        "description": "A team of explorers travel through a wormhole in space in an attempt to ensure humanity's survival",
+        "genre": "Science Fiction",
+        "year": 2014,
+    }
+
+    uuid = await weaviate_service.data.insert(
+        collection_name="Movie", properties=test_object
+    )
+
+    # Verify object exists
+    exists_before = await weaviate_service.data.exists(
+        collection_name="Movie", uuid=uuid
+    )
+    assert exists_before is True
+
+    # Delete the object
+    await weaviate_service.data.delete_by_id(collection_name="Movie", uuid=uuid)
+
+    # Verify object no longer exists
+    exists_after = await weaviate_service.data.exists(
+        collection_name="Movie", uuid=uuid
+    )
+    assert exists_after is False
 
 
 @pytest.mark.asyncio
@@ -171,6 +308,7 @@ async def test_collection_query_near_vector(weaviate_service):
     assert "objects" in result
     # Should return at least one result
     assert len(result["objects"]) > 0
+    assert all(obj["collection"] == "Movie" for obj in result["objects"])
 
 
 @pytest.mark.asyncio
@@ -188,6 +326,7 @@ async def test_collection_query_fetch_objects(weaviate_service):
     assert "objects" in result
     # Should return exactly one result due to limit=1
     assert len(result["objects"]) == 1
+    assert all(obj["collection"] == "Movie" for obj in result["objects"])
 
 
 @pytest.mark.asyncio
@@ -213,6 +352,7 @@ async def test_collection_query_hybrid(weaviate_service):
     assert "objects" in result
     # Should return results
     assert len(result["objects"]) > 0
+    assert all(obj["collection"] == "Movie" for obj in result["objects"])
 
 
 @pytest.mark.asyncio
@@ -234,3 +374,4 @@ async def test_collection_query_near_text(weaviate_service):
     assert "objects" in result
     # Should return at least one result
     assert len(result["objects"]) > 0
+    assert all(obj["collection"] == "Movie" for obj in result["objects"])
