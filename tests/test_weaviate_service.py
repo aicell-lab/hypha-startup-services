@@ -1,8 +1,11 @@
+"""Tests for the Weaviate service functionality including collections and data operations."""
+
 import pytest
 
 
 @pytest.mark.asyncio
 async def test_create_collection(weaviate_service):
+    """Test creating a Weaviate collection with proper schema configuration."""
     ollama_endpoint = "https://hypha-ollama.scilifelab-2-dev.sys.kth.se"
     ollama_model = "llama3.2"  # For embeddings - using an available model
 
@@ -75,6 +78,7 @@ async def test_create_collection(weaviate_service):
 
 @pytest.mark.asyncio
 async def test_get_collection(weaviate_service):
+    """Test retrieving a collection's configuration by name."""
     await test_create_collection(weaviate_service)
 
     collection = await weaviate_service.collections.get("Movie")
@@ -86,6 +90,7 @@ async def test_get_collection(weaviate_service):
 
 @pytest.mark.asyncio
 async def test_list_collections(weaviate_service):
+    """Test listing all available collections in the workspace."""
     # First create a collection
     await test_create_collection(weaviate_service)
 
@@ -103,6 +108,7 @@ async def test_list_collections(weaviate_service):
 
 @pytest.mark.asyncio
 async def test_delete_collection(weaviate_service):
+    """Test deleting a collection and verifying it no longer exists."""
     await test_create_collection(weaviate_service)
 
     await weaviate_service.collections.delete("Movie")
@@ -160,7 +166,9 @@ async def test_collection_data_insert(weaviate_service):
     # Create test data
     test_object = {
         "title": "The Godfather",
-        "description": "The aging patriarch of an organized crime dynasty transfers control to his son",
+        "description": (
+            "The aging patriarch of an organized crime dynasty transfers control to his son"
+        ),
         "genre": "Crime",
         "year": 1972,
     }
@@ -193,7 +201,10 @@ async def test_collection_data_update(weaviate_service):
 
     test_object = {
         "title": "Pulp Fiction",
-        "description": "The lives of two mob hitmen, a boxer, a gangster's wife, and a pair of diner bandits intertwine",
+        "description": (
+            "The lives of two mob hitmen, a boxer, a gangster's wife, and"
+            " a pair of diner bandits intertwine"
+        ),
         "genre": "Crime",
         "year": 1994,
     }
@@ -233,7 +244,10 @@ async def test_collection_data_exists(weaviate_service):
 
     test_object = {
         "title": "Fight Club",
-        "description": "An insomniac office worker and a devil-may-care soapmaker form an underground fight club",
+        "description": (
+            "An insomniac office worker and a devil-may-care soapmaker form an"
+            " underground fight club"
+        ),
         "genre": "Drama",
         "year": 1999,
     }
@@ -262,7 +276,10 @@ async def test_collection_data_delete_by_id(weaviate_service):
 
     test_object = {
         "title": "Interstellar",
-        "description": "A team of explorers travel through a wormhole in space in an attempt to ensure humanity's survival",
+        "description": (
+            "A team of explorers travel through a wormhole in space in an attempt to ensure"
+            " humanity's survival"
+        ),
         "genre": "Science Fiction",
         "year": 2014,
     }

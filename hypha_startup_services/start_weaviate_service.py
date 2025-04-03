@@ -1,3 +1,10 @@
+"""
+Weaviate service implementation for Hypha.
+
+This module provides functionality to interface with Weaviate vector database,
+handling collections, data operations, and query functionality with workspace isolation.
+"""
+
 from functools import partial
 import uuid
 from typing import Any
@@ -18,11 +25,20 @@ OLLAMA_LLM_MODEL = "llama3.2"  # For generation - using an available model
 
 
 def format_workspace(workspace: str) -> str:
+    """Format workspace name to use in collection names.
+
+    Replaces hyphens with underscores and capitalizes the name.
+    """
     workspace_formatted = workspace.replace("-", "_").capitalize()
     return workspace_formatted
 
 
 def name_without_workspace(collection_name: str) -> str:
+    """Extract collection name without workspace prefix.
+
+    If the collection name contains the workspace delimiter, returns the part after it.
+    Otherwise, returns the original collection name.
+    """
     if WORKSPACE_DELIMITER in collection_name:
         return collection_name.split(WORKSPACE_DELIMITER)[1]
     return collection_name
@@ -45,6 +61,7 @@ async def collection_to_config_dict(collection: CollectionAsync) -> dict:
 
 
 def assert_valid_collection_name(collection_name: str) -> None:
+    """Ensure collection name doesn't contain the workspace delimiter."""
     assert (
         WORKSPACE_DELIMITER not in collection_name
     ), f"Collection name should not contain '{WORKSPACE_DELIMITER}'"
@@ -56,6 +73,7 @@ def stringify_keys(d: dict) -> dict:
 
 
 def full_collection_name_single(workspace: str, collection_name: str) -> str:
+    """Create a full collection name with workspace prefix for a single collection."""
     assert_valid_collection_name(collection_name)
 
     workspace_formatted = format_workspace(workspace)
@@ -77,6 +95,7 @@ def full_collection_name(
 
 
 def is_in_workspace(collection_name: str, workspace: str) -> bool:
+    """Check if a collection belongs to the specified workspace."""
     formatted_workspace = format_workspace(workspace)
     return collection_name.startswith(f"{formatted_workspace}{WORKSPACE_DELIMITER}")
 
@@ -88,7 +107,10 @@ def call_collection_method(
     *args,
     **kwargs,
 ) -> Any:
-    """Call a method on the collection."""
+    """Call a method on the collection.
+
+    A utility function to dynamically call methods on a collection.
+    """
     collection = acquire_collection(client, collection_name)
     method = getattr(collection, method_name)
     return method(*args, **kwargs)
@@ -97,6 +119,7 @@ def call_collection_method(
 async def collections_exists(
     client: WeaviateAsyncClient, collection_name: str, context: dict = None
 ) -> bool:
+    """Check if a collection exists in the workspace."""
     collection_name = full_collection_name(collection_name, context)
     return await client.collections.exists(collection_name)
 
@@ -126,6 +149,11 @@ def objects_without_workspace(objects: list[dict]) -> list[dict]:
 async def collections_create(
     client: WeaviateAsyncClient, settings: dict, context: dict = None
 ) -> dict[str, Any]:
+    """Create a new collection in the workspace.
+
+    Adds workspace prefix to the collection name before creating it.
+    Returns the collection configuration with the workspace prefix removed.
+    """
     settings_with_workspace = settings.copy()
     settings_with_workspace["class"] = full_collection_name(
         settings_with_workspace["class"], context
@@ -141,6 +169,10 @@ async def collections_create(
 async def collections_list_all(
     client: WeaviateAsyncClient, context: dict = None
 ) -> dict[str, dict]:
+    """List all collections in the workspace.
+
+    Returns collections with workspace prefixes removed from their names.
+    """
     workspace = ws_from_context(context)
     collections = await client.collections.list_all(simple=False)
     return {
@@ -153,6 +185,10 @@ async def collections_list_all(
 async def collections_get(
     client: WeaviateAsyncClient, name: str, context: dict = None
 ) -> dict[str, Any]:
+    """Get a collection's configuration by name.
+
+    Returns the collection configuration with the workspace prefix removed.
+    """
     collection = acquire_collection(client, name, context)
     return await collection_to_config_dict(collection)
 
@@ -160,6 +196,10 @@ async def collections_get(
 async def collections_delete(
     client: WeaviateAsyncClient, name: str | list[str], context: dict = None
 ) -> None:
+    """Delete a collection or multiple collections by name.
+
+    Adds workspace prefix to collection names before deletion.
+    """
     collection_name = full_collection_name(name, context)
     await client.collections.delete(collection_name)
 
@@ -336,6 +376,10 @@ async def collection_data_exists(
 
 
 async def register_weaviate(server, service_id: str):
+    """Register the Weaviate service with the Hypha server.
+
+    Sets up all service endpoints for collections, data operations, and queries.
+    """
     register_weaviate_codecs(server)
     weaviate_url = "https://hypha-weaviate.scilifelab-2-dev.sys.kth.se"
     weaviate_grpc_url = "https://hypha-weaviate-grpc.scilifelab-2-dev.sys.kth.se"
