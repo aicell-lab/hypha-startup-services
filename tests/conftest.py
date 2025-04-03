@@ -4,17 +4,9 @@ import os
 import pytest_asyncio
 from dotenv import load_dotenv
 from hypha_rpc import connect_to_server
+from hypha_startup_services.start_weaviate_service import register_weaviate
 
 load_dotenv()
-
-
-def pytest_addoption(parser):
-    """Add command-line options for tests."""
-    parser.addoption(
-        "--service-id",
-        default="weaviate",
-        help="Service ID to use for connecting to Hypha service (default: weaviate)",
-    )
 
 
 async def get_server(server_url: str):
@@ -26,19 +18,19 @@ async def get_server(server_url: str):
             "token": token,
         }
     )
+    await register_weaviate(server, "weaviate-test")
 
     return server
 
 
 @pytest_asyncio.fixture
-async def weaviate_service(request):
+async def weaviate_service():
     """Fixture for connecting to the weaviate service.
 
     Use --service-id command-line option to override the default service ID.
     """
-    service_id = request.config.getoption("--service-id")
     server = await get_server("https://hypha.aicell.io")
-    service = await server.get_service(service_id)
+    service = await server.get_service("weaviate-test")
     yield service
     # Cleanup after tests
     try:
