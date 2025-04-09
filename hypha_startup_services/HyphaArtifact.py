@@ -71,6 +71,86 @@ class HyphaArtifact:
             f"{self.artifact_url}/{method_name}", params=extended_params, timeout=20
         )
 
+    def _remote_edit(
+        self: Self,
+        manifest: dict | None = None,
+        artifact_type: str | None = None,
+        permissions: dict | None = None,
+        config: dict | None = None,
+        secrets: dict | None = None,
+        version: str | None = None,
+        comment: str | None = None,
+        copy_files: bool | None = None,
+    ) -> None:
+        """Edits the artifact's metadata, including the manifest, type, and permissions.
+
+        Args:
+            self (Self): The instance of the HyphaArtifact class.
+            manifest (dict | None): Optional. The updated manifest.
+                Ensure the manifest follows the required schema
+                if applicable (e.g., for collections).
+            artifact_type (str | None): Optional. The type of the artifact.
+                Supported values are collection, generic and any other custom type.
+                By default, it's set to generic which contains fields tailored for
+                displaying the artifact as cards on a webpage.
+            permissions (dict | None): Optional. A dictionary containing user permissions.
+                For example {"*": "r+"} gives read and create access to everyone,
+                {"@": "rw+"} allows all authenticated users to read/write/create,
+                and {"user_id_1": "r+"} grants read and create permissions to a specific user.
+                You can also set permissions for specific operations,
+                such as {"user_id_1": ["read", "create"]}.
+                See detailed explanation about permissions below.
+            secrets (dict | None): Optional. A dictionary containing secrets to be stored
+                with the artifact. Secrets are encrypted and can only be accessed
+                by the artifact owner or users with appropriate permissions.
+                See the create function for a list of supported secrets.
+            config (dict | None): Optional. Optional. A dictionary containing additional
+                configuration options for the artifact.
+            version (str | None): Optional. Optional. The version of the artifact to edit.
+                By default, it set to None, the version will stay the same.
+                If you want to create a staged version, you can set it to "stage".
+                You can set it to any version in text, e.g. 0.1.0 or v1.
+                If you set it to "new", it will generate a version similar to v0, v1, etc.
+            comment (str | None): Optional. A comment to describe the changes made to the artifact.
+            copy_files (bool | None): Optional. A boolean flag indicating whether to copy files
+                from the previous version when creating a new staged version.
+                Default is None. Set to True to copy files from the previous version.
+        """
+
+        params = {
+            "manifest": manifest,
+            "artifact_type": artifact_type,
+            "permissions": permissions,
+            "config": config,
+            "secrets": secrets,
+            "version": version,
+            "comment": comment,
+            "copy_files": copy_files,
+        }
+        self._remote_post("edit", params)
+
+    def _remote_commit(
+        self: Self, version: str | None = None, comment: str | None = None
+    ) -> None:
+        """Finalizes and commits an artifact's staged changes.
+            Validates uploaded files and commits the staged manifest.
+            This process also updates view and download statistics.
+
+        Args:
+            self (Self): The instance of the HyphaArtifact class.
+            version (str | None): Optional. The version of the artifact to edit.
+                By default, it set to None, the version will stay the same.
+                If you want to create a staged version, you can set it to "stage".
+                You can set it to any version in text, e.g. 0.1.0 or v1. If you set it to new,
+                it will generate a version similar to v0, v1, etc.
+            comment (str | None): Optional. A comment to describe the changes made to the artifact.
+        """
+        params = {
+            "version": version,
+            "comment": comment,
+        }
+        self._remote_post("commit", params)
+
     def _remote_put_file(
         self: Self,
         file_path: str,
