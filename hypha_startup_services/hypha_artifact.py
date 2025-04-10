@@ -12,7 +12,6 @@ import os
 import sys
 import asyncio
 import logging
-from logging import Logger
 from typing import Literal, Self, overload
 import jwt
 from dotenv import load_dotenv
@@ -99,7 +98,7 @@ class WithHTTPFile(io.IOBase):
     def _upload_to_s3(self, content):
         """Handle upload specifically for S3 pre-signed URLs"""
         try:
-            logger.info(f"Uploading {len(content)} bytes to S3 URL")
+            logger.info("Uploading %d bytes to S3 URL", len(content))
 
             # S3 pre-signed URLs require specific headers
             headers = {
@@ -114,14 +113,16 @@ class WithHTTPFile(io.IOBase):
 
             if response.status_code >= 400:
                 logger.error(
-                    f"S3 upload failed with status {response.status_code}: {response.text}"
+                    "S3 upload failed with status %s: %s",
+                    response.status_code,
+                    response.text,
                 )
 
             response.raise_for_status()
             logger.info("S3 upload completed successfully")
             return response
         except Exception as e:
-            logger.error(f"S3 upload error: {str(e)}")
+            logger.error("S3 upload error: %s", str(e))
             raise IOError(f"Error uploading to S3: {str(e)}") from e
 
     def _upload_content(self):
@@ -135,7 +136,7 @@ class WithHTTPFile(io.IOBase):
 
             headers = {"Content-Type": "application/octet-stream"}
             logger.debug(
-                f"Uploading content to {self._url} using {self._upload_method}"
+                "Uploading content to %s using %s", self._url, self._upload_method
             )
 
             if self._upload_method == "PUT":
@@ -286,20 +287,12 @@ class HyphaArtifact:
         self.workspace_id = ws_from_token(self.token)
         self.artifact_url = "https://hypha.aicell.io/public/services/artifact-manager"
 
-        # Check if the artifact exists by default
-        try:
-            self._remote_get("list_files", {"file_path": "/"})
-            logger.info(f"Successfully connected to artifact: {artifact_id}")
-        except Exception as e:
-            logger.warning(
-                f"Could not verify artifact existence: {str(e)}. Operations may fail if the artifact doesn't exist."
-            )
-
     def _extend_params(
         self: Self,
         params: dict[str, JsonType],
     ) -> dict[str, JsonType]:
-        params["artifact_id"] = f"{self.workspace_id}/{self.artifact_id}"
+        params["artifact_id"] = self.artifact_id
+        params["workspace"] = self.workspace_id
 
         return params
 
@@ -311,9 +304,6 @@ class HyphaArtifact:
             For other requests, returns the response content.
         """
         extended_params = self._extend_params(params)
-        logger.debug(
-            f"Making POST request to {method_name} with params: {extended_params}"
-        )
 
         response = requests.post(
             f"{self.artifact_url}/{method_name}",
@@ -324,10 +314,6 @@ class HyphaArtifact:
 
         response.raise_for_status()
 
-        # For debugging
-        if method_name != "put_file":  # Avoid printing long URLs
-            print(response.content)
-
         # Handle put_file specially to return the URL string
         if method_name == "put_file":
             try:
@@ -336,8 +322,7 @@ class HyphaArtifact:
                 if isinstance(url_data, dict) and "url" in url_data:
                     return url_data["url"]
                 return url_data
-            except:
-                # If not JSON, it's likely the URL is directly returned as a string
+            except Exception as e:
                 return response.content.decode("utf-8").strip('"')
 
         return response.content
@@ -352,7 +337,6 @@ class HyphaArtifact:
         )
 
         response.raise_for_status()
-        print(response.content)
         return response.content
 
     def _remote_edit(
@@ -461,14 +445,8 @@ class HyphaArtifact:
         if download_weight is not None:
             params["download_weight"] = download_weight
 
-        try:
-            logger.debug(f"Requesting pre-signed URL for path: {file_path}")
-            response = self._remote_post("put_file", params)
-            logger.debug(f"Received pre-signed URL response: {response}")
-            return response
-        except Exception as e:
-            logger.error(f"Error generating pre-signed URL for {file_path}: {str(e)}")
-            raise
+        response = self._remote_post("put_file", params)
+        return response.text
 
     def _remote_remove_file(
         self: Self,
@@ -1060,13 +1038,10 @@ class HyphaArtifact:
         """Put the artifact in staging mode if it's not already."""
         self._remote_edit(
             version="stage",
-            comment="Preparing artifact for upload",
         )
 
 
-async def create_artifact(
-    artifact_id: str, token: str, workspace_id: str, server_url: str
-) -> bool:
+async def create_artifact(artifact_id: str, token: str, server_url: str) -> bool:
     """Create a new artifact in Hypha.
 
     Parameters
@@ -1075,9 +1050,7 @@ async def create_artifact(
         The identifier for the new artifact
     token: str
         Authorization token for Hypha
-    workspace_id: str
-        The workspace ID where the artifact will be created
-    server_url: str
+     server_url: str
         The base URL of the Hypha server
 
     Returns
@@ -1122,15 +1095,11 @@ async def create_artifact(
         return False
 
 
-def create_artifact_sync(
-    artifact_id: str, token: str, workspace_id: str, server_url: str
-) -> bool:
+def create_artifact_sync(artifact_id: str, token: str, server_url: str) -> bool:
     """Synchronous wrapper for create_artifact function"""
     loop = asyncio.new_event_loop()
     try:
-        return loop.run_until_complete(
-            create_artifact(artifact_id, token, workspace_id, server_url)
-        )
+        return loop.run_until_complete(create_artifact(artifact_id, token, server_url))
     finally:
         loop.close()
 
@@ -1156,9 +1125,7 @@ if __name__ == "__main__":
         exit(1)
 
     # Initialize artifact object
-    print(f"Initializing connection to artifact '{artifact_id}'...")
     artifact = HyphaArtifact(artifact_id)
-    workspace_id = artifact.workspace_id
     server_url = artifact.artifact_url
 
     # Check if the artifact exists by trying to list files
@@ -1175,26 +1142,25 @@ if __name__ == "__main__":
         artifact_exists = False
 
     # Create artifact only if it doesn't exist
-    if not artifact_exists:
-        print(f"Creating new artifact '{artifact_id}'...")
-        try:
-            success = create_artifact_sync(
-                artifact_id=artifact_id,
-                token=token,
-                workspace_id=workspace_id,
-                server_url=server_url,
-            )
-            if success:
-                print(f"Successfully created artifact '{artifact_id}'")
-            else:
-                print(f"Failed to create artifact '{artifact_id}'")
-                sys.exit(1)
-        except Exception as e:
-            if "already exists" in str(e):
-                print(f"Artifact '{artifact_id}' already exists, using it.")
-            else:
-                print(f"Error creating artifact: {e}")
-                sys.exit(1)
+    # if not artifact_exists:
+    #     print(f"Creating new artifact '{artifact_id}'...")
+    #     try:
+    #         success = create_artifact_sync(
+    #             artifact_id=artifact_id,
+    #             token=token,
+    #             server_url=server_url,
+    #         )
+    #         if success:
+    #             print(f"Successfully created artifact '{artifact_id}'")
+    #         else:
+    #             print(f"Failed to create artifact '{artifact_id}'")
+    #             sys.exit(1)
+    #     except Exception as e:
+    #         if "already exists" in str(e):
+    #             print(f"Artifact '{artifact_id}' already exists, using it.")
+    #         else:
+    #             print(f"Error creating artifact: {e}")
+    #             sys.exit(1)
 
     # Clear existing event loops and create a fresh one for our operations
     loop = asyncio.new_event_loop()
