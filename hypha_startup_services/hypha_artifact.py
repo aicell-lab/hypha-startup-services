@@ -6,9 +6,26 @@ using the fsspec specification, allowing for operations like reading, writing, l
 and manipulating files stored in Hypha artifacts.
 """
 
+import io
+import locale
+import os
+import sys
+import asyncio
+import logging
+from logging import Logger
 from typing import Literal, Self, overload
-from imjoy_rpc.utils import HTTPFile
+import jwt
+from dotenv import load_dotenv
 import requests
+from hypha_rpc import connect_to_server
+
+# Set up logger
+logger = logging.getLogger("hypha_artifact")
+handler = logging.StreamHandler()
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
 
 type OnError = Literal["raise", "ignore"]
 type JsonType = str | int | float | bool | None | dict[str, "JsonType"] | list[
@@ -18,11 +35,19 @@ type FileMode = Literal["r", "rb", "w", "wb", "a", "ab"]
 type UploadMethod = Literal["POST", "PUT"]
 
 
-class WithHTTPFile(HTTPFile):
-    """A file-like object that supports async context manager protocol.
+def ws_from_token(token: str) -> str:
+    """Extracts the workspace ID from the token."""
+    decoded_token = jwt.decode(token, options={"verify_signature": False})
+    scope = decoded_token.get("scope", "")
+    workspace_parts = [part for part in scope.split() if part.startswith("ws:")]
+    return workspace_parts[0].split(":", 1)[1].split("#", 1)[0]
 
-    This extends the HTTPFile class to add support for async context managers,
-    allowing the file to be used in async with statements.
+
+class WithHTTPFile(io.IOBase):
+    """A file-like object that supports both sync and async context manager protocols.
+
+    This implements a file interface for Hypha artifacts, handling HTTP operations
+    via the requests library instead of relying on Pyodide.
     """
 
     def __init__(
@@ -34,19 +59,210 @@ class WithHTTPFile(HTTPFile):
         name: str | None = None,
         upload_method: UploadMethod = "POST",
     ):
-        super().__init__(
-            url=url,
-            mode=mode,
-            encoding=encoding,
-            newline=newline,
-            name=name,
-            upload_method=upload_method,
-        )
+        self._url = url
+        self._pos = 0
+        self._mode = mode
+        self._encoding = encoding or locale.getpreferredencoding()
+        self._newline = newline or os.linesep
+        self.name = name
+        self._upload_method = upload_method
+        self._closed = False
+        self._buffer = io.BytesIO()
+
+        if "r" in mode:
+            # For read mode, download the content immediately
+            self._download_content()
+            self._size = len(self._buffer.getvalue())
+        else:
+            # For write modes, initialize an empty buffer
+            self._size = 0
+
+    def _download_content(self):
+        """Download content from URL into buffer"""
+        try:
+            headers = {}
+            response = requests.get(self._url, headers=headers, timeout=60)
+            response.raise_for_status()
+            self._buffer = io.BytesIO(response.content)
+        except requests.exceptions.RequestException as e:
+            # More detailed error information for debugging
+            status_code = (
+                e.response.status_code if hasattr(e, "response") else "unknown"
+            )
+            message = str(e)
+            raise IOError(
+                f"Error downloading content (status {status_code}): {message}"
+            ) from e
+        except Exception as e:
+            raise IOError(f"Unexpected error downloading content: {str(e)}") from e
+
+    def _upload_to_s3(self, content):
+        """Handle upload specifically for S3 pre-signed URLs"""
+        try:
+            logger.info(f"Uploading {len(content)} bytes to S3 URL")
+
+            # S3 pre-signed URLs require specific headers
+            headers = {
+                "Content-Type": "application/octet-stream",
+                "Content-Length": str(len(content)),
+            }
+
+            # Always use PUT for S3 pre-signed URLs
+            response = requests.put(
+                self._url, data=content, headers=headers, timeout=60
+            )
+
+            if response.status_code >= 400:
+                logger.error(
+                    f"S3 upload failed with status {response.status_code}: {response.text}"
+                )
+
+            response.raise_for_status()
+            logger.info("S3 upload completed successfully")
+            return response
+        except Exception as e:
+            logger.error(f"S3 upload error: {str(e)}")
+            raise IOError(f"Error uploading to S3: {str(e)}") from e
+
+    def _upload_content(self):
+        """Upload buffer content to URL"""
+        try:
+            content = self._buffer.getvalue()
+
+            # Check if this is an S3 URL
+            if "s3.amazonaws.com" in self._url or ".s3." in self._url:
+                return self._upload_to_s3(content)
+
+            headers = {"Content-Type": "application/octet-stream"}
+            logger.debug(
+                f"Uploading content to {self._url} using {self._upload_method}"
+            )
+
+            if self._upload_method == "PUT":
+                response = requests.put(
+                    self._url, data=content, headers=headers, timeout=60
+                )
+            else:  # Default to POST
+                files = {"file": ("blob", content, "application/octet-stream")}
+                response = requests.post(self._url, files=files, timeout=60)
+
+            if response.status_code >= 400:
+                logger.error(
+                    f"Upload failed with status {response.status_code}: {response.text}"
+                )
+
+            response.raise_for_status()
+            return response
+        except requests.exceptions.HTTPError as e:
+            status_code = (
+                e.response.status_code if hasattr(e, "response") else "unknown"
+            )
+            error_msg = e.response.text if hasattr(e, "response") else str(e)
+            raise IOError(
+                f"HTTP error uploading content (status {status_code}): {error_msg}"
+            ) from e
+        except Exception as e:
+            raise IOError(f"Error uploading content: {str(e)}") from e
+
+    def tell(self):
+        """Return current position in the file"""
+        return self._pos
+
+    def seek(self, offset, whence=0):
+        """Change stream position"""
+        if whence == 0:  # os.SEEK_SET
+            self._pos = offset
+        elif whence == 1:  # os.SEEK_CUR
+            self._pos += offset
+        elif whence == 2:  # os.SEEK_END
+            self._pos = self._size + offset
+
+        # Make sure buffer's position is synced
+        self._buffer.seek(self._pos)
+        return self._pos
+
+    def read(self, size=-1):
+        """Read up to size bytes from the file"""
+        if "r" not in self._mode:
+            raise IOError("File not open for reading")
+
+        self._buffer.seek(self._pos)
+        if size < 0:
+            data = self._buffer.read()
+        else:
+            data = self._buffer.read(size)
+
+        self._pos = self._buffer.tell()
+
+        if "b" not in self._mode:
+            return data.decode(self._encoding)
+        return data
+
+    def write(self, data):
+        """Write data to the file"""
+        if "w" not in self._mode and "a" not in self._mode:
+            raise IOError("File not open for writing")
+
+        # Convert string to bytes if necessary
+        if isinstance(data, str) and "b" in self._mode:
+            data = data.encode(self._encoding)
+        elif isinstance(data, bytes) and "b" not in self._mode:
+            data = data.decode(self._encoding)
+            data = data.encode(self._encoding)
+
+        # Ensure we're at the right position
+        self._buffer.seek(self._pos)
+
+        # Write the data
+        if isinstance(data, str):
+            bytes_written = self._buffer.write(data.encode(self._encoding))
+        else:
+            bytes_written = self._buffer.write(data)
+
+        self._pos = self._buffer.tell()
+        if self._pos > self._size:
+            self._size = self._pos
+
+        return bytes_written
+
+    def readable(self):
+        """Return whether the file is readable"""
+        return "r" in self._mode
+
+    def writable(self):
+        """Return whether the file is writable"""
+        return "w" in self._mode or "a" in self._mode
+
+    def seekable(self):
+        """Return whether the file is seekable"""
+        return True
+
+    def close(self):
+        """Close the file and upload content if in write mode"""
+        if self._closed:
+            return
+
+        try:
+            if "w" in self._mode or "a" in self._mode:
+                self._upload_content()
+        finally:
+            self._closed = True
+            self._buffer.close()
+
+    def __enter__(self: Self) -> Self:
+        """Enter context manager"""
+        return self
+
+    def __exit__(self: Self, exc_type, exc_val, exc_tb) -> None:
+        """Exit context manager"""
+        self.close()
 
     def __aenter__(self: Self) -> Self:
+        """Enter async context manager"""
         return self
 
     def __aexit__(self: Self, exc_type, exc_val, exc_tb) -> None:
+        """Exit async context manager"""
         self.close()
 
 
@@ -64,33 +280,80 @@ class HyphaArtifact:
         artifact_id: str
             The identifier of the Hypha artifact to interact with
         """
+        load_dotenv()
         self.artifact_id = artifact_id
-        self.token = "test-token"
-        self.workspace_id = "test-workspace-id"
+        self.token = os.getenv("PERSONAL_TOKEN")
+        self.workspace_id = ws_from_token(self.token)
         self.artifact_url = "https://hypha.aicell.io/public/services/artifact-manager"
+
+        # Check if the artifact exists by default
+        try:
+            self._remote_get("list_files", {"file_path": "/"})
+            logger.info(f"Successfully connected to artifact: {artifact_id}")
+        except Exception as e:
+            logger.warning(
+                f"Could not verify artifact existence: {str(e)}. Operations may fail if the artifact doesn't exist."
+            )
 
     def _extend_params(
         self: Self,
         params: dict[str, JsonType],
     ) -> dict[str, JsonType]:
         params["artifact_id"] = f"{self.workspace_id}/{self.artifact_id}"
-        params["token"] = self.token
 
         return params
 
-    def _remote_post(self: Self, method_name: str, params: dict[str, JsonType]) -> None:
+    def _remote_post(self: Self, method_name: str, params: dict[str, JsonType]) -> str:
+        """Make a POST request to the artifact service with extended parameters.
+
+        Returns:
+            For put_file requests, returns the pre-signed URL as a string.
+            For other requests, returns the response content.
+        """
         extended_params = self._extend_params(params)
-        return requests.post(
+        logger.debug(
+            f"Making POST request to {method_name} with params: {extended_params}"
+        )
+
+        response = requests.post(
             f"{self.artifact_url}/{method_name}",
             params=extended_params,
-            timeout=20,
+            headers={"Authorization": f"Bearer {self.token}"},
+            timeout=60,  # Increased timeout
         )
+
+        response.raise_for_status()
+
+        # For debugging
+        if method_name != "put_file":  # Avoid printing long URLs
+            print(response.content)
+
+        # Handle put_file specially to return the URL string
+        if method_name == "put_file":
+            try:
+                # Try to decode as JSON first
+                url_data = response.json()
+                if isinstance(url_data, dict) and "url" in url_data:
+                    return url_data["url"]
+                return url_data
+            except:
+                # If not JSON, it's likely the URL is directly returned as a string
+                return response.content.decode("utf-8").strip('"')
+
+        return response.content
 
     def _remote_get(self: Self, method_name: str, params: dict[str, JsonType]) -> None:
         extended_params = self._extend_params(params)
-        return requests.get(
-            f"{self.artifact_url}/{method_name}", params=extended_params, timeout=20
+        response = requests.get(
+            f"{self.artifact_url}/{method_name}",
+            params=extended_params,
+            headers={"Authorization": f"Bearer {self.token}"},
+            timeout=20,
         )
+
+        response.raise_for_status()
+        print(response.content)
+        return response.content
 
     def _remote_edit(
         self: Self,
@@ -193,9 +456,19 @@ class HyphaArtifact:
         """
         params = {
             "file_path": file_path,
-            "download_weight": download_weight,
         }
-        return self._remote_post("put_file", params)
+        # Only include download_weight if it's not None
+        if download_weight is not None:
+            params["download_weight"] = download_weight
+
+        try:
+            logger.debug(f"Requesting pre-signed URL for path: {file_path}")
+            response = self._remote_post("put_file", params)
+            logger.debug(f"Received pre-signed URL response: {response}")
+            return response
+        except Exception as e:
+            logger.error(f"Error generating pre-signed URL for {file_path}: {str(e)}")
+            raise
 
     def _remote_remove_file(
         self: Self,
@@ -782,3 +1055,244 @@ class HyphaArtifact:
             Sizes of the files in bytes
         """
         return [self.size(path) for path in paths]
+
+    def prepare_for_upload(self):
+        """Put the artifact in staging mode if it's not already."""
+        self._remote_edit(
+            version="stage",
+            comment="Preparing artifact for upload",
+        )
+
+
+async def create_artifact(
+    artifact_id: str, token: str, workspace_id: str, server_url: str
+) -> bool:
+    """Create a new artifact in Hypha.
+
+    Parameters
+    ----------
+    artifact_id: str
+        The identifier for the new artifact
+    token: str
+        Authorization token for Hypha
+    workspace_id: str
+        The workspace ID where the artifact will be created
+    server_url: str
+        The base URL of the Hypha server
+
+    Returns
+    -------
+    bool
+        True if artifact was created successfully, False otherwise
+    """
+    try:
+        # Connect to the Hypha server
+        api = await connect_to_server(
+            {
+                "name": "artifact-client",
+                "server_url": server_url.rsplit("/public/services/artifact-manager", 1)[
+                    0
+                ],
+                "token": token,
+            }
+        )
+
+        # Get the artifact manager service
+        artifact_manager = await api.get_service("public/artifact-manager")
+
+        # Create the artifact
+        manifest = {
+            "name": artifact_id,
+            "description": f"Artifact created programmatically: {artifact_id}",
+        }
+
+        await artifact_manager.create(
+            alias=artifact_id,
+            type="generic",
+            manifest=manifest,
+            config={"permissions": {"*": "r+", "@": "rw+"}},
+        )
+
+        # Disconnect from the server
+        await api.disconnect()
+        return True
+
+    except Exception as e:
+        print(f"Failed to create artifact: {e}")
+        return False
+
+
+def create_artifact_sync(
+    artifact_id: str, token: str, workspace_id: str, server_url: str
+) -> bool:
+    """Synchronous wrapper for create_artifact function"""
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(
+            create_artifact(artifact_id, token, workspace_id, server_url)
+        )
+    finally:
+        loop.close()
+
+
+if __name__ == "__main__":
+    import sys
+    import signal
+
+    # Set up clean shutdown for asyncio tasks
+    def signal_handler(sig, frame):
+        print("Shutting down gracefully...")
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, signal_handler)
+
+    artifact_id = "example_artifact"
+    load_dotenv()  # Load token from .env file
+    token = os.getenv("PERSONAL_TOKEN")
+
+    if not token:
+        print("ERROR: No PERSONAL_TOKEN found in environment variables")
+        print("Please create a .env file with your PERSONAL_TOKEN")
+        exit(1)
+
+    # Initialize artifact object
+    print(f"Initializing connection to artifact '{artifact_id}'...")
+    artifact = HyphaArtifact(artifact_id)
+    workspace_id = artifact.workspace_id
+    server_url = artifact.artifact_url
+
+    # Check if the artifact exists by trying to list files
+    print(f"Checking if artifact '{artifact_id}' exists...")
+    try:
+        # Try a simple operation to check if artifact exists and is accessible
+        files = artifact.ls("/")
+        print(f"Artifact '{artifact_id}' already exists. Found {len(files)} files.")
+        artifact_exists = True
+    except Exception as e:
+        print(
+            f"Artifact '{artifact_id}' does not exist or is not accessible. Will try to create it."
+        )
+        artifact_exists = False
+
+    # Create artifact only if it doesn't exist
+    if not artifact_exists:
+        print(f"Creating new artifact '{artifact_id}'...")
+        try:
+            success = create_artifact_sync(
+                artifact_id=artifact_id,
+                token=token,
+                workspace_id=workspace_id,
+                server_url=server_url,
+            )
+            if success:
+                print(f"Successfully created artifact '{artifact_id}'")
+            else:
+                print(f"Failed to create artifact '{artifact_id}'")
+                sys.exit(1)
+        except Exception as e:
+            if "already exists" in str(e):
+                print(f"Artifact '{artifact_id}' already exists, using it.")
+            else:
+                print(f"Error creating artifact: {e}")
+                sys.exit(1)
+
+    # Clear existing event loops and create a fresh one for our operations
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    # Proceed with file operations
+    print("\n--- File Operations ---")
+
+    # Create test file
+    print("Creating test file...")
+    try:
+        # First, prepare the artifact for upload (put it in staging mode)
+        print("Putting artifact in staging mode...")
+        artifact.prepare_for_upload()
+
+        # Now try to upload the file
+        with artifact.open("/example_file.txt", "w") as f:
+            f.write("This is a test file")
+        print("✓ Successfully created test file")
+    except Exception as e:
+        print(f"✗ Failed to create test file: {str(e)}")
+        sys.exit(1)
+
+    # List files
+    print("\nListing files:")
+    try:
+        files = artifact.ls("/")
+        if files:
+            for file in files:
+                print(f"- {file.get('name', 'Unknown')}")
+        else:
+            print("No files found")
+        print("✓ Successfully listed files")
+    except Exception as e:
+        print(f"✗ Failed to list files: {str(e)}")
+
+    # Read file content
+    print("\nReading file content:")
+    try:
+        content = artifact.cat("/example_file.txt")
+        print(f"Content: {content}")
+        print("✓ Successfully read file content")
+    except Exception as e:
+        print(f"✗ Failed to read file content: {str(e)}")
+
+    # Copy file
+    print("\nCopying file...")
+    try:
+        artifact.copy("/example_file.txt", "/copy_of_example_file.txt")
+        print("✓ Successfully copied file")
+    except Exception as e:
+        print(f"✗ Failed to copy file: {str(e)}")
+
+    # Check file existence
+    print("\nChecking if files exist:")
+    try:
+        original_exists = artifact.exists("/example_file.txt")
+        copy_exists = artifact.exists("/copy_of_example_file.txt")
+        print(f"Original file exists: {original_exists}")
+        print(f"Copied file exists: {copy_exists}")
+        print("✓ Successfully checked file existence")
+    except Exception as e:
+        print(f"✗ Failed to check file existence: {str(e)}")
+
+    # Remove copied file
+    print("\nRemoving copied file...")
+    try:
+        artifact.rm("/copy_of_example_file.txt")
+        print("✓ Successfully removed copied file")
+    except Exception as e:
+        print(f"✗ Failed to remove copied file: {str(e)}")
+
+    # Final check
+    print("\nVerifying final state:")
+    try:
+        original_exists = artifact.exists("/example_file.txt")
+        copy_exists = artifact.exists("/copy_of_example_file.txt")
+        print(f"Original file exists: {original_exists}")
+        print(f"Copied file exists: {copy_exists} (should be False)")
+
+        if original_exists and not copy_exists:
+            print("\n✓ All operations completed successfully!")
+        else:
+            print("\n✗ Some operations didn't complete as expected.")
+    except Exception as e:
+        print(f"✗ Failed during final verification: {str(e)}")
+
+    # Clean up any remaining asyncio resources
+    pending = asyncio.all_tasks(loop)
+    for task in pending:
+        task.cancel()
+
+    try:
+        # Give tasks a chance to properly cancel
+        if pending:
+            loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+        loop.close()
+    except Exception:
+        pass
+
+    print("\nScript completed.")
