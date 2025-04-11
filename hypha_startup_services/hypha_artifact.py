@@ -1030,9 +1030,7 @@ async def create_artifact(artifact_id: str, token: str, server_url: str) -> bool
         api = await connect_to_server(
             {
                 "name": "artifact-client",
-                "server_url": server_url.rsplit("/public/services/artifact-manager", 1)[
-                    0
-                ],
+                "server_url": "https://hypha.aicell.io",
                 "token": token,
             }
         )

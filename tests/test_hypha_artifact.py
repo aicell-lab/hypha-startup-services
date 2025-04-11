@@ -9,8 +9,10 @@ against an actual Hypha artifact service.
 import os
 import uuid
 import pytest
+import asyncio
 from dotenv import load_dotenv
 from hypha_startup_services.hypha_artifact import HyphaArtifact
+from hypha_rpc import connect_to_server
 
 # Load environment variables from .env file
 load_dotenv()
@@ -28,13 +30,53 @@ def artifact_name():
     return f"test_artifact_{uuid.uuid4().hex[:8]}"
 
 
+async def create_artifact(artifact_id: str, token: str):
+    api = await connect_to_server(
+        {
+            "name": "artifact-client",
+            "server_url": "https://hypha.aicell.io",
+            "token": token,
+        }
+    )
+
+    # Get the artifact manager service
+    artifact_manager = await api.get_service("public/artifact-manager")
+
+    # Create the artifact
+    manifest = {
+        "name": artifact_id,
+        "description": f"Artifact created programmatically: {artifact_id}",
+    }
+
+    await artifact_manager.create(
+        alias=artifact_id,
+        type="generic",
+        manifest=manifest,
+        config={"permissions": {"*": "rw+", "@": "rw+"}},
+    )
+
+    # Disconnect from the server
+    await api.disconnect()
+
+
+def create_artifact_sync(artifact_id: str, token: str) -> bool:
+    """Synchronous wrapper for create_artifact function"""
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(create_artifact(artifact_id, token))
+    finally:
+        loop.close()
+
+
 @pytest.fixture(scope="module")
 def artifact(artifact_name):
     """Create a test artifact with a real connection to Hypha."""
-    artifact = HyphaArtifact(artifact_name)
-    print(f"Created test artifact: {artifact_name}")
-    return artifact
 
+    create_artifact_sync(artifact_name, os.getenv("PERSONAL_TOKEN"))
+    _artifact = HyphaArtifact(artifact_name)
+    print(f"Created test artifact: {artifact_name}")
+    return _artifact
+ä'äö
 
 @pytest.fixture
 def test_content():
