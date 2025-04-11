@@ -638,9 +638,9 @@ class HyphaArtifact:
                 # Copy a single file
                 self._copy_single_file(path1, path2)
         finally:
-            # print(self.info(path1))
+            print(self.info(path1))
             self._remote_commit(version="new")
-            # print(self.info(path1))
+            print(self.info(path1))
 
     def _copy_single_file(self, src: str, dst: str) -> None:
         """Helper method to copy a single file"""
@@ -1107,24 +1107,24 @@ def main():
 
     # Create artifact only if it doesn't exist
     # if not artifact_exists:
-    print(f"Creating new artifact '{artifact_alias}'...")
-    try:
-        success = create_artifact_sync(
-            artifact_id=artifact_alias,
-            token=token,
-            server_url=server_url,
-        )
-        if success:
-            print(f"Successfully created artifact '{artifact_alias}'")
-        else:
-            print(f"Failed to create artifact '{artifact_alias}'")
-            sys.exit(1)
-    except Exception as e:
-        if "already exists" in str(e):
-            print(f"Artifact '{artifact_alias}' already exists, using it.")
-        else:
-            print(f"Error creating artifact: {e}")
-            sys.exit(1)
+    # print(f"Creating new artifact '{artifact_alias}'...")
+    # try:
+    #     success = create_artifact_sync(
+    #         artifact_id=artifact_alias,
+    #         token=token,
+    #         server_url=server_url,
+    #     )
+    #     if success:
+    #         print(f"Successfully created artifact '{artifact_alias}'")
+    #     else:
+    #         print(f"Failed to create artifact '{artifact_alias}'")
+    #         sys.exit(1)
+    # except Exception as e:
+    #     if "already exists" in str(e):
+    #         print(f"Artifact '{artifact_alias}' already exists, using it.")
+    #     else:
+    #         print(f"Error creating artifact: {e}")
+    #         sys.exit(1)
 
     # Clear existing event loops and create a fresh one for our operations
     loop = asyncio.new_event_loop()
