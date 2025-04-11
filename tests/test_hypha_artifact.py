@@ -76,7 +76,7 @@ def artifact(artifact_name):
     _artifact = HyphaArtifact(artifact_name)
     print(f"Created test artifact: {artifact_name}")
     return _artifact
-ä'äö
+
 
 @pytest.fixture
 def test_content():
