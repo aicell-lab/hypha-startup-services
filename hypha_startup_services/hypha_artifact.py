@@ -6,32 +6,26 @@ using the fsspec specification, allowing for operations like reading, writing, l
 and manipulating files stored in Hypha artifacts.
 """
 
+import sys
+import signal
 import io
 import locale
 import os
-import sys
+from functools import partial
+import json
+from collections.abc import Callable
 import asyncio
-import logging
 from typing import Literal, Self, overload
 import jwt
 from dotenv import load_dotenv
 import requests
 from hypha_rpc import connect_to_server
 
-# Set up logger
-logger = logging.getLogger("hypha_artifact")
-handler = logging.StreamHandler()
-formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-handler.setFormatter(formatter)
-logger.addHandler(handler)
-logger.setLevel(logging.INFO)
-
 type OnError = Literal["raise", "ignore"]
 type JsonType = str | int | float | bool | None | dict[str, "JsonType"] | list[
     "JsonType"
 ]
 type FileMode = Literal["r", "rb", "w", "wb", "a", "ab"]
-type UploadMethod = Literal["POST", "PUT"]
 
 
 def ws_from_token(token: str) -> str:
@@ -42,12 +36,34 @@ def ws_from_token(token: str) -> str:
     return workspace_parts[0].split(":", 1)[1].split("#", 1)[0]
 
 
-class WithHTTPFile(io.IOBase):
+def remove_none(d: dict) -> dict:
+    """Remove None values from a dictionary."""
+    return {k: v for k, v in d.items() if v is not None}
+
+
+def clean_url(url: str | bytes) -> str:
+    """Clean the URL by removing surrounding quotes and converting to string if needed."""
+    if isinstance(url, bytes):
+        url = url.decode("utf-8")
+    return url.strip("\"'")
+
+
+def parent_and_filename(path: str) -> str | None:
+    """Get the parent directory of a path"""
+    parts = path.rstrip("/").split("/")
+    if len(parts) == 1:
+        return None, parts[-1]  # Root directory
+    return "/".join(parts[:-1]), parts[-1]
+
+
+class ArtifactHttpFile(io.IOBase):
     """A file-like object that supports both sync and async context manager protocols.
 
     This implements a file interface for Hypha artifacts, handling HTTP operations
     via the requests library instead of relying on Pyodide.
     """
+
+    _on_close: Callable | None = None
 
     def __init__(
         self: Self,
@@ -56,15 +72,13 @@ class WithHTTPFile(io.IOBase):
         encoding: str | None = None,
         newline: str | None = None,
         name: str | None = None,
-        upload_method: UploadMethod = "POST",
-    ):
+    ) -> None:
         self._url = url
         self._pos = 0
         self._mode = mode
         self._encoding = encoding or locale.getpreferredencoding()
         self._newline = newline or os.linesep
         self.name = name
-        self._upload_method = upload_method
         self._closed = False
         self._buffer = io.BytesIO()
 
@@ -76,11 +90,26 @@ class WithHTTPFile(io.IOBase):
             # For write modes, initialize an empty buffer
             self._size = 0
 
-    def _download_content(self):
+    @property
+    def on_close(self: Self) -> Callable | None:
+        """Get the on_close callback function."""
+        return self._on_close
+
+    @on_close.setter
+    def on_close(self: Self, func: Callable | None) -> None:
+        """Set the on_close callback function."""
+        if func is not None and not isinstance(func, Callable):
+            raise ValueError("on_close must be a callable function")
+        self._on_close = func
+
+    def _download_content(self: Self) -> None:
         """Download content from URL into buffer"""
         try:
+            # Clean the URL by removing any surrounding quotes and converting to string if needed
+            cleaned_url = clean_url(self._url)
+
             headers = {}
-            response = requests.get(self._url, headers=headers, timeout=60)
+            response = requests.get(cleaned_url, headers=headers, timeout=60)
             response.raise_for_status()
             self._buffer = io.BytesIO(response.content)
         except requests.exceptions.RequestException as e:
@@ -95,62 +124,21 @@ class WithHTTPFile(io.IOBase):
         except Exception as e:
             raise IOError(f"Unexpected error downloading content: {str(e)}") from e
 
-    def _upload_to_s3(self, content):
-        """Handle upload specifically for S3 pre-signed URLs"""
+    def _upload_content(self: Self) -> requests.Response:
+        """Upload buffer content to URL"""
         try:
-            logger.info("Uploading %d bytes to S3 URL", len(content))
+            content = self._buffer.getvalue()
 
-            # S3 pre-signed URLs require specific headers
+            cleaned_url = clean_url(self._url)
+
             headers = {
                 "Content-Type": "application/octet-stream",
                 "Content-Length": str(len(content)),
             }
 
-            # Always use PUT for S3 pre-signed URLs
             response = requests.put(
-                self._url, data=content, headers=headers, timeout=60
+                cleaned_url, data=content, headers=headers, timeout=60
             )
-
-            if response.status_code >= 400:
-                logger.error(
-                    "S3 upload failed with status %s: %s",
-                    response.status_code,
-                    response.text,
-                )
-
-            response.raise_for_status()
-            logger.info("S3 upload completed successfully")
-            return response
-        except Exception as e:
-            logger.error("S3 upload error: %s", str(e))
-            raise IOError(f"Error uploading to S3: {str(e)}") from e
-
-    def _upload_content(self):
-        """Upload buffer content to URL"""
-        try:
-            content = self._buffer.getvalue()
-
-            # Check if this is an S3 URL
-            if "s3.amazonaws.com" in self._url or ".s3." in self._url:
-                return self._upload_to_s3(content)
-
-            headers = {"Content-Type": "application/octet-stream"}
-            logger.debug(
-                "Uploading content to %s using %s", self._url, self._upload_method
-            )
-
-            if self._upload_method == "PUT":
-                response = requests.put(
-                    self._url, data=content, headers=headers, timeout=60
-                )
-            else:  # Default to POST
-                files = {"file": ("blob", content, "application/octet-stream")}
-                response = requests.post(self._url, files=files, timeout=60)
-
-            if response.status_code >= 400:
-                logger.error(
-                    f"Upload failed with status {response.status_code}: {response.text}"
-                )
 
             response.raise_for_status()
             return response
@@ -165,11 +153,11 @@ class WithHTTPFile(io.IOBase):
         except Exception as e:
             raise IOError(f"Error uploading content: {str(e)}") from e
 
-    def tell(self):
+    def tell(self: Self) -> int:
         """Return current position in the file"""
         return self._pos
 
-    def seek(self, offset, whence=0):
+    def seek(self: Self, offset: int, whence: int = 0) -> int:
         """Change stream position"""
         if whence == 0:  # os.SEEK_SET
             self._pos = offset
@@ -182,7 +170,7 @@ class WithHTTPFile(io.IOBase):
         self._buffer.seek(self._pos)
         return self._pos
 
-    def read(self, size=-1):
+    def read(self: Self, size: int = -1) -> bytes:
         """Read up to size bytes from the file"""
         if "r" not in self._mode:
             raise IOError("File not open for reading")
@@ -199,7 +187,7 @@ class WithHTTPFile(io.IOBase):
             return data.decode(self._encoding)
         return data
 
-    def write(self, data):
+    def write(self: Self, data: str | bytes) -> int:
         """Write data to the file"""
         if "w" not in self._mode and "a" not in self._mode:
             raise IOError("File not open for writing")
@@ -226,19 +214,19 @@ class WithHTTPFile(io.IOBase):
 
         return bytes_written
 
-    def readable(self):
+    def readable(self: Self) -> bool:
         """Return whether the file is readable"""
         return "r" in self._mode
 
-    def writable(self):
+    def writable(self: Self) -> bool:
         """Return whether the file is writable"""
         return "w" in self._mode or "a" in self._mode
 
-    def seekable(self):
+    def seekable(self: Self) -> bool:
         """Return whether the file is seekable"""
         return True
 
-    def close(self):
+    def close(self: Self) -> None:
         """Close the file and upload content if in write mode"""
         if self._closed:
             return
@@ -249,6 +237,8 @@ class WithHTTPFile(io.IOBase):
         finally:
             self._closed = True
             self._buffer.close()
+            if self._on_close is not None:
+                self._on_close()
 
     def __enter__(self: Self) -> Self:
         """Enter context manager"""
@@ -268,12 +258,12 @@ class WithHTTPFile(io.IOBase):
 
 
 class HyphaArtifact:
-    artifact_id: str
+    artifact_alias: str
     artifact_url: str
     token: str
     workspace_id: str
 
-    def __init__(self: Self, artifact_id: str):
+    def __init__(self: Self, artifact_alias: str):
         """Initialize a HyphaArtifact instance.
 
         Parameters
@@ -282,7 +272,7 @@ class HyphaArtifact:
             The identifier of the Hypha artifact to interact with
         """
         load_dotenv()
-        self.artifact_id = artifact_id
+        self.artifact_alias = artifact_alias
         self.token = os.getenv("PERSONAL_TOKEN")
         self.workspace_id = ws_from_token(self.token)
         self.artifact_url = "https://hypha.aicell.io/public/services/artifact-manager"
@@ -291,8 +281,7 @@ class HyphaArtifact:
         self: Self,
         params: dict[str, JsonType],
     ) -> dict[str, JsonType]:
-        params["artifact_id"] = self.artifact_id
-        params["workspace"] = self.workspace_id
+        params["artifact_id"] = self.artifact_alias
 
         return params
 
@@ -304,26 +293,18 @@ class HyphaArtifact:
             For other requests, returns the response content.
         """
         extended_params = self._extend_params(params)
+        cleaned_params = remove_none(extended_params)
+
+        print(f"{method_name} Params: {cleaned_params}")
 
         response = requests.post(
             f"{self.artifact_url}/{method_name}",
-            params=extended_params,
+            json=cleaned_params,  # Send as JSON in request body
             headers={"Authorization": f"Bearer {self.token}"},
             timeout=60,  # Increased timeout
         )
 
         response.raise_for_status()
-
-        # Handle put_file specially to return the URL string
-        if method_name == "put_file":
-            try:
-                # Try to decode as JSON first
-                url_data = response.json()
-                if isinstance(url_data, dict) and "url" in url_data:
-                    return url_data["url"]
-                return url_data
-            except Exception as e:
-                return response.content.decode("utf-8").strip('"')
 
         return response.content
 
@@ -419,7 +400,7 @@ class HyphaArtifact:
         }
         self._remote_post("commit", params)
 
-    def _remote_put_file(
+    def _remote_put_file_url(
         self: Self,
         file_path: str,
         download_weight: float | None = None,
@@ -446,7 +427,7 @@ class HyphaArtifact:
             params["download_weight"] = download_weight
 
         response = self._remote_post("put_file", params)
-        return response.text
+        return response
 
     def _remote_remove_file(
         self: Self,
@@ -464,7 +445,7 @@ class HyphaArtifact:
         }
         self._remote_post("remove_file", params)
 
-    def _remote_get_file(self: Self, file_path: str, silent: bool = False) -> str:
+    def _remote_get_file_url(self: Self, file_path: str, silent: bool = False) -> str:
         """Generates a pre-signed URL to download a file from the artifact stored in S3.
 
         Args:
@@ -482,7 +463,9 @@ class HyphaArtifact:
         }
         return self._remote_get("get_file", params)
 
-    def _remote_list_files(self: Self, dir_path: str | None = None) -> list[JsonType]:
+    def _remote_list_contents(
+        self: Self, dir_path: str | None = None
+    ) -> list[JsonType]:
         """Lists all files in the artifact.
 
         Args:
@@ -496,7 +479,9 @@ class HyphaArtifact:
         params = {
             "dir_path": dir_path,
         }
-        return self._remote_get("list_files", params)
+        response_bytes = self._remote_get("list_files", params)
+
+        return json.loads(response_bytes.decode("utf-8"))
 
     @overload
     def cat(
@@ -558,7 +543,13 @@ class HyphaArtifact:
                 raise
             return None
 
-    def open(self: Self, urlpath: str, mode: FileMode = "rb", **kwargs) -> WithHTTPFile:
+    def open(
+        self: Self,
+        urlpath: str,
+        mode: FileMode = "rb",
+        auto_commit: bool = True,
+        **kwargs,
+    ) -> ArtifactHttpFile:
         """Open a file for reading or writing
 
         Parameters
@@ -567,24 +558,40 @@ class HyphaArtifact:
             Path to the file within the artifact
         mode: FileMode
             File mode, one of 'r', 'rb', 'w', 'wb', 'a', 'ab'
+        auto_commit: bool
+            If True (default), automatically stages before writing and commits after closing
 
         Returns
         -------
         WithHTTPFile
             A file-like object
         """
+        normalized_path = urlpath[1:] if urlpath.startswith("/") else urlpath
+
         if "r" in mode:
-            # Reading mode
-            download_url = self._remote_get_file(urlpath)
-            return WithHTTPFile(
-                url=download_url, mode=mode, name=urlpath, upload_method="PUT", **kwargs
+            download_url = self._remote_get_file_url(normalized_path)
+            return ArtifactHttpFile(
+                url=download_url,
+                mode=mode,
+                name=normalized_path,
+                **kwargs,
             )
         elif "w" in mode or "a" in mode:
-            # Writing or appending mode
-            upload_url = self._remote_put_file(urlpath)
-            return WithHTTPFile(
-                url=upload_url, mode=mode, name=urlpath, upload_method="PUT", **kwargs
+            if auto_commit:
+                self._remote_edit(version="stage", copy_files=True)
+
+            upload_url = self._remote_put_file_url(normalized_path)
+            file_obj = ArtifactHttpFile(
+                url=upload_url,
+                mode=mode,
+                name=normalized_path,
+                **kwargs,
             )
+
+            if auto_commit:
+                file_obj.on_close = partial(self._remote_commit, version="new")
+
+            return file_obj
         else:
             raise ValueError(f"Unsupported file mode: {mode}")
 
@@ -614,8 +621,7 @@ class HyphaArtifact:
         """
         try:
             # Stage the artifact for edits
-            self._remote_edit(version="stage")
-
+            self._remote_edit(version="stage", copy_files=True)
             # Handle recursive case
             if recursive and self.isdir(path1):
                 files = self.find(path1, maxdepth=maxdepth)
@@ -632,18 +638,19 @@ class HyphaArtifact:
                 # Copy a single file
                 self._copy_single_file(path1, path2)
         finally:
-            # Commit changes
+            # print(self.info(path1))
             self._remote_commit(version="new")
+            # print(self.info(path1))
 
     def _copy_single_file(self, src: str, dst: str) -> None:
         """Helper method to copy a single file"""
         content = self.cat(src)
-        with self.open(dst, mode="w") as f:
+        with self.open(dst, mode="w", auto_commit=False) as f:
             f.write(content)
 
     def cp(
         self: Self, path1: str, path2: str, on_error: OnError | None = None, **kwargs
-    ):
+    ) -> None:
         """Alias for copy method
 
         Parameters
@@ -681,8 +688,9 @@ class HyphaArtifact:
         -------
         None
         """
-        # recursive and maxdepth are ignored as Hypha artifacts handle files individually
-        return self._remote_remove_file(path)
+        self._remote_edit(version="stage", copy_files=True)
+        self._remote_remove_file(path)
+        self._remote_commit(version="new")
 
     def created(self: Self, path: str):
         """Get the creation time of a file
@@ -723,14 +731,13 @@ class HyphaArtifact:
             True if the path exists, False otherwise
         """
         try:
-            # Try to get file info - if it doesn't exist, this will fail
             self.info(path)
             return True
         except Exception:
             return False
 
     def ls(self: Self, path: str, detail: bool = True, **kwargs) -> list[str | dict]:
-        """List files in a directory
+        """List files and directories in a directory
 
         Parameters
         ----------
@@ -743,16 +750,13 @@ class HyphaArtifact:
         Returns
         -------
         list
-            List of files in the directory
+            List of files and directories in the directory
         """
-        # First, get the list of files
-        result = self._remote_list_files(path)
+        result = self._remote_list_contents(path)
 
         if not detail:
-            # Return only the file paths
             return [item["name"] for item in result]
 
-        # Return the full file details
         return result
 
     def info(self: Self, path: str, **kwargs) -> dict[str, str | int]:
@@ -768,40 +772,15 @@ class HyphaArtifact:
         dict
             Dictionary with file information
         """
-        # First check if it's in the listing of its parent directory
-        parent_path = self._get_parent_path(path)
+        parent_path, filename = parent_and_filename(path)
 
-        try:
-            listing = self.ls(parent_path)
-            for item in listing:
-                if item["name"] == path:
-                    return item
-        except Exception:
-            pass
+        listing = self.ls(parent_path)
+        for item in listing:
+            if item["name"] == filename:
+                # It's a file
+                return item
 
-        # If we couldn't find it that way, check if it exists directly
-        try:
-            # Try to get a download URL - this will fail if the file doesn't exist
-            self._remote_get_file(path, silent=True)
-
-            # If we reached here, the file exists but we don't have details
-            # Return minimal info
-            return {"name": path, "size": None, "type": "file"}  # Size unknown
-        except Exception:
-            # Try as a directory
-            try:
-                listing = self._remote_list_files(path)
-                # If we get here, it's a directory
-                return {"name": path, "size": 0, "type": "directory"}
-            except Exception:
-                raise FileNotFoundError(f"Path not found: {path}")
-
-    def _get_parent_path(self, path: str) -> str:
-        """Get the parent directory of a path"""
-        parts = path.rstrip("/").split("/")
-        if len(parts) == 1:
-            return ""  # Root directory
-        return "/".join(parts[:-1])
+        raise FileNotFoundError(f"Path not found: {path}")
 
     def isdir(self: Self, path: str) -> bool:
         """Check if a path is a directory
@@ -950,13 +929,7 @@ class HyphaArtifact:
         path: str
             Path to remove
         """
-        try:
-            # Stage the artifact for edits
-            self._remote_edit(version="stage")
-            self._remote_remove_file(path)
-        finally:
-            # Commit changes
-            self._remote_commit(version="new")
+        self.rm(path)
 
     def rmdir(self: Self, path: str) -> None:
         """Remove an empty directory
@@ -1034,12 +1007,6 @@ class HyphaArtifact:
         """
         return [self.size(path) for path in paths]
 
-    def prepare_for_upload(self):
-        """Put the artifact in staging mode if it's not already."""
-        self._remote_edit(
-            version="stage",
-        )
-
 
 async def create_artifact(artifact_id: str, token: str, server_url: str) -> bool:
     """Create a new artifact in Hypha.
@@ -1083,7 +1050,7 @@ async def create_artifact(artifact_id: str, token: str, server_url: str) -> bool
             alias=artifact_id,
             type="generic",
             manifest=manifest,
-            config={"permissions": {"*": "r+", "@": "rw+"}},
+            config={"permissions": {"*": "rw+", "@": "rw+"}},
         )
 
         # Disconnect from the server
@@ -1104,10 +1071,7 @@ def create_artifact_sync(artifact_id: str, token: str, server_url: str) -> bool:
         loop.close()
 
 
-if __name__ == "__main__":
-    import sys
-    import signal
-
+def main():
     # Set up clean shutdown for asyncio tasks
     def signal_handler(sig, frame):
         print("Shutting down gracefully...")
@@ -1115,7 +1079,7 @@ if __name__ == "__main__":
 
     signal.signal(signal.SIGINT, signal_handler)
 
-    artifact_id = "example_artifact"
+    artifact_alias = "example_artifact_2"
     load_dotenv()  # Load token from .env file
     token = os.getenv("PERSONAL_TOKEN")
 
@@ -1125,42 +1089,42 @@ if __name__ == "__main__":
         exit(1)
 
     # Initialize artifact object
-    artifact = HyphaArtifact(artifact_id)
+    artifact = HyphaArtifact(artifact_alias)
     server_url = artifact.artifact_url
 
     # Check if the artifact exists by trying to list files
-    print(f"Checking if artifact '{artifact_id}' exists...")
+    print(f"Checking if artifact '{artifact_alias}' exists...")
     try:
         # Try a simple operation to check if artifact exists and is accessible
         files = artifact.ls("/")
-        print(f"Artifact '{artifact_id}' already exists. Found {len(files)} files.")
+        print(f"Artifact '{artifact_alias}' already exists. Found {len(files)} files.")
         artifact_exists = True
-    except Exception as e:
+    except FileNotFoundError:
         print(
-            f"Artifact '{artifact_id}' does not exist or is not accessible. Will try to create it."
+            f"Artifact '{artifact_alias}' does not exist or is not accessible. Will try to create it."
         )
         artifact_exists = False
 
     # Create artifact only if it doesn't exist
     # if not artifact_exists:
-    #     print(f"Creating new artifact '{artifact_id}'...")
-    #     try:
-    #         success = create_artifact_sync(
-    #             artifact_id=artifact_id,
-    #             token=token,
-    #             server_url=server_url,
-    #         )
-    #         if success:
-    #             print(f"Successfully created artifact '{artifact_id}'")
-    #         else:
-    #             print(f"Failed to create artifact '{artifact_id}'")
-    #             sys.exit(1)
-    #     except Exception as e:
-    #         if "already exists" in str(e):
-    #             print(f"Artifact '{artifact_id}' already exists, using it.")
-    #         else:
-    #             print(f"Error creating artifact: {e}")
-    #             sys.exit(1)
+    print(f"Creating new artifact '{artifact_alias}'...")
+    try:
+        success = create_artifact_sync(
+            artifact_id=artifact_alias,
+            token=token,
+            server_url=server_url,
+        )
+        if success:
+            print(f"Successfully created artifact '{artifact_alias}'")
+        else:
+            print(f"Failed to create artifact '{artifact_alias}'")
+            sys.exit(1)
+    except Exception as e:
+        if "already exists" in str(e):
+            print(f"Artifact '{artifact_alias}' already exists, using it.")
+        else:
+            print(f"Error creating artifact: {e}")
+            sys.exit(1)
 
     # Clear existing event loops and create a fresh one for our operations
     loop = asyncio.new_event_loop()
@@ -1172,12 +1136,7 @@ if __name__ == "__main__":
     # Create test file
     print("Creating test file...")
     try:
-        # First, prepare the artifact for upload (put it in staging mode)
-        print("Putting artifact in staging mode...")
-        artifact.prepare_for_upload()
-
-        # Now try to upload the file
-        with artifact.open("/example_file.txt", "w") as f:
+        with artifact.open("test_folder/example_file.txt", "w") as f:
             f.write("This is a test file")
         print("✓ Successfully created test file")
     except Exception as e:
@@ -1187,10 +1146,10 @@ if __name__ == "__main__":
     # List files
     print("\nListing files:")
     try:
-        files = artifact.ls("/")
+        files = artifact.ls("/test_folder")
         if files:
-            for file in files:
-                print(f"- {file.get('name', 'Unknown')}")
+            for loaded_file in files:
+                print(f"- {loaded_file.get('name', 'Unknown')}")
         else:
             print("No files found")
         print("✓ Successfully listed files")
@@ -1200,16 +1159,28 @@ if __name__ == "__main__":
     # Read file content
     print("\nReading file content:")
     try:
-        content = artifact.cat("/example_file.txt")
+        content = artifact.cat("test_folder/example_file.txt")
         print(f"Content: {content}")
         print("✓ Successfully read file content")
     except Exception as e:
         print(f"✗ Failed to read file content: {str(e)}")
 
+    print("\nChecking if files exist:")
+    try:
+        original_exists = artifact.exists("test_folder/example_file.txt")
+        copy_exists = artifact.exists("test_folder/copy_of_example_file.txt")
+        print(f"Original file exists: {original_exists}")
+        print(f"Copied file exists: {copy_exists}")
+        print("✓ Successfully checked file existence")
+    except Exception as e:
+        print(f"✗ Failed to check file existence: {str(e)}")
+
     # Copy file
     print("\nCopying file...")
     try:
-        artifact.copy("/example_file.txt", "/copy_of_example_file.txt")
+        artifact.copy(
+            "test_folder/example_file.txt", "test_folder/copy_of_example_file.txt"
+        )
         print("✓ Successfully copied file")
     except Exception as e:
         print(f"✗ Failed to copy file: {str(e)}")
@@ -1217,8 +1188,8 @@ if __name__ == "__main__":
     # Check file existence
     print("\nChecking if files exist:")
     try:
-        original_exists = artifact.exists("/example_file.txt")
-        copy_exists = artifact.exists("/copy_of_example_file.txt")
+        original_exists = artifact.exists("test_folder/example_file.txt")
+        copy_exists = artifact.exists("test_folder/copy_of_example_file.txt")
         print(f"Original file exists: {original_exists}")
         print(f"Copied file exists: {copy_exists}")
         print("✓ Successfully checked file existence")
@@ -1228,7 +1199,7 @@ if __name__ == "__main__":
     # Remove copied file
     print("\nRemoving copied file...")
     try:
-        artifact.rm("/copy_of_example_file.txt")
+        artifact.rm("test_folder/copy_of_example_file.txt")
         print("✓ Successfully removed copied file")
     except Exception as e:
         print(f"✗ Failed to remove copied file: {str(e)}")
@@ -1236,8 +1207,8 @@ if __name__ == "__main__":
     # Final check
     print("\nVerifying final state:")
     try:
-        original_exists = artifact.exists("/example_file.txt")
-        copy_exists = artifact.exists("/copy_of_example_file.txt")
+        original_exists = artifact.exists("test_folder/example_file.txt")
+        copy_exists = artifact.exists("test_folder/copy_of_example_file.txt")
         print(f"Original file exists: {original_exists}")
         print(f"Copied file exists: {copy_exists} (should be False)")
 
@@ -1262,3 +1233,7 @@ if __name__ == "__main__":
         pass
 
     print("\nScript completed.")
+
+
+if __name__ == "__main__":
+    main()
