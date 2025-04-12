@@ -234,6 +234,24 @@ class TestHyphaArtifactIntegration:
         assert not artifact.exists(copied_file)
         assert artifact.exists(original_file)
 
+    def test_partial_file_read(self, artifact, test_content):
+        """Test reading only part of a file using the size parameter in read."""
+        test_file_path = "partial_read_test.txt"
+
+        # Create a test file
+        with artifact.open(test_file_path, "w") as f:
+            f.write(test_content)
+
+        # Read only the first 10 bytes of the file
+        with artifact.open(test_file_path, "r") as f:
+            partial_content = f.read(10)
+
+        # Verify the partial content matches the expected first 10 bytes
+        expected_content = test_content[:10]
+        assert (
+            partial_content == expected_content
+        ), f"Partial content doesn't match. Expected: '{expected_content}', Got: '{partial_content}'"
+
 
 if __name__ == "__main__":
     # For manual test runs

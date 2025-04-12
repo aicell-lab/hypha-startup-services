@@ -102,13 +102,16 @@ class ArtifactHttpFile(io.IOBase):
             raise ValueError("on_close must be a callable function")
         self._on_close = func
 
-    def _download_content(self: Self) -> None:
-        """Download content from URL into buffer"""
+    def _download_content(self: Self, range_header: str = None) -> None:
+        """Download content from URL into buffer, optionally using a range header."""
         try:
             # Clean the URL by removing any surrounding quotes and converting to string if needed
             cleaned_url = clean_url(self._url)
 
             headers = {}
+            if range_header:
+                headers["Range"] = range_header
+
             response = requests.get(cleaned_url, headers=headers, timeout=60)
             response.raise_for_status()
             self._buffer = io.BytesIO(response.content)
@@ -171,17 +174,18 @@ class ArtifactHttpFile(io.IOBase):
         return self._pos
 
     def read(self: Self, size: int = -1) -> bytes:
-        """Read up to size bytes from the file"""
+        """Read up to size bytes from the file, using HTTP range if necessary."""
         if "r" not in self._mode:
             raise IOError("File not open for reading")
 
-        self._buffer.seek(self._pos)
         if size < 0:
-            data = self._buffer.read()
+            self._download_content()
         else:
-            data = self._buffer.read(size)
+            range_header = f"bytes={self._pos}-{self._pos + size - 1}"
+            self._download_content(range_header=range_header)
 
-        self._pos = self._buffer.tell()
+        data = self._buffer.read()
+        self._pos += len(data)
 
         if "b" not in self._mode:
             return data.decode(self._encoding)
