@@ -155,7 +155,14 @@ async def test_collection_data_insert_many(weaviate_service):
     assert "objects" in query_result
     assert len(query_result["objects"]) == 2
     assert all(obj["collection"] == "Movie" for obj in query_result["objects"])
+    # check properties
+    assert all(obj["properties"]["title"] in ["The Matrix", "Inception"] for obj in query_result["objects"])
 
+    query_result = await weaviate_service.query.fetch_objects(
+        collection_name="Movie", limit=10, return_properties=["title"], include_vector=False
+    )
+    assert all(obj["properties"]["title"] in ["The Matrix", "Inception"] for obj in query_result["objects"])
+    assert all(not obj["vector"] for obj in query_result["objects"])
 
 @pytest.mark.asyncio
 async def test_collection_data_insert(weaviate_service):
@@ -319,6 +326,7 @@ async def test_collection_query_near_vector(weaviate_service):
         near_vector=test_vector,
         target_vector="title_vector",
         limit=1,
+        include_vector=True,
     )
 
     assert result is not None
@@ -326,7 +334,10 @@ async def test_collection_query_near_vector(weaviate_service):
     # Should return at least one result
     assert len(result["objects"]) > 0
     assert all(obj["collection"] == "Movie" for obj in result["objects"])
-
+    # check properties
+    assert all(obj["properties"]["title"] in ["The Matrix", "Inception"] for obj in result["objects"])
+    # check vector
+    assert all(("description_vector" in obj["vector"] and "title_vector" in obj["vector"]) for obj in result["objects"])
 
 @pytest.mark.asyncio
 async def test_collection_query_fetch_objects(weaviate_service):

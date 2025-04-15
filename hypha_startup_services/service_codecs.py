@@ -6,7 +6,7 @@ allowing them to be serialized and transferred through Hypha RPC.
 
 import uuid
 from weaviate.collections.classes.internal import _Object
-
+from dataclasses import asdict
 
 def register_weaviate_codecs(server):
     """Register all Weaviate codecs with the Hypha server."""
@@ -18,7 +18,7 @@ def register_weaviate_codecs(server):
             "encoder": lambda obj: obj.hex,
         }
     )
-
+    
     server.register_codec(
         {
             "name": "weaviate_object",
@@ -26,6 +26,8 @@ def register_weaviate_codecs(server):
             "encoder": lambda obj: {
                 "uuid": obj.uuid.hex,
                 "vector": obj.vector,
+                "properties": obj.properties,
+                "metadata": obj.metadata and asdict(obj.metadata),
                 "collection": obj.collection,
             },
         }
