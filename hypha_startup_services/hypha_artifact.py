@@ -6,14 +6,10 @@ using the fsspec specification, allowing for operations like reading, writing, l
 and manipulating files stored in Hypha artifacts.
 """
 
-import sys
-import signal
 import io
 import locale
 import os
-from functools import partial
 import json
-from collections.abc import Callable
 import asyncio
 from typing import Literal, Self, overload
 import jwt
@@ -63,8 +59,6 @@ class ArtifactHttpFile(io.IOBase):
     via the requests library instead of relying on Pyodide.
     """
 
-    _on_close: Callable | None = None
-
     def __init__(
         self: Self,
         url: str,
@@ -89,18 +83,6 @@ class ArtifactHttpFile(io.IOBase):
         else:
             # For write modes, initialize an empty buffer
             self._size = 0
-
-    @property
-    def on_close(self: Self) -> Callable | None:
-        """Get the on_close callback function."""
-        return self._on_close
-
-    @on_close.setter
-    def on_close(self: Self, func: Callable | None) -> None:
-        """Set the on_close callback function."""
-        if func is not None and not isinstance(func, Callable):
-            raise ValueError("on_close must be a callable function")
-        self._on_close = func
 
     def _download_content(self: Self, range_header: str = None) -> None:
         """Download content from URL into buffer, optionally using a range header."""
@@ -241,8 +223,6 @@ class ArtifactHttpFile(io.IOBase):
         finally:
             self._closed = True
             self._buffer.close()
-            if self._on_close is not None:
-                self._on_close()
 
     def __enter__(self: Self) -> Self:
         """Enter context manager"""
@@ -299,10 +279,10 @@ class HyphaArtifact:
         extended_params = self._extend_params(params)
         cleaned_params = remove_none(extended_params)
 
-        print(f"{method_name} Params: {cleaned_params}")
+        request_url = f"{self.artifact_url}/{method_name}"
 
         response = requests.post(
-            f"{self.artifact_url}/{method_name}",
+            request_url,
             json=cleaned_params,  # Send as JSON in request body
             headers={"Authorization": f"Bearer {self.token}"},
             timeout=60,  # Increased timeout
@@ -314,9 +294,13 @@ class HyphaArtifact:
 
     def _remote_get(self: Self, method_name: str, params: dict[str, JsonType]) -> None:
         extended_params = self._extend_params(params)
+        if extended_params.get("version") is None:
+            extended_params["version"] = "stage"
+        cleaned_params = remove_none(extended_params)
+
         response = requests.get(
             f"{self.artifact_url}/{method_name}",
-            params=extended_params,
+            params=cleaned_params,
             headers={"Authorization": f"Bearer {self.token}"},
             timeout=20,
         )
@@ -382,36 +366,13 @@ class HyphaArtifact:
         }
         self._remote_post("edit", params)
 
-    def _remote_commit(
-        self: Self, version: str | None = None, comment: str | None = None
-    ) -> None:
-        """Finalizes and commits an artifact's staged changes.
-            Validates uploaded files and commits the staged manifest.
-            This process also updates view and download statistics.
-
-        Args:
-            self (Self): The instance of the HyphaArtifact class.
-            version (str | None): Optional. The version of the artifact to edit.
-                By default, it set to None, the version will stay the same.
-                If you want to create a staged version, you can set it to "stage".
-                You can set it to any version in text, e.g. 0.1.0 or v1. If you set it to new,
-                it will generate a version similar to v0, v1, etc.
-            comment (str | None): Optional. A comment to describe the changes made to the artifact.
-        """
-        params = {
-            "version": version,
-            "comment": comment,
-        }
-        self._remote_post("commit", params)
-
     def _remote_put_file_url(
         self: Self,
         file_path: str,
         download_weight: float | None = None,
     ) -> str:
         """Generates a pre-signed URL to upload a file to the artifact in S3. The URL can be used
-        with an HTTP PUT request to upload the file. The file is staged until the
-        artifact is committed.
+        with an HTTP PUT request to upload the file.
 
         Args:
             self (Self): The instance of the HyphaArtifact class.
@@ -551,7 +512,6 @@ class HyphaArtifact:
         self: Self,
         urlpath: str,
         mode: FileMode = "rb",
-        auto_commit: bool = True,
         **kwargs,
     ) -> ArtifactHttpFile:
         """Open a file for reading or writing
@@ -562,8 +522,6 @@ class HyphaArtifact:
             Path to the file within the artifact
         mode: FileMode
             File mode, one of 'r', 'rb', 'w', 'wb', 'a', 'ab'
-        auto_commit: bool
-            If True (default), automatically stages before writing and commits after closing
 
         Returns
         -------
@@ -581,9 +539,7 @@ class HyphaArtifact:
                 **kwargs,
             )
         elif "w" in mode or "a" in mode:
-            if auto_commit:
-                self._remote_edit(version="stage", copy_files=True)
-
+            self._remote_edit(version="stage")
             upload_url = self._remote_put_file_url(normalized_path)
             file_obj = ArtifactHttpFile(
                 url=upload_url,
@@ -591,9 +547,6 @@ class HyphaArtifact:
                 name=normalized_path,
                 **kwargs,
             )
-
-            if auto_commit:
-                file_obj.on_close = partial(self._remote_commit, version="new")
 
             return file_obj
         else:
@@ -623,33 +576,28 @@ class HyphaArtifact:
         on_error: "raise" or "ignore"
             What to do if a file is not found
         """
-        try:
-            # Stage the artifact for edits
-            self._remote_edit(version="stage", copy_files=True)
-            # Handle recursive case
-            if recursive and self.isdir(path1):
-                files = self.find(path1, maxdepth=maxdepth)
-                for file_path in files:
-                    # Calculate the destination path
-                    rel_path = file_path[len(path1) :].lstrip("/")
-                    dest_path = f"{path2}/{rel_path}" if path2 else rel_path
-                    try:
-                        self._copy_single_file(file_path, dest_path)
-                    except Exception:
-                        if on_error == "raise":
-                            raise
-            else:
-                # Copy a single file
-                self._copy_single_file(path1, path2)
-        finally:
-            print(self.info(path1))
-            self._remote_commit(version="new")
-            print(self.info(path1))
+        # Stage the artifact for edits
+        self._remote_edit(version="stage")
+        # Handle recursive case
+        if recursive and self.isdir(path1):
+            files = self.find(path1, maxdepth=maxdepth)
+            for file_path in files:
+                # Calculate the destination path
+                rel_path = file_path[len(path1) :].lstrip("/")
+                dest_path = f"{path2}/{rel_path}" if path2 else rel_path
+                try:
+                    self._copy_single_file(file_path, dest_path)
+                except Exception:
+                    if on_error == "raise":
+                        raise
+        else:
+            # Copy a single file
+            self._copy_single_file(path1, path2)
 
     def _copy_single_file(self, src: str, dst: str) -> None:
         """Helper method to copy a single file"""
         content = self.cat(src)
-        with self.open(dst, mode="w", auto_commit=False) as f:
+        with self.open(dst, mode="w") as f:
             f.write(content)
 
     def cp(
@@ -692,9 +640,8 @@ class HyphaArtifact:
         -------
         None
         """
-        self._remote_edit(version="stage", copy_files=True)
+        self._remote_edit(version="stage")
         self._remote_remove_file(path)
-        self._remote_commit(version="new")
 
     def created(self: Self, path: str):
         """Get the creation time of a file
@@ -1059,8 +1006,7 @@ async def create_artifact(artifact_id: str, token: str, server_url: str) -> bool
         await api.disconnect()
         return True
 
-    except Exception as e:
-        print(f"Failed to create artifact: {e}")
+    except Exception:
         return False
 
 
@@ -1071,171 +1017,3 @@ def create_artifact_sync(artifact_id: str, token: str, server_url: str) -> bool:
         return loop.run_until_complete(create_artifact(artifact_id, token, server_url))
     finally:
         loop.close()
-
-
-def main():
-    # Set up clean shutdown for asyncio tasks
-    def signal_handler(sig, frame):
-        print("Shutting down gracefully...")
-        sys.exit(0)
-
-    signal.signal(signal.SIGINT, signal_handler)
-
-    artifact_alias = "example_artifact_2"
-    load_dotenv()  # Load token from .env file
-    token = os.getenv("PERSONAL_TOKEN")
-
-    if not token:
-        print("ERROR: No PERSONAL_TOKEN found in environment variables")
-        print("Please create a .env file with your PERSONAL_TOKEN")
-        exit(1)
-
-    # Initialize artifact object
-    artifact = HyphaArtifact(artifact_alias)
-    server_url = artifact.artifact_url
-
-    # Check if the artifact exists by trying to list files
-    print(f"Checking if artifact '{artifact_alias}' exists...")
-    try:
-        # Try a simple operation to check if artifact exists and is accessible
-        files = artifact.ls("/")
-        print(f"Artifact '{artifact_alias}' already exists. Found {len(files)} files.")
-        artifact_exists = True
-    except FileNotFoundError:
-        print(
-            f"Artifact '{artifact_alias}' does not exist or is not accessible. Will try to create it."
-        )
-        artifact_exists = False
-
-    # Create artifact only if it doesn't exist
-    # if not artifact_exists:
-    # print(f"Creating new artifact '{artifact_alias}'...")
-    # try:
-    #     success = create_artifact_sync(
-    #         artifact_id=artifact_alias,
-    #         token=token,
-    #         server_url=server_url,
-    #     )
-    #     if success:
-    #         print(f"Successfully created artifact '{artifact_alias}'")
-    #     else:
-    #         print(f"Failed to create artifact '{artifact_alias}'")
-    #         sys.exit(1)
-    # except Exception as e:
-    #     if "already exists" in str(e):
-    #         print(f"Artifact '{artifact_alias}' already exists, using it.")
-    #     else:
-    #         print(f"Error creating artifact: {e}")
-    #         sys.exit(1)
-
-    # Clear existing event loops and create a fresh one for our operations
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-
-    # Proceed with file operations
-    print("\n--- File Operations ---")
-
-    # Create test file
-    print("Creating test file...")
-    try:
-        with artifact.open("test_folder/example_file.txt", "w") as f:
-            f.write("This is a test file")
-        print("✓ Successfully created test file")
-    except Exception as e:
-        print(f"✗ Failed to create test file: {str(e)}")
-        sys.exit(1)
-
-    # List files
-    print("\nListing files:")
-    try:
-        files = artifact.ls("/test_folder")
-        if files:
-            for loaded_file in files:
-                print(f"- {loaded_file.get('name', 'Unknown')}")
-        else:
-            print("No files found")
-        print("✓ Successfully listed files")
-    except Exception as e:
-        print(f"✗ Failed to list files: {str(e)}")
-
-    # Read file content
-    print("\nReading file content:")
-    try:
-        content = artifact.cat("test_folder/example_file.txt")
-        print(f"Content: {content}")
-        print("✓ Successfully read file content")
-    except Exception as e:
-        print(f"✗ Failed to read file content: {str(e)}")
-
-    print("\nChecking if files exist:")
-    try:
-        original_exists = artifact.exists("test_folder/example_file.txt")
-        copy_exists = artifact.exists("test_folder/copy_of_example_file.txt")
-        print(f"Original file exists: {original_exists}")
-        print(f"Copied file exists: {copy_exists}")
-        print("✓ Successfully checked file existence")
-    except Exception as e:
-        print(f"✗ Failed to check file existence: {str(e)}")
-
-    # Copy file
-    print("\nCopying file...")
-    try:
-        artifact.copy(
-            "test_folder/example_file.txt", "test_folder/copy_of_example_file.txt"
-        )
-        print("✓ Successfully copied file")
-    except Exception as e:
-        print(f"✗ Failed to copy file: {str(e)}")
-
-    # Check file existence
-    print("\nChecking if files exist:")
-    try:
-        original_exists = artifact.exists("test_folder/example_file.txt")
-        copy_exists = artifact.exists("test_folder/copy_of_example_file.txt")
-        print(f"Original file exists: {original_exists}")
-        print(f"Copied file exists: {copy_exists}")
-        print("✓ Successfully checked file existence")
-    except Exception as e:
-        print(f"✗ Failed to check file existence: {str(e)}")
-
-    # Remove copied file
-    print("\nRemoving copied file...")
-    try:
-        artifact.rm("test_folder/copy_of_example_file.txt")
-        print("✓ Successfully removed copied file")
-    except Exception as e:
-        print(f"✗ Failed to remove copied file: {str(e)}")
-
-    # Final check
-    print("\nVerifying final state:")
-    try:
-        original_exists = artifact.exists("test_folder/example_file.txt")
-        copy_exists = artifact.exists("test_folder/copy_of_example_file.txt")
-        print(f"Original file exists: {original_exists}")
-        print(f"Copied file exists: {copy_exists} (should be False)")
-
-        if original_exists and not copy_exists:
-            print("\n✓ All operations completed successfully!")
-        else:
-            print("\n✗ Some operations didn't complete as expected.")
-    except Exception as e:
-        print(f"✗ Failed during final verification: {str(e)}")
-
-    # Clean up any remaining asyncio resources
-    pending = asyncio.all_tasks(loop)
-    for task in pending:
-        task.cancel()
-
-    try:
-        # Give tasks a chance to properly cancel
-        if pending:
-            loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-        loop.close()
-    except Exception:
-        pass
-
-    print("\nScript completed.")
-
-
-if __name__ == "__main__":
-    main()
