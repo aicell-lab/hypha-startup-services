@@ -27,7 +27,7 @@ from hypha_startup_services.collection_utils import (
 
 
 async def collections_exists(
-    client: WeaviateAsyncClient, collection_name: str, context: dict = None
+    client: WeaviateAsyncClient, collection_name: str, context: dict[str, Any]
 ) -> bool:
     """Check if a collection exists in the workspace."""
     collection_name = full_collection_name(collection_name, context)
@@ -35,7 +35,7 @@ async def collections_exists(
 
 
 async def collections_create(
-    client: WeaviateAsyncClient, settings: dict, context: dict = None
+    client: WeaviateAsyncClient, settings: dict, context: dict[str, Any]
 ) -> dict[str, Any]:
     """Create a new collection in the workspace.
 
@@ -55,7 +55,7 @@ async def collections_create(
 
 
 async def collections_list_all(
-    client: WeaviateAsyncClient, context: dict = None
+    client: WeaviateAsyncClient, context: dict[str, Any]
 ) -> dict[str, dict]:
     """List all collections in the workspace.
 
@@ -71,7 +71,7 @@ async def collections_list_all(
 
 
 async def collections_get(
-    client: WeaviateAsyncClient, name: str, context: dict = None
+    client: WeaviateAsyncClient, name: str, context: dict[str, Any]
 ) -> dict[str, Any]:
     """Get a collection's configuration by name.
 
@@ -82,7 +82,7 @@ async def collections_get(
 
 
 async def collections_delete(
-    client: WeaviateAsyncClient, name: str | list[str], context: dict = None
+    client: WeaviateAsyncClient, name: str | list[str], context: dict[str, Any]
 ) -> None:
     """Delete a collection or multiple collections by name.
 
@@ -95,6 +95,7 @@ async def collections_delete(
 async def collection_data_insert_many(
     client: WeaviateAsyncClient,
     collection_name: str,
+    *args,
     context: dict[str, Any],
     **kwargs,
 ) -> dict[str, Any]:
@@ -103,7 +104,7 @@ async def collection_data_insert_many(
     Forwards all kwargs to collection.data.insert_many().
     """
     collection = acquire_collection(client, collection_name, context)
-    response = await collection.data.insert_many(**kwargs)
+    response = await collection.data.insert_many(*args, **kwargs)
 
     return {
         "elapsed_seconds": response.elapsed_seconds,
@@ -116,6 +117,7 @@ async def collection_data_insert_many(
 async def collection_data_insert(
     client: WeaviateAsyncClient,
     collection_name: str,
+    *args,
     context: dict[str, Any],
     **kwargs,
 ) -> uuid.UUID:
@@ -124,12 +126,13 @@ async def collection_data_insert(
     Forwards all kwargs to collection.data.insert().
     """
     collection = acquire_collection(client, collection_name, context)
-    return await collection.data.insert(**kwargs)
+    return await collection.data.insert(*args, **kwargs)
 
 
 async def collection_query_near_vector(
     client: WeaviateAsyncClient,
     collection_name: str,
+    *args,
     context: dict[str, Any],
     **kwargs,
 ) -> dict[str, Any]:
@@ -138,7 +141,7 @@ async def collection_query_near_vector(
     Forwards all kwargs to collection.query.near_vector().
     """
     collection = acquire_collection(client, collection_name, context)
-    response: QueryReturn = await collection.query.near_vector(**kwargs)
+    response: QueryReturn = await collection.query.near_vector(*args, **kwargs)
 
     return {
         "objects": objects_without_workspace(response.objects),
@@ -148,6 +151,7 @@ async def collection_query_near_vector(
 async def collection_query_fetch_objects(
     client: WeaviateAsyncClient,
     collection_name: str,
+    *args,
     context: dict[str, Any],
     **kwargs,
 ) -> dict[str, Any]:
@@ -156,7 +160,7 @@ async def collection_query_fetch_objects(
     Forwards all kwargs to collection.query.fetch_objects().
     """
     collection = acquire_collection(client, collection_name, context)
-    response: QueryReturn = await collection.query.fetch_objects(**kwargs)
+    response: QueryReturn = await collection.query.fetch_objects(*args, **kwargs)
 
     return {
         "objects": objects_without_workspace(response.objects),
@@ -166,6 +170,7 @@ async def collection_query_fetch_objects(
 async def collection_query_hybrid(
     client: WeaviateAsyncClient,
     collection_name: str,
+    *args,
     context: dict[str, Any],
     **kwargs,
 ) -> dict[str, Any]:
@@ -174,7 +179,7 @@ async def collection_query_hybrid(
     Forwards all kwargs to collection.query.hybrid().
     """
     collection = acquire_collection(client, collection_name, context)
-    response: QueryReturn = await collection.query.hybrid(**kwargs)
+    response: QueryReturn = await collection.query.hybrid(*args, **kwargs)
 
     return {
         "objects": objects_without_workspace(response.objects),
@@ -184,6 +189,7 @@ async def collection_query_hybrid(
 async def collection_generate_near_text(
     client: WeaviateAsyncClient,
     collection_name: str,
+    *args,
     context: dict[str, Any],
     **kwargs,
 ) -> dict[str, Any]:
@@ -192,7 +198,7 @@ async def collection_generate_near_text(
     Forwards all kwargs to collection.query.near_text().
     """
     collection = acquire_collection(client, collection_name, context)
-    response: GenerativeReturn = await collection.generate.near_text(**kwargs)
+    response: GenerativeReturn = await collection.generate.near_text(*args, **kwargs)
 
     return {
         "objects": objects_without_workspace(response.objects),
@@ -203,6 +209,7 @@ async def collection_generate_near_text(
 async def collection_data_update(
     client: WeaviateAsyncClient,
     collection_name: str,
+    *args,
     context: dict[str, Any],
     **kwargs,
 ) -> None:
@@ -211,12 +218,13 @@ async def collection_data_update(
     Forwards all kwargs to collection.data.update().
     """
     collection = acquire_collection(client, collection_name, context)
-    await collection.data.update(**kwargs)
+    await collection.data.update(*args, **kwargs)
 
 
 async def collection_data_delete_by_id(
     client: WeaviateAsyncClient,
     collection_name: str,
+    *args,
     context: dict[str, Any],
     **kwargs,
 ) -> bool:
@@ -225,12 +233,13 @@ async def collection_data_delete_by_id(
     Forwards all kwargs to collection.data.delete_by_id().
     """
     collection = acquire_collection(client, collection_name, context)
-    await collection.data.delete_by_id(**kwargs)
+    await collection.data.delete_by_id(*args, **kwargs)
 
 
 async def collection_data_delete_many(
     client: WeaviateAsyncClient,
     collection_name: str,
+    *args,
     context: dict[str, Any],
     **kwargs,
 ) -> dict[str, Any]:
@@ -239,7 +248,7 @@ async def collection_data_delete_many(
     Forwards all kwargs to collection.data.delete_many().
     """
     collection = acquire_collection(client, collection_name, context)
-    response: DeleteManyReturn = await collection.data.delete_many(**kwargs)
+    response: DeleteManyReturn = await collection.data.delete_many(*args, **kwargs)
 
     return {
         "failed": response.failed,
@@ -252,6 +261,7 @@ async def collection_data_delete_many(
 async def collection_data_exists(
     client: WeaviateAsyncClient,
     collection_name: str,
+    *args,
     context: dict[str, Any],
     **kwargs,
 ) -> bool:
@@ -260,7 +270,7 @@ async def collection_data_exists(
     Forwards all kwargs to collection.data.exists().
     """
     collection = acquire_collection(client, collection_name, context)
-    return await collection.data.exists(**kwargs)
+    return await collection.data.exists(*args, **kwargs)
 
 
 async def register_weaviate(server, service_id: str):

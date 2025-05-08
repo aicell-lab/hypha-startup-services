@@ -140,29 +140,35 @@ async def test_collection_data_insert_many(weaviate_service):
     ]
 
     # Insert data using kwargs
-    result = await weaviate_service.data.insert_many(
-        collection_name="Movie", objects=test_objects
-    )
+    result = await weaviate_service.data.insert_many("Movie", test_objects)
 
     assert result is not None
 
     # Verify objects were inserted by fetching them back
-    query_result = await weaviate_service.query.fetch_objects(
-        collection_name="Movie", limit=10
-    )
+    query_result = await weaviate_service.query.fetch_objects("Movie", limit=10)
 
     assert query_result is not None
     assert "objects" in query_result
     assert len(query_result["objects"]) == 2
     assert all(obj["collection"] == "Movie" for obj in query_result["objects"])
     # check properties
-    assert all(obj["properties"]["title"] in ["The Matrix", "Inception"] for obj in query_result["objects"])
+    assert all(
+        obj["properties"]["title"] in ["The Matrix", "Inception"]
+        for obj in query_result["objects"]
+    )
 
     query_result = await weaviate_service.query.fetch_objects(
-        collection_name="Movie", limit=10, return_properties=["title"], include_vector=False
+        "Movie",
+        limit=10,
+        return_properties=["title"],
+        include_vector=False,
     )
-    assert all(obj["properties"]["title"] in ["The Matrix", "Inception"] for obj in query_result["objects"])
+    assert all(
+        obj["properties"]["title"] in ["The Matrix", "Inception"]
+        for obj in query_result["objects"]
+    )
     assert all(not obj["vector"] for obj in query_result["objects"])
+
 
 @pytest.mark.asyncio
 async def test_collection_data_insert(weaviate_service):
@@ -181,15 +187,13 @@ async def test_collection_data_insert(weaviate_service):
     }
 
     # Insert data
-    uuid = await weaviate_service.data.insert(
-        collection_name="Movie", properties=test_object
-    )
+    uuid = await weaviate_service.data.insert("Movie", properties=test_object)
 
     assert uuid is not None
 
     # Verify object was inserted by fetching it back
     query_result = await weaviate_service.query.fetch_objects(
-        collection_name="Movie",
+        "Movie",
         limit=1,
     )
 
@@ -216,9 +220,7 @@ async def test_collection_data_update(weaviate_service):
         "year": 1994,
     }
 
-    uuid = await weaviate_service.data.insert(
-        collection_name="Movie", properties=test_object
-    )
+    uuid = await weaviate_service.data.insert("Movie", properties=test_object)
 
     # Update the object
     updated_properties = {
@@ -227,14 +229,11 @@ async def test_collection_data_update(weaviate_service):
     }
 
     await weaviate_service.data.update(
-        collection_name="Movie", uuid=uuid, properties=updated_properties
+        "Movie", uuid=uuid, properties=updated_properties
     )
 
     # Verify the update
-    query_result = await weaviate_service.query.fetch_objects(
-        collection_name="Movie",
-        limit=1,
-    )
+    query_result = await weaviate_service.query.fetch_objects("Movie", limit=1)
 
     assert query_result is not None
     assert "objects" in query_result
@@ -259,18 +258,16 @@ async def test_collection_data_exists(weaviate_service):
         "year": 1999,
     }
 
-    uuid = await weaviate_service.data.insert(
-        collection_name="Movie", properties=test_object
-    )
+    uuid = await weaviate_service.data.insert("Movie", properties=test_object)
 
     # Check if object exists
-    exists = await weaviate_service.data.exists(collection_name="Movie", uuid=uuid)
+    exists = await weaviate_service.data.exists("Movie", uuid=uuid)
 
     assert exists is True
 
     # Check if non-existent object returns False
     fake_uuid = "00000000-0000-0000-0000-000000000000"
-    exists = await weaviate_service.data.exists(collection_name="Movie", uuid=fake_uuid)
+    exists = await weaviate_service.data.exists("Movie", uuid=fake_uuid)
 
     assert exists is False
 
@@ -291,23 +288,17 @@ async def test_collection_data_delete_by_id(weaviate_service):
         "year": 2014,
     }
 
-    uuid = await weaviate_service.data.insert(
-        collection_name="Movie", properties=test_object
-    )
+    uuid = await weaviate_service.data.insert("Movie", properties=test_object)
 
     # Verify object exists
-    exists_before = await weaviate_service.data.exists(
-        collection_name="Movie", uuid=uuid
-    )
+    exists_before = await weaviate_service.data.exists("Movie", uuid=uuid)
     assert exists_before is True
 
     # Delete the object
-    await weaviate_service.data.delete_by_id(collection_name="Movie", uuid=uuid)
+    await weaviate_service.data.delete_by_id("Movie", uuid=uuid)
 
     # Verify object no longer exists
-    exists_after = await weaviate_service.data.exists(
-        collection_name="Movie", uuid=uuid
-    )
+    exists_after = await weaviate_service.data.exists("Movie", uuid=uuid)
     assert exists_after is False
 
 
@@ -322,7 +313,7 @@ async def test_collection_query_near_vector(weaviate_service):
 
     # Query using kwargs
     result = await weaviate_service.query.near_vector(
-        collection_name="Movie",
+        "Movie",
         near_vector=test_vector,
         target_vector="title_vector",
         limit=1,
@@ -335,9 +326,16 @@ async def test_collection_query_near_vector(weaviate_service):
     assert len(result["objects"]) > 0
     assert all(obj["collection"] == "Movie" for obj in result["objects"])
     # check properties
-    assert all(obj["properties"]["title"] in ["The Matrix", "Inception"] for obj in result["objects"])
+    assert all(
+        obj["properties"]["title"] in ["The Matrix", "Inception"]
+        for obj in result["objects"]
+    )
     # check vector
-    assert all(("description_vector" in obj["vector"] and "title_vector" in obj["vector"]) for obj in result["objects"])
+    assert all(
+        ("description_vector" in obj["vector"] and "title_vector" in obj["vector"])
+        for obj in result["objects"]
+    )
+
 
 @pytest.mark.asyncio
 async def test_collection_query_fetch_objects(weaviate_service):
@@ -347,7 +345,7 @@ async def test_collection_query_fetch_objects(weaviate_service):
 
     # Fetch objects using kwargs with various parameters
     result = await weaviate_service.query.fetch_objects(
-        collection_name="Movie", limit=1, offset=0, after="", include_vector=False
+        "Movie", limit=1, offset=0, after="", include_vector=False
     )
 
     assert result is not None
@@ -368,7 +366,7 @@ async def test_collection_query_hybrid(weaviate_service):
 
     # Query using kwargs for hybrid search
     result = await weaviate_service.query.hybrid(
-        collection_name="Movie",
+        "Movie",
         query="Science Fiction",
         vector=test_vector,
         target_vector="description_vector",
@@ -390,7 +388,7 @@ async def test_collection_query_near_text(weaviate_service):
     await test_collection_data_insert_many(weaviate_service)
 
     result = await weaviate_service.generate.near_text(
-        collection_name="Movie",
+        "Movie",
         query="A sci-fi film",
         single_prompt="Translate this into French: {title}",
         target_vector="description_vector",
