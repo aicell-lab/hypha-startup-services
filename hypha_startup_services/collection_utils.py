@@ -5,7 +5,7 @@ from weaviate import WeaviateAsyncClient
 from weaviate.collections import CollectionAsync
 from weaviate.collections.classes.config import CollectionConfig
 
-WORKSPACE_DELIMITER = "____"
+WORKSPACE_DELIMITER = "__DELIM__"
 
 
 def acquire_collection(
