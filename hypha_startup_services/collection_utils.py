@@ -1,18 +1,19 @@
 """Utility functions for managing Weaviate collections."""
 
-from typing import Any
 from weaviate import WeaviateAsyncClient
 from weaviate.collections import CollectionAsync
 from weaviate.collections.classes.config import CollectionConfig
 
 WORKSPACE_DELIMITER = "__DELIM__"
+ARTIFACT_DELIMITER = ":"
+DEFAULT_WORKSPACE = "SHARED"
 
 
 def acquire_collection(
-    client: WeaviateAsyncClient, collection_name: str, context: dict = None
+    client: WeaviateAsyncClient, collection_name: str
 ) -> CollectionAsync:
     """Acquire a collection from the client."""
-    collection_name = full_collection_name(collection_name, context)
+    collection_name = full_collection_name(collection_name)
     return client.collections.get(collection_name)
 
 
@@ -59,6 +60,13 @@ def assert_valid_collection_name(collection_name: str) -> None:
     ), f"Collection name should not contain '{WORKSPACE_DELIMITER}'"
 
 
+def assert_valid_application_name(application_id: str) -> None:
+    """Ensure application name doesn't contain the artifact delimiter."""
+    assert (
+        ARTIFACT_DELIMITER not in application_id
+    ), f"Application ID should not contain '{ARTIFACT_DELIMITER}'"
+
+
 def stringify_keys(d: dict) -> dict:
     """Convert all keys in a dictionary to strings."""
     return {str(k): v for k, v in d.items()}
@@ -72,18 +80,24 @@ def full_collection_name_single(workspace: str, collection_name: str) -> str:
     return f"{workspace_formatted}{WORKSPACE_DELIMITER}{collection_name}"
 
 
-def full_collection_name(
-    name: str | list[str], workspace_or_context: str | dict[str, Any]
-) -> str:
+def full_collection_name(name: str | list[str]) -> str:
     """Acquire a collection name from the client."""
-    workspace = (
-        ws_from_context(workspace_or_context)
-        if isinstance(workspace_or_context, dict)
-        else workspace_or_context
-    )
+    workspace = DEFAULT_WORKSPACE
     if isinstance(name, list):
         return [full_collection_name_single(workspace, n) for n in name]
     return full_collection_name_single(workspace, name)
+
+
+def collection_artifact_name(name: str) -> str:
+    """Create a full collection artifact name with workspace prefix."""
+    return full_collection_name(name)
+
+
+def application_artifact_name(ws_collection_name: str, application_id: str) -> str:
+    """Create a full application artifact name with workspace prefix."""
+    assert_valid_collection_name(ws_collection_name)
+    assert_valid_application_name(application_id)
+    return f"{ws_collection_name}{ARTIFACT_DELIMITER}{application_id}"
 
 
 def is_in_workspace(collection_name: str, workspace: str) -> bool:

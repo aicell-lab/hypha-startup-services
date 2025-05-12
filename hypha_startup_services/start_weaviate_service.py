@@ -9,6 +9,7 @@ from functools import partial
 import uuid
 from typing import Any
 from weaviate import WeaviateAsyncClient
+from weaviate.classes.tenants import Tenant
 from weaviate.collections.classes.internal import QueryReturn, GenerativeReturn
 from weaviate.collections.classes.batch import DeleteManyReturn
 from hypha_startup_services.weaviate_client import instantiate_and_connect
@@ -23,19 +24,32 @@ from hypha_startup_services.collection_utils import (
     acquire_collection,
     stringify_keys,
     collection_to_config_dict,
+    application_artifact_name,
+    collection_artifact_name,
 )
+from hypha_startup_services.artifacts import (
+    create_artifact,
+    list_artifacts,
+    get_artifact,
+    delete_artifact,
+    artifact_exists,
+)
+from hypha_rpc.rpc import RemoteService
 
 
 async def collections_exists(
     client: WeaviateAsyncClient, collection_name: str, context: dict[str, Any]
 ) -> bool:
     """Check if a collection exists in the workspace."""
-    collection_name = full_collection_name(collection_name, context)
+    collection_name = full_collection_name(collection_name)
     return await client.collections.exists(collection_name)
 
 
 async def collections_create(
-    client: WeaviateAsyncClient, settings: dict, context: dict[str, Any]
+    client: WeaviateAsyncClient,
+    server: RemoteService,
+    settings: dict,
+    context: dict[str, Any],
 ) -> dict[str, Any]:
     """Create a new collection in the workspace.
 
@@ -44,11 +58,18 @@ async def collections_create(
     """
     settings_with_workspace = settings.copy()
     settings_with_workspace["class"] = full_collection_name(
-        settings_with_workspace["class"], context
+        settings_with_workspace["class"]
     )
 
     collection = await client.collections.create_from_dict(
         settings_with_workspace,
+    )
+
+    await create_artifact(
+        server,
+        settings_with_workspace["class"],
+        settings_with_workspace.get("description", ""),
+        ws_from_context(context),
     )
 
     return await collection_to_config_dict(collection)
@@ -77,7 +98,7 @@ async def collections_get(
 
     Returns the collection configuration with the workspace prefix removed.
     """
-    collection = acquire_collection(client, name, context)
+    collection = acquire_collection(client, name)
     return await collection_to_config_dict(collection)
 
 
@@ -88,8 +109,131 @@ async def collections_delete(
 
     Adds workspace prefix to collection names before deletion.
     """
-    collection_name = full_collection_name(name, context)
+    collection_name = full_collection_name(name)
     await client.collections.delete(collection_name)
+
+
+async def applications_create(
+    client: WeaviateAsyncClient,
+    server: RemoteService,
+    collection_name: str,
+    application_id: str,
+    description: str,
+    context: dict[str, Any],
+) -> dict[str, Any]:
+    """Create a new application in the workspace.
+
+    Adds workspace prefix to the collection name before creating it.
+    Returns the application configuration with the workspace prefix removed.
+    """
+    tenant_name = ws_from_context(context)
+
+    collection = acquire_collection(client, collection_name)
+    existing_tenant = await collection.tenants.get_by_name(tenant_name)
+    if existing_tenant is None or not existing_tenant.name == tenant_name:
+        await collection.tenants.create(
+            tenants=[Tenant(name=tenant_name)],
+        )
+
+    ws_collection_name = full_collection_name(collection_name)
+    artifact_name = application_artifact_name(ws_collection_name, application_id)
+    parent_artifact_name = collection_artifact_name(collection_name)
+    await create_artifact(
+        server,
+        artifact_name,
+        description,
+        tenant_name,
+        parent_id=parent_artifact_name,
+    )
+
+
+async def applications_list_all(
+    server: RemoteService,
+    collection_name: str,
+    context: dict[str, Any],
+) -> dict[str, dict]:
+    tenant_name = ws_from_context(context)
+    parent_artifact_name = collection_artifact_name(collection_name)
+    artifacts = await list_artifacts(server, parent_artifact_name, tenant_name)
+
+    return {artifact["name"]: artifact for artifact in artifacts}
+
+
+async def applications_delete(
+    client: WeaviateAsyncClient,
+    server: RemoteService,
+    collection_name: str,
+    application_id: str,
+    context: dict[str, Any],
+) -> None:
+    """Delete an application by ID from the collection.
+
+    Forwards all kwargs to collection.applications.delete().
+    """
+    tenant_name = ws_from_context(context)
+    ws_collection_name = full_collection_name(collection_name)
+    artifact_name = application_artifact_name(ws_collection_name, application_id)
+    await delete_artifact(
+        server,
+        artifact_name,
+        tenant_name,
+    )
+    collection = acquire_collection(client, collection_name)
+    tenant_collection = collection.with_tenant(tenant_name)
+    # Delete all objects in the collection with the given application ID
+    response = await tenant_collection.data.delete_many(
+        {
+            "where": {
+                "path": ["application_id"],
+                "operator": "Equal",
+                "valueString": application_id,
+            }
+        }
+    )
+
+    return {
+        "failed": response.failed,
+        "matches": response.matches,
+        "objects": objects_without_workspace(response.objects),
+        "successful": response.successful,
+    }
+
+
+async def applications_get(
+    server: WeaviateAsyncClient,
+    collection_name: str,
+    application_id: str,
+    context: dict[str, Any],
+) -> dict[str, Any]:
+    """Get an application by ID from the collection.
+
+    Forwards all kwargs to collection.applications.get().
+    """
+    tenant_name = ws_from_context(context)
+    ws_collection_name = full_collection_name(collection_name)
+    artifact_name = application_artifact_name(ws_collection_name, application_id)
+    artifact = await get_artifact(server, artifact_name, tenant_name)
+    return {
+        "name": artifact.name,
+        "description": artifact.description,
+        "metadata": artifact.metadata,
+    }
+
+
+async def applications_exists(
+    server: WeaviateAsyncClient,
+    collection_name: str,
+    application_id: str,
+    context: dict[str, Any],
+) -> bool:
+    """Check if an application exists in the collection.
+
+    Forwards all kwargs to collection.applications.exists().
+    """
+    tenant_name = ws_from_context(context)
+    ws_collection_name = full_collection_name(collection_name)
+    artifact_name = application_artifact_name(ws_collection_name, application_id)
+    return await artifact_exists(server, artifact_name, tenant_name)
 
 
 async def collection_data_insert_many(
@@ -103,7 +247,7 @@ async def collection_data_insert_many(
 
     Forwards all kwargs to collection.data.insert_many().
     """
-    collection = acquire_collection(client, collection_name, context)
+    collection = acquire_collection(client, collection_name)
     response = await collection.data.insert_many(*args, **kwargs)
 
     return {
@@ -125,7 +269,7 @@ async def collection_data_insert(
 
     Forwards all kwargs to collection.data.insert().
     """
-    collection = acquire_collection(client, collection_name, context)
+    collection = acquire_collection(client, collection_name)
     return await collection.data.insert(*args, **kwargs)
 
 
@@ -140,7 +284,7 @@ async def collection_query_near_vector(
 
     Forwards all kwargs to collection.query.near_vector().
     """
-    collection = acquire_collection(client, collection_name, context)
+    collection = acquire_collection(client, collection_name)
     response: QueryReturn = await collection.query.near_vector(*args, **kwargs)
 
     return {
@@ -159,7 +303,7 @@ async def collection_query_fetch_objects(
 
     Forwards all kwargs to collection.query.fetch_objects().
     """
-    collection = acquire_collection(client, collection_name, context)
+    collection = acquire_collection(client, collection_name)
     response: QueryReturn = await collection.query.fetch_objects(*args, **kwargs)
 
     return {
@@ -178,7 +322,7 @@ async def collection_query_hybrid(
 
     Forwards all kwargs to collection.query.hybrid().
     """
-    collection = acquire_collection(client, collection_name, context)
+    collection = acquire_collection(client, collection_name)
     response: QueryReturn = await collection.query.hybrid(*args, **kwargs)
 
     return {
@@ -197,7 +341,7 @@ async def collection_generate_near_text(
 
     Forwards all kwargs to collection.query.near_text().
     """
-    collection = acquire_collection(client, collection_name, context)
+    collection = acquire_collection(client, collection_name)
     response: GenerativeReturn = await collection.generate.near_text(*args, **kwargs)
 
     return {
@@ -217,7 +361,7 @@ async def collection_data_update(
 
     Forwards all kwargs to collection.data.update().
     """
-    collection = acquire_collection(client, collection_name, context)
+    collection = acquire_collection(client, collection_name)
     await collection.data.update(*args, **kwargs)
 
 
@@ -232,7 +376,7 @@ async def collection_data_delete_by_id(
 
     Forwards all kwargs to collection.data.delete_by_id().
     """
-    collection = acquire_collection(client, collection_name, context)
+    collection = acquire_collection(client, collection_name)
     await collection.data.delete_by_id(*args, **kwargs)
 
 
@@ -247,7 +391,7 @@ async def collection_data_delete_many(
 
     Forwards all kwargs to collection.data.delete_many().
     """
-    collection = acquire_collection(client, collection_name, context)
+    collection = acquire_collection(client, collection_name)
     response: DeleteManyReturn = await collection.data.delete_many(*args, **kwargs)
 
     return {
@@ -269,11 +413,11 @@ async def collection_data_exists(
 
     Forwards all kwargs to collection.data.exists().
     """
-    collection = acquire_collection(client, collection_name, context)
+    collection = acquire_collection(client, collection_name)
     return await collection.data.exists(*args, **kwargs)
 
 
-async def register_weaviate(server, service_id: str):
+async def register_weaviate(server: RemoteService, service_id: str):
     """Register the Weaviate service with the Hypha server.
 
     Sets up all service endpoints for collections, data operations, and queries.
@@ -299,11 +443,18 @@ async def register_weaviate(server, service_id: str):
                 "require_context": True,
             },
             "collections": {
-                "create": partial(collections_create, client),
-                "delete": partial(collections_delete, client),
+                "create": partial(collections_create, client, server),
+                "delete": partial(collections_delete, client, server),
                 "list_all": partial(collections_list_all, client),
                 "get": partial(collections_get, client),
                 "exists": partial(collections_exists, client),
+            },
+            "applications": {
+                "create": partial(applications_create, client, server),
+                "delete": partial(applications_delete, client, server),
+                "list_all": partial(applications_list_all, server),
+                "get": partial(applications_get, server),
+                "exists": partial(applications_exists, server),
             },
             "data": {
                 "insert_many": partial(collection_data_insert_many, client),
