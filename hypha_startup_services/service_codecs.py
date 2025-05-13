@@ -17,6 +17,7 @@ def register_weaviate_codecs(server):
             "name": "uuid-uuid",
             "type": uuid.UUID,
             "encoder": lambda obj: obj.hex,
+            "decoder": uuid.UUID,
         }
     )
 
