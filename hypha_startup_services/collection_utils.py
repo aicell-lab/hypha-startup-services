@@ -6,7 +6,8 @@ from weaviate.collections.classes.config import CollectionConfig
 
 WORKSPACE_DELIMITER = "__DELIM__"
 ARTIFACT_DELIMITER = ":"
-DEFAULT_WORKSPACE = "SHARED"
+SHARED_WORKSPACE = "SHARED"
+ADMIN_WORKSPACES = ["hugo.dettner@scilifelab.se"]
 
 
 def acquire_collection(
@@ -82,7 +83,7 @@ def full_collection_name_single(workspace: str, collection_name: str) -> str:
 
 def full_collection_name(name: str | list[str]) -> str:
     """Acquire a collection name from the client."""
-    workspace = DEFAULT_WORKSPACE
+    workspace = SHARED_WORKSPACE
     if isinstance(name, list):
         return [full_collection_name_single(workspace, n) for n in name]
     return full_collection_name_single(workspace, name)

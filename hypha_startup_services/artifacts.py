@@ -6,7 +6,7 @@ async def create_artifact(
     server: RemoteService,
     artifact_name: str,
     description: str,
-    tenant: str,
+    workspace: str,
     parent_id: str | None = None,
 ) -> dict[str, Any]:
     """Create a new application artifact in the workspace.
@@ -26,7 +26,7 @@ async def create_artifact(
     try:
         await artifact_manager.create(
             type="collection",
-            workspace=tenant,  # TODO: decide workspace
+            workspace=workspace,  # TODO: decide workspace
             alias=artifact_name,
             manifest=galleryManifest,
             parent_id=parent_id,
