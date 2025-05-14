@@ -98,3 +98,17 @@ def get_settings_with_workspace(settings: dict[str, Any]) -> dict[str, Any]:
     original_class_name = settings_with_workspace["class"]
     settings_with_workspace["class"] = full_collection_name(original_class_name)
     return settings_with_workspace
+
+
+def append_app_session(
+    objects: dict[str, Any] | list[dict[str, Any]],
+    application_id: str,
+    session_id: str | None = None,
+) -> list[dict[str, Any]]:
+    """Append the application ID and session ID to each object in the list."""
+    object_list = objects if isinstance(objects, list) else [objects]
+    for obj in object_list:
+        obj["application_id"] = application_id
+        obj.setdefault("session_id", session_id)
+        assert obj.get("session_id") is not None, "Session ID is required"
+    return object_list

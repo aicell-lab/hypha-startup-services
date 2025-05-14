@@ -1,10 +1,13 @@
 """Utility functions for managing Weaviate collections."""
 
+from typing import Any
 from weaviate import WeaviateAsyncClient
 from weaviate.collections import CollectionAsync
+from weaviate.classes.tenants import Tenant
 from hypha_startup_services.utils.format_utils import (
     full_collection_name,
     name_without_workspace,
+    ws_from_context,
 )
 
 
@@ -85,3 +88,28 @@ def apply_query_filter(
     if query_filter:
         kwargs["where"] = query_filter
     return kwargs
+
+
+async def add_tenant_if_not_exists(
+    client: WeaviateAsyncClient,
+    collection_name: str,
+    tenant_name: str,
+) -> None:
+    """Add a tenant to the collection if it doesn't already exist."""
+    collection = acquire_collection(client, collection_name)
+    existing_tenant = await collection.tenants.get_by_name(tenant_name)
+    if existing_tenant is None or not existing_tenant.name == tenant_name:
+        await collection.tenants.create(
+            tenants=[Tenant(name=tenant_name)],
+        )
+
+
+def get_tenant_collection(
+    client: WeaviateAsyncClient,
+    collection_name: str,
+    context: dict[str, Any],
+) -> CollectionAsync:
+    """Get the tenant collection from the client."""
+    tenant_ws = ws_from_context(context)
+    collection = acquire_collection(client, collection_name)
+    return collection.with_tenant(tenant_ws)

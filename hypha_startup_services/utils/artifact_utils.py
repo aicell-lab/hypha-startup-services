@@ -5,6 +5,7 @@ from hypha_startup_services.artifacts import (
     create_artifact,
     delete_artifact,
     get_artifact,
+    artifact_exists,
 )
 from hypha_startup_services.utils.constants import (
     SHARED_WORKSPACE,
@@ -219,4 +220,146 @@ async def check_collection_delete_permissions(
             return {
                 "error": f"You do not have permission to delete collection '{coll_name}'."
             }
+    return None
+
+
+async def create_application_artifact(
+    server: RemoteService,
+    collection_name: str,
+    application_id: str,
+    description: str,
+    tenant_ws: str,
+) -> dict:
+    """Create an application artifact.
+
+    Args:
+        server: RemoteService instance
+        ws_collection_name: Workspace-prefixed collection name
+        application_id: Application ID
+        description: Application description
+        tenant_ws: Tenant workspace
+
+    Returns:
+        Result of artifact creation
+    """
+    # Create application artifact
+    ws_collection_name = full_collection_name(collection_name)
+    artifact_name = application_artifact_name(ws_collection_name, application_id)
+
+    # Set up application metadata
+    metadata = create_artifact_metadata(
+        application_id=application_id,
+        collection_name=collection_name,
+        workspace=tenant_ws,
+    )
+
+    # Set up permissions - owner can write, everyone can read
+    permissions = get_artifact_permissions(owner=True)
+
+    return await create_artifact(
+        server=server,
+        artifact_name=artifact_name,
+        description=description,
+        workspace=tenant_ws,  # Application artifacts are in user's workspace
+        permissions=permissions,
+        metadata=metadata,
+    )
+
+
+async def delete_application_artifact(
+    server: RemoteService, ws_collection_name: str, application_id: str, tenant_ws: str
+) -> None:
+    """Delete an application artifact.
+
+    Args:
+        server: RemoteService instance
+        ws_collection_name: Workspace-prefixed collection name
+        application_id: Application ID
+        tenant_ws: Tenant workspace
+    """
+    artifact_name = application_artifact_name(ws_collection_name, application_id)
+    await delete_artifact(
+        server,
+        artifact_name,
+        tenant_ws,
+    )
+
+
+async def create_session_artifact(
+    server: RemoteService,
+    ws_collection_name: str,
+    application_id: str,
+    session_id: str,
+    description: str,
+    tenant_ws: str,
+    collection_name: str,
+) -> tuple[dict, str]:
+    """Create a session artifact.
+
+    Args:
+        server: RemoteService instance
+        ws_collection_name: Workspace-prefixed collection name
+        application_id: Application ID
+        session_id: Session ID
+        description: Session description
+        tenant_ws: Tenant workspace
+        collection_name: Original collection name
+
+    Returns:
+        Tuple of (result of artifact creation, session artifact name)
+    """
+    session_artifact_name_full = session_artifact_name(
+        ws_collection_name, application_id, session_id
+    )
+
+    # Set up session metadata
+    metadata = create_artifact_metadata(
+        application_id=application_id,
+        collection_name=collection_name,
+        session_id=session_id,
+        workspace=tenant_ws,
+    )
+
+    # Set up permissions - only owner can read and write by default
+    # This restricts session artifacts to only be readable by the session user
+    permissions = get_artifact_permissions(owner=True, read_public=False)
+
+    result = await create_artifact(
+        server=server,
+        artifact_name=session_artifact_name_full,
+        description=description,
+        workspace=tenant_ws,  # Session artifacts are in user's workspace
+        permissions=permissions,
+        metadata=metadata,
+    )
+
+    return result, session_artifact_name_full
+
+
+async def verify_application_exists(
+    server: RemoteService,
+    ws_collection_name: str,
+    application_id: str,
+    tenant_ws: str,
+    collection_name: str,
+) -> dict | None:
+    """Verify that an application exists.
+
+    Args:
+        server: RemoteService instance
+        ws_collection_name: Workspace-prefixed collection name
+        application_id: Application ID
+        tenant_ws: Tenant workspace
+        collection_name: Original collection name
+
+    Returns:
+        Error dict if application doesn't exist, None if it exists
+    """
+    app_artifact_name = application_artifact_name(ws_collection_name, application_id)
+
+    if not await artifact_exists(server, app_artifact_name, tenant_ws):
+        return {
+            "error": f"Application '{application_id}' does not exist in collection '{collection_name}'."
+        }
+
     return None
