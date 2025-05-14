@@ -2,7 +2,7 @@ import os
 import argparse
 import asyncio
 from hypha_rpc import connect_to_server
-from hypha_startup_services.start_weaviate_service import register_weaviate
+from hypha_startup_services.register_weaviate_service import register_weaviate
 
 
 async def register_to_existing_server(provided_url, service_id, port=None):

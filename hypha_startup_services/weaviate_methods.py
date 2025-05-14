@@ -12,8 +12,6 @@ from weaviate.classes.tenants import Tenant
 from weaviate.collections.classes.internal import QueryReturn, GenerativeReturn
 from weaviate.collections.classes.batch import DeleteManyReturn
 from hypha_rpc.rpc import RemoteService
-from hypha_startup_services.weaviate_client import instantiate_and_connect
-from hypha_startup_services.service_codecs import register_weaviate_codecs
 from hypha_startup_services.collection_utils import (
     full_collection_name,
     config_minus_workspace,
@@ -26,10 +24,13 @@ from hypha_startup_services.collection_utils import (
     collection_to_config_dict,
     application_artifact_name,
     collection_artifact_name,
-    is_admin_workspace,
     session_artifact_name,
     get_artifact_permissions,
     SHARED_WORKSPACE,
+    is_admin,
+    create_artifact_metadata,
+    create_application_filter,
+    apply_query_filter,
 )
 from hypha_startup_services.artifacts import (
     create_artifact,
@@ -38,46 +39,6 @@ from hypha_startup_services.artifacts import (
     delete_artifact,
     artifact_exists,
 )
-from hypha_startup_services.register_weaviate_service import register_weaviate_service
-
-
-async def is_admin(
-    server: RemoteService, context: dict[str, Any], collection_name: str = None
-) -> bool:
-    """Check if the user has admin permissions for collections.
-
-    Args:
-        server: The RemoteService instance
-        context: The request context containing workspace info
-        collection_name: Optional collection name to check permissions for
-
-    Returns:
-        True if the user has admin permissions, False otherwise
-    """
-    workspace = ws_from_context(context)
-
-    # First check if the user is in the admin workspaces list
-    if is_admin_workspace(workspace):
-        return True
-
-    # If no specific collection is provided, return False for non-admins
-    if collection_name is None:
-        return False
-
-    # Check if the user has admin permissions for this specific collection artifact
-    collection_artifact = collection_artifact_name(collection_name)
-
-    try:
-        artifact = await get_artifact(server, collection_artifact, workspace)
-        # Check if current user has admin permissions in this artifact
-        # This would depend on how permissions are stored in the artifact
-        if "permissions" in artifact and "admin" in artifact["permissions"]:
-            if workspace in artifact["permissions"]["admin"]:
-                return True
-    except Exception:
-        pass
-
-    return False
 
 
 async def collections_exists(
@@ -479,7 +440,6 @@ async def query_hybrid(
     client: WeaviateAsyncClient,
     collection_name: str,
     application_id: str = None,
-    *args,
     session_id: str = None,
     context: dict[str, Any] = None,
     **kwargs,
@@ -496,7 +456,7 @@ async def query_hybrid(
     # Apply filters for application_id and session_id if provided
     kwargs = apply_query_filter(kwargs, application_id, session_id)
 
-    response: QueryReturn = await tenant_collection.query.hybrid(*args, **kwargs)
+    response: QueryReturn = await tenant_collection.query.hybrid(**kwargs)
 
     return {
         "objects": objects_without_workspace(response.objects),
@@ -586,31 +546,6 @@ async def data_exists(
     """
     collection = acquire_collection(client, collection_name)
     return await collection.data.exists(uuid=uuid_input)
-
-
-async def register_weaviate(server: RemoteService, service_id: str):
-    """Register the Weaviate service with the Hypha server.
-
-    Sets up all service endpoints for collections, data operations, and queries.
-    """
-    register_weaviate_codecs(server)
-    weaviate_url = "https://hypha-weaviate.scilifelab-2-dev.sys.kth.se"
-    weaviate_grpc_url = "https://hypha-weaviate-grpc.scilifelab-2-dev.sys.kth.se"
-
-    http_host = weaviate_url.replace("https://", "").replace("http://", "")
-    grpc_host = weaviate_grpc_url.replace("https://", "").replace("http://", "")
-    is_secure = weaviate_url.startswith("https://")
-    is_grpc_secure = weaviate_grpc_url.startswith("https://")
-    client = await instantiate_and_connect(
-        http_host, is_secure, grpc_host, is_grpc_secure
-    )
-
-    await register_weaviate_service(server, client, service_id)
-
-    print(
-        "Service registered at",
-        f"{server.config.public_base_url}/{server.config.workspace}/services/{service_id}",
-    )
 
 
 async def sessions_create(
@@ -718,114 +653,3 @@ async def sessions_delete(
     )
 
     return {"success": True}
-
-
-# Helper functions to reduce repetition
-
-
-def create_application_filter(application_id: str) -> dict:
-    """Create a filter for application_id."""
-    return {
-        "path": ["application_id"],
-        "operator": "Equal",
-        "valueString": application_id,
-    }
-
-
-def create_session_filter(session_id: str) -> dict:
-    """Create a filter for session_id."""
-    return {
-        "path": ["session_id"],
-        "operator": "Equal",
-        "valueString": session_id,
-    }
-
-
-def build_query_filter(
-    application_id: str = None, session_id: str = None
-) -> dict | None:
-    """Build a query filter for application_id and optionally session_id.
-
-    Args:
-        application_id: The application ID to filter by
-        session_id: The optional session ID to filter by
-
-    Returns:
-        A Weaviate filter object or None if no filters are requested
-    """
-    if not application_id:
-        return None
-
-    app_filter = create_application_filter(application_id)
-
-    if session_id:
-        session_filter = create_session_filter(session_id)
-        return {
-            "operator": "And",
-            "operands": [app_filter, session_filter],
-        }
-
-    return app_filter
-
-
-def apply_query_filter(
-    kwargs: dict, application_id: str = None, session_id: str = None
-) -> dict:
-    """Apply application and session filters to query kwargs if needed.
-
-    Args:
-        kwargs: The existing query kwargs
-        application_id: The application ID to filter by
-        session_id: The optional session ID to filter by
-
-    Returns:
-        Updated kwargs dict with filters added
-    """
-    query_filter = build_query_filter(application_id, session_id)
-    if query_filter:
-        kwargs["where"] = query_filter
-    return kwargs
-
-
-def create_artifact_metadata(
-    collection_name: str = None,
-    application_id: str = None,
-    session_id: str = None,
-    description: str = None,
-    workspace: str = None,
-    **kwargs,
-) -> dict:
-    """Create standard metadata for artifacts.
-
-    Args:
-        collection_name: The collection name
-        application_id: The application ID
-        session_id: The session ID
-        description: The artifact description
-        workspace: The creator's workspace
-        **kwargs: Additional metadata fields
-
-    Returns:
-        A metadata dictionary with standard fields
-    """
-    metadata = {
-        "created_by": workspace,
-        "created_at": str(uuid.uuid1()),
-    }
-
-    if collection_name:
-        metadata["collection_name"] = collection_name
-
-    if application_id:
-        metadata["application_id"] = application_id
-
-    if session_id:
-        metadata["session_id"] = session_id
-
-    if description:
-        metadata["description"] = description
-
-    # Add any additional metadata
-    metadata.update(kwargs)
-
-    return metadata

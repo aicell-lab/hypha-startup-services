@@ -3,6 +3,9 @@ Helper functions to register the Weaviate service with proper API endpoints.
 """
 
 from functools import partial
+from hypha_rpc.rpc import RemoteService
+from hypha_startup_services.service_codecs import register_weaviate_codecs
+from hypha_startup_services.weaviate_client import instantiate_and_connect
 from hypha_startup_services.weaviate_methods import (
     collections_create,
     collections_delete,
@@ -28,6 +31,31 @@ from hypha_startup_services.weaviate_methods import (
     query_hybrid,
     generate_near_text,
 )
+
+
+async def register_weaviate(server: RemoteService, service_id: str):
+    """Register the Weaviate service with the Hypha server.
+
+    Sets up all service endpoints for collections, data operations, and queries.
+    """
+    register_weaviate_codecs(server)
+    weaviate_url = "https://hypha-weaviate.scilifelab-2-dev.sys.kth.se"
+    weaviate_grpc_url = "https://hypha-weaviate-grpc.scilifelab-2-dev.sys.kth.se"
+
+    http_host = weaviate_url.replace("https://", "").replace("http://", "")
+    grpc_host = weaviate_grpc_url.replace("https://", "").replace("http://", "")
+    is_secure = weaviate_url.startswith("https://")
+    is_grpc_secure = weaviate_grpc_url.startswith("https://")
+    client = await instantiate_and_connect(
+        http_host, is_secure, grpc_host, is_grpc_secure
+    )
+
+    await register_weaviate_service(server, client, service_id)
+
+    print(
+        "Service registered at",
+        f"{server.config.public_base_url}/{server.config.workspace}/services/{service_id}",
+    )
 
 
 def register_weaviate_service(server, client, service_id):

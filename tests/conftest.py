@@ -5,7 +5,7 @@ import pytest
 import pytest_asyncio
 from dotenv import load_dotenv
 from hypha_rpc import connect_to_server
-from hypha_startup_services.start_weaviate_service import register_weaviate
+from hypha_startup_services.register_weaviate_service import register_weaviate
 
 load_dotenv()
 
