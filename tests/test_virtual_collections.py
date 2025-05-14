@@ -2,7 +2,6 @@
 
 import pytest
 import uuid
-import pytest_asyncio
 
 
 @pytest.mark.asyncio
