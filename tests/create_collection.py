@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 from hypha_rpc import connect_to_server
-from hypha_startup_services.start_weaviate_service import register_weaviate
+from hypha_startup_services.weaviate_methods import register_weaviate
 import asyncio
 
 load_dotenv()
