@@ -3,7 +3,7 @@ Helper functions to register the Weaviate service with proper API endpoints.
 """
 
 from functools import partial
-from hypha_startup_services.start_weaviate_service import (
+from hypha_startup_services.weaviate_methods import (
     collections_create,
     collections_delete,
     collections_list_all,

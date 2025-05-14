@@ -38,7 +38,7 @@ from hypha_startup_services.artifacts import (
     delete_artifact,
     artifact_exists,
 )
-from hypha_startup_services.register_service import register_weaviate_service
+from hypha_startup_services.register_weaviate_service import register_weaviate_service
 
 
 async def is_admin(
