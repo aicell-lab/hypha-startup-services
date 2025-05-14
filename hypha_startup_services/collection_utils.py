@@ -8,6 +8,7 @@ WORKSPACE_DELIMITER = "__DELIM__"
 ARTIFACT_DELIMITER = ":"
 SHARED_WORKSPACE = "SHARED"
 ADMIN_WORKSPACES = ["hugo.dettner@scilifelab.se"]
+SESSION_DELIMITER = "@"
 
 
 def acquire_collection(
@@ -101,10 +102,24 @@ def application_artifact_name(ws_collection_name: str, application_id: str) -> s
     return f"{ws_collection_name}{ARTIFACT_DELIMITER}{application_id}"
 
 
+def session_artifact_name(
+    ws_collection_name: str, application_id: str, session_id: str
+) -> str:
+    """Create a full session artifact name."""
+    assert_valid_collection_name(ws_collection_name)
+    assert_valid_application_name(application_id)
+    return f"{ws_collection_name}{ARTIFACT_DELIMITER}{application_id}{SESSION_DELIMITER}{session_id}"
+
+
 def is_in_workspace(collection_name: str, workspace: str) -> bool:
     """Check if a collection belongs to the specified workspace."""
     formatted_workspace = format_workspace(workspace)
     return collection_name.startswith(f"{formatted_workspace}{WORKSPACE_DELIMITER}")
+
+
+def is_admin_workspace(workspace: str) -> bool:
+    """Check if a workspace has admin privileges."""
+    return workspace in ADMIN_WORKSPACES
 
 
 def ws_from_context(context: dict) -> str:
@@ -119,3 +134,38 @@ def objects_without_workspace(objects: list[dict]) -> list[dict]:
     for obj in objects:
         obj.collection = name_without_workspace(obj.collection)
     return objects
+
+
+def get_artifact_permissions(
+    owner: bool = False, admin: bool = False, read_public: bool = True
+) -> dict:
+    """Generate permissions dictionary for artifacts.
+
+    Args:
+        owner: If True, adds $OWNER to write permissions
+        admin: If True, adds $ADMIN to admin and write permissions
+        read_public: If True, everyone can read. If False, only owner can read.
+
+    Returns:
+        A permissions dictionary with read, write, and admin keys
+    """
+    permissions = {
+        "read": ["*"] if read_public else ["$OWNER"],  # Control read access
+        "write": [],  # No write by default
+        "admin": [],  # No admin by default
+    }
+
+    if owner:
+        permissions["write"].append("$OWNER")
+        if not read_public:
+            # Ensure owner is in read permissions if not public
+            permissions["read"].append("$OWNER")
+
+    if admin:
+        permissions["admin"].append("$ADMIN")
+        permissions["write"].append("$ADMIN")
+        if not read_public:
+            # Ensure admins can read even if not public
+            permissions["read"].append("$ADMIN")
+
+    return permissions

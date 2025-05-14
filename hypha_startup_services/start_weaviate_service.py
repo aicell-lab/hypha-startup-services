@@ -5,13 +5,13 @@ This module provides functionality to interface with Weaviate vector database,
 handling collections, data operations, and query functionality with workspace isolation.
 """
 
-from functools import partial
 import uuid
 from typing import Any
 from weaviate import WeaviateAsyncClient
 from weaviate.classes.tenants import Tenant
 from weaviate.collections.classes.internal import QueryReturn, GenerativeReturn
 from weaviate.collections.classes.batch import DeleteManyReturn
+from hypha_rpc.rpc import RemoteService
 from hypha_startup_services.weaviate_client import instantiate_and_connect
 from hypha_startup_services.service_codecs import register_weaviate_codecs
 from hypha_startup_services.collection_utils import (
@@ -26,6 +26,10 @@ from hypha_startup_services.collection_utils import (
     collection_to_config_dict,
     application_artifact_name,
     collection_artifact_name,
+    is_admin_workspace,
+    session_artifact_name,
+    get_artifact_permissions,
+    SHARED_WORKSPACE,
 )
 from hypha_startup_services.artifacts import (
     create_artifact,
@@ -34,11 +38,46 @@ from hypha_startup_services.artifacts import (
     delete_artifact,
     artifact_exists,
 )
-from hypha_rpc.rpc import RemoteService
+from hypha_startup_services.register_service import register_weaviate_service
 
 
-def is_admin(context: dict[str, Any]) -> bool:
-    return True
+async def is_admin(
+    server: RemoteService, context: dict[str, Any], collection_name: str = None
+) -> bool:
+    """Check if the user has admin permissions for collections.
+
+    Args:
+        server: The RemoteService instance
+        context: The request context containing workspace info
+        collection_name: Optional collection name to check permissions for
+
+    Returns:
+        True if the user has admin permissions, False otherwise
+    """
+    workspace = ws_from_context(context)
+
+    # First check if the user is in the admin workspaces list
+    if is_admin_workspace(workspace):
+        return True
+
+    # If no specific collection is provided, return False for non-admins
+    if collection_name is None:
+        return False
+
+    # Check if the user has admin permissions for this specific collection artifact
+    collection_artifact = collection_artifact_name(collection_name)
+
+    try:
+        artifact = await get_artifact(server, collection_artifact, workspace)
+        # Check if current user has admin permissions in this artifact
+        # This would depend on how permissions are stored in the artifact
+        if "permissions" in artifact and "admin" in artifact["permissions"]:
+            if workspace in artifact["permissions"]["admin"]:
+                return True
+    except Exception:
+        pass
+
+    return False
 
 
 async def collections_exists(
@@ -60,38 +99,51 @@ async def collections_create(
     Adds workspace prefix to the collection name before creating it.
     Returns the collection configuration with the workspace prefix removed.
     """
-    if not is_admin(context):
+    if not await is_admin(server, context):
         return {
             "error": "You do not have permission to create collections in this workspace."
         }
 
     settings_with_workspace = settings.copy()
-    settings_with_workspace["class"] = full_collection_name(
-        settings_with_workspace["class"]
-    )
+    original_class_name = settings_with_workspace["class"]
+    settings_with_workspace["class"] = full_collection_name(original_class_name)
 
+    # Create the collection in Weaviate
     collection = await client.collections.create_from_dict(
         settings_with_workspace,
+    )
+
+    # Create an artifact in the shared workspace for the collection
+    # This artifact will be used for permission management
+    workspace = ws_from_context(context)
+    permissions = get_artifact_permissions(owner=True, admin=True)
+    metadata = create_artifact_metadata(
+        workspace=workspace,
+        description=settings_with_workspace.get("description", ""),
+        collection_type="weaviate",
+        settings=settings,
     )
 
     await create_artifact(
         server,
         settings_with_workspace["class"],
         settings_with_workspace.get("description", ""),
-        ws_from_context(context),
+        SHARED_WORKSPACE,  # Store collection artifacts in shared workspace
+        permissions=permissions,
+        metadata=metadata,
     )
 
     return await collection_to_config_dict(collection)
 
 
 async def collections_list_all(
-    client: WeaviateAsyncClient, context: dict[str, Any]
+    client: WeaviateAsyncClient, server: RemoteService, context: dict[str, Any]
 ) -> dict[str, dict]:
     """List all collections in the workspace.
 
     Returns collections with workspace prefixes removed from their names.
     """
-    if not is_admin(context):
+    if not await is_admin(server, context):
         return {
             "error": "You do not have permission to list collections in this workspace."
         }
@@ -106,13 +158,16 @@ async def collections_list_all(
 
 
 async def collections_get(
-    client: WeaviateAsyncClient, name: str, context: dict[str, Any]
+    client: WeaviateAsyncClient,
+    server: RemoteService,
+    name: str,
+    context: dict[str, Any],
 ) -> dict[str, Any]:
     """Get a collection's configuration by name.
 
     Returns the collection configuration with the workspace prefix removed.
     """
-    if not is_admin(context):
+    if not await is_admin(server, context, name):
         return {
             "error": "You do not have permission to get collections in this workspace."
         }
@@ -122,19 +177,38 @@ async def collections_get(
 
 
 async def collections_delete(
-    client: WeaviateAsyncClient, name: str | list[str], context: dict[str, Any]
+    client: WeaviateAsyncClient,
+    server: RemoteService,
+    name: str | list[str],
+    context: dict[str, Any],
 ) -> None:
     """Delete a collection or multiple collections by name.
 
     Adds workspace prefix to collection names before deletion.
+    Also deletes the collection artifact from the shared workspace.
     """
-    if not is_admin(context):
-        return {
-            "error": "You do not have permission to delete collections in this workspace."
-        }
+    # Check if single name or list of names
+    names = [name] if isinstance(name, str) else name
 
-    collection_name = full_collection_name(name)
-    await client.collections.delete(collection_name)
+    # Check permissions for each collection
+    for coll_name in names:
+        if not await is_admin(server, context, coll_name):
+            return {
+                "error": f"You do not have permission to delete collection '{coll_name}'."
+            }
+
+    # Delete each collection
+    for coll_name in names:
+        # Delete from Weaviate
+        full_name = full_collection_name(coll_name)
+        await client.collections.delete(full_name)
+
+        # Delete collection artifact
+        await delete_artifact(
+            server,
+            full_name,
+            SHARED_WORKSPACE,
+        )
 
 
 async def add_tenant_if_not_exists(
@@ -162,26 +236,55 @@ async def applications_create(
     """Create a new application in the workspace.
 
     Adds workspace prefix to the collection name before creating it.
-    Returns the application configuration with the workspace prefix removed.
+    Creates an application artifact in the user's workspace as a child of the collection artifact.
+    Returns the application configuration.
     """
     tenant_ws = ws_from_context(context)
 
+    # Make sure the collection exists and the user has the tenant
+    if not await collections_exists(client, collection_name, context):
+        return {"error": f"Collection '{collection_name}' does not exist."}
+
+    # Add tenant for this user if it doesn't exist
     await add_tenant_if_not_exists(
         client,
         collection_name,
         tenant_ws,
     )
 
+    # Create application artifact
     ws_collection_name = full_collection_name(collection_name)
     artifact_name = application_artifact_name(ws_collection_name, application_id)
     parent_artifact_name = collection_artifact_name(collection_name)
-    await create_artifact(
+
+    # Set up application metadata
+    metadata = create_artifact_metadata(
+        application_id=application_id,
+        collection_name=collection_name,
+        workspace=tenant_ws,
+    )
+
+    # Set up permissions - owner can write, everyone can read
+    permissions = get_artifact_permissions(owner=True)
+
+    result = await create_artifact(
         server=server,
         artifact_name=artifact_name,
         description=description,
-        workspace=tenant_ws,  # TODO: should be SHARED_WORKSPACE?
+        workspace=tenant_ws,  # Application artifacts are in user's workspace
         parent_id=parent_artifact_name,
+        permissions=permissions,
+        metadata=metadata,
     )
+
+    return {
+        "application_id": application_id,
+        "collection_name": collection_name,
+        "description": description,
+        "owner": tenant_ws,
+        "artifact_name": artifact_name,
+        "result": result,
+    }
 
 
 async def applications_list_all(
@@ -214,13 +317,10 @@ async def applications_delete(
     )
     collection = acquire_collection(client, collection_name)
     tenant_collection = collection.with_tenant(tenant_ws)
+
     # Delete all objects in the collection with the given application ID
     response = await tenant_collection.data.delete_many(
-        where={  # TODO: convert to Weaviate filter
-            "path": ["application_id"],
-            "operator": "Equal",
-            "valueString": application_id,
-        }
+        where=create_application_filter(application_id)
     )
 
     return {
@@ -324,18 +424,24 @@ async def query_near_vector(
     client: WeaviateAsyncClient,
     collection_name: str,
     application_id: str,
-    *args,
-    context: dict[str, Any],
+    session_id: str = None,
+    context: dict[str, Any] = None,
     **kwargs,
 ) -> dict[str, Any]:
     """Query the collection using a vector.
 
     Forwards all kwargs to collection.query.near_vector().
+    Filters results by application_id and optionally by session_id.
     """
     tenant_ws = ws_from_context(context)
     collection = acquire_collection(client, collection_name)
     tenant_collection = collection.with_tenant(tenant_ws)
-    response: QueryReturn = await tenant_collection.query.near_vector(*args, **kwargs)
+
+    # Apply filters for application_id and session_id
+    kwargs = apply_query_filter(kwargs, application_id, session_id)
+
+    # Execute query with filters
+    response: QueryReturn = await tenant_collection.query.near_vector(**kwargs)
 
     return {
         "objects": objects_without_workspace(response.objects),
@@ -345,16 +451,24 @@ async def query_near_vector(
 async def query_fetch_objects(
     client: WeaviateAsyncClient,
     collection_name: str,
-    *args,
-    context: dict[str, Any],
+    application_id: str = None,
+    session_id: str = None,
+    context: dict[str, Any] = None,
     **kwargs,
 ) -> dict[str, Any]:
     """Query the collection to fetch objects.
 
     Forwards all kwargs to collection.query.fetch_objects().
+    Filters results by application_id and optionally by session_id if provided.
     """
+    tenant_ws = ws_from_context(context)
     collection = acquire_collection(client, collection_name)
-    response: QueryReturn = await collection.query.fetch_objects(*args, **kwargs)
+    tenant_collection = collection.with_tenant(tenant_ws)
+
+    # Apply filters for application_id and session_id if provided
+    kwargs = apply_query_filter(kwargs, application_id, session_id)
+
+    response: QueryReturn = await tenant_collection.query.fetch_objects(**kwargs)
 
     return {
         "objects": objects_without_workspace(response.objects),
@@ -364,16 +478,25 @@ async def query_fetch_objects(
 async def query_hybrid(
     client: WeaviateAsyncClient,
     collection_name: str,
+    application_id: str = None,
     *args,
-    context: dict[str, Any],
+    session_id: str = None,
+    context: dict[str, Any] = None,
     **kwargs,
 ) -> dict[str, Any]:
     """Query the collection using hybrid search.
 
     Forwards all kwargs to collection.query.hybrid().
+    Filters results by application_id and optionally by session_id if provided.
     """
+    tenant_ws = ws_from_context(context)
     collection = acquire_collection(client, collection_name)
-    response: QueryReturn = await collection.query.hybrid(*args, **kwargs)
+    tenant_collection = collection.with_tenant(tenant_ws)
+
+    # Apply filters for application_id and session_id if provided
+    kwargs = apply_query_filter(kwargs, application_id, session_id)
+
+    response: QueryReturn = await tenant_collection.query.hybrid(*args, **kwargs)
 
     return {
         "objects": objects_without_workspace(response.objects),
@@ -482,48 +605,227 @@ async def register_weaviate(server: RemoteService, service_id: str):
         http_host, is_secure, grpc_host, is_grpc_secure
     )
 
-    await server.register_service(
-        {
-            "name": "Hypha Weaviate Service",
-            "id": service_id,
-            "config": {
-                "visibility": "public",
-                "require_context": True,
-            },
-            "collections": {
-                "create": partial(collections_create, client, server),
-                "delete": partial(collections_delete, client, server),
-                "list_all": partial(collections_list_all, client),
-                "get": partial(collections_get, client),
-                "exists": partial(collections_exists, client),
-            },
-            "applications": {
-                "create": partial(applications_create, client, server),
-                "delete": partial(applications_delete, client, server),
-                "list_all": partial(applications_list_all, server),
-                "get": partial(applications_get, server),
-                "exists": partial(applications_exists, server),
-            },
-            "data": {
-                "insert_many": partial(data_insert_many, client),
-                "insert": partial(data_insert, client),
-                "update": partial(data_update, client),
-                "delete_by_id": partial(data_delete_by_id, client),
-                "delete_many": partial(data_delete_many, client),
-                "exists": partial(data_exists, client),
-            },
-            "query": {
-                "near_vector": partial(query_near_vector, client),
-                "fetch_objects": partial(query_fetch_objects, client),
-                "hybrid": partial(query_hybrid, client),
-            },
-            "generate": {
-                "near_text": partial(generate_near_text, client),
-            },
-        }
-    )
+    await register_weaviate_service(server, client, service_id)
 
     print(
         "Service registered at",
         f"{server.config.public_base_url}/{server.config.workspace}/services/{service_id}",
     )
+
+
+async def sessions_create(
+    server: RemoteService,
+    collection_name: str,
+    application_id: str,
+    session_id: str,
+    description: str,
+    context: dict[str, Any],
+) -> dict[str, Any]:
+    """Create a new session for an application.
+
+    Creates a session artifact in the user's workspace as a child of the application artifact.
+    Returns the session configuration.
+    """
+    tenant_ws = ws_from_context(context)
+
+    # Verify the application exists
+    ws_collection_name = full_collection_name(collection_name)
+    app_artifact_name = application_artifact_name(ws_collection_name, application_id)
+
+    if not await artifact_exists(server, app_artifact_name, tenant_ws):
+        return {
+            "error": f"Application '{application_id}' does not exist in collection '{collection_name}'."
+        }
+
+    # Create session artifact
+    session_artifact_name_full = session_artifact_name(
+        ws_collection_name, application_id, session_id
+    )
+
+    # Set up session metadata
+    metadata = create_artifact_metadata(
+        application_id=application_id,
+        collection_name=collection_name,
+        session_id=session_id,
+        workspace=tenant_ws,
+    )
+
+    # Set up permissions - only owner can read and write by default
+    # This restricts session artifacts to only be readable by the session user
+    permissions = get_artifact_permissions(owner=True, read_public=False)
+
+    result = await create_artifact(
+        server=server,
+        artifact_name=session_artifact_name_full,
+        description=description,
+        workspace=tenant_ws,  # Session artifacts are in user's workspace
+        parent_id=app_artifact_name,
+        permissions=permissions,
+        metadata=metadata,
+    )
+
+    return {
+        "session_id": session_id,
+        "application_id": application_id,
+        "collection_name": collection_name,
+        "description": description,
+        "owner": tenant_ws,
+        "artifact_name": session_artifact_name_full,
+        "result": result,
+    }
+
+
+async def sessions_list_all(
+    server: RemoteService,
+    collection_name: str,
+    application_id: str,
+    context: dict[str, Any],
+) -> dict[str, dict]:
+    """List all sessions for an application."""
+    tenant_ws = ws_from_context(context)
+
+    # Get application artifact name
+    ws_collection_name = full_collection_name(collection_name)
+    app_artifact_name = application_artifact_name(ws_collection_name, application_id)
+
+    # List all child artifacts (sessions)
+    sessions = await list_artifacts(server, app_artifact_name, tenant_ws)
+
+    return {session["name"]: session for session in sessions}
+
+
+async def sessions_delete(
+    server: RemoteService,
+    collection_name: str,
+    application_id: str,
+    session_id: str,
+    context: dict[str, Any],
+) -> None:
+    """Delete a session artifact."""
+    tenant_ws = ws_from_context(context)
+
+    # Get session artifact name
+    ws_collection_name = full_collection_name(collection_name)
+    session_artifact_name_full = session_artifact_name(
+        ws_collection_name, application_id, session_id
+    )
+
+    # Delete the session artifact
+    await delete_artifact(
+        server,
+        session_artifact_name_full,
+        tenant_ws,
+    )
+
+    return {"success": True}
+
+
+# Helper functions to reduce repetition
+
+
+def create_application_filter(application_id: str) -> dict:
+    """Create a filter for application_id."""
+    return {
+        "path": ["application_id"],
+        "operator": "Equal",
+        "valueString": application_id,
+    }
+
+
+def create_session_filter(session_id: str) -> dict:
+    """Create a filter for session_id."""
+    return {
+        "path": ["session_id"],
+        "operator": "Equal",
+        "valueString": session_id,
+    }
+
+
+def build_query_filter(
+    application_id: str = None, session_id: str = None
+) -> dict | None:
+    """Build a query filter for application_id and optionally session_id.
+
+    Args:
+        application_id: The application ID to filter by
+        session_id: The optional session ID to filter by
+
+    Returns:
+        A Weaviate filter object or None if no filters are requested
+    """
+    if not application_id:
+        return None
+
+    app_filter = create_application_filter(application_id)
+
+    if session_id:
+        session_filter = create_session_filter(session_id)
+        return {
+            "operator": "And",
+            "operands": [app_filter, session_filter],
+        }
+
+    return app_filter
+
+
+def apply_query_filter(
+    kwargs: dict, application_id: str = None, session_id: str = None
+) -> dict:
+    """Apply application and session filters to query kwargs if needed.
+
+    Args:
+        kwargs: The existing query kwargs
+        application_id: The application ID to filter by
+        session_id: The optional session ID to filter by
+
+    Returns:
+        Updated kwargs dict with filters added
+    """
+    query_filter = build_query_filter(application_id, session_id)
+    if query_filter:
+        kwargs["where"] = query_filter
+    return kwargs
+
+
+def create_artifact_metadata(
+    collection_name: str = None,
+    application_id: str = None,
+    session_id: str = None,
+    description: str = None,
+    workspace: str = None,
+    **kwargs,
+) -> dict:
+    """Create standard metadata for artifacts.
+
+    Args:
+        collection_name: The collection name
+        application_id: The application ID
+        session_id: The session ID
+        description: The artifact description
+        workspace: The creator's workspace
+        **kwargs: Additional metadata fields
+
+    Returns:
+        A metadata dictionary with standard fields
+    """
+    metadata = {
+        "created_by": workspace,
+        "created_at": str(uuid.uuid1()),
+    }
+
+    if collection_name:
+        metadata["collection_name"] = collection_name
+
+    if application_id:
+        metadata["application_id"] = application_id
+
+    if session_id:
+        metadata["session_id"] = session_id
+
+    if description:
+        metadata["description"] = description
+
+    # Add any additional metadata
+    metadata.update(kwargs)
+
+    return metadata

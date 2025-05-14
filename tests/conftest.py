@@ -1,12 +1,39 @@
 """Common test fixtures for weaviate tests."""
 
 import os
+import pytest
 import pytest_asyncio
 from dotenv import load_dotenv
 from hypha_rpc import connect_to_server
 from hypha_startup_services.start_weaviate_service import register_weaviate
 
 load_dotenv()
+
+
+# Add command line options for testing
+def pytest_addoption(parser):
+    parser.addoption(
+        "--token",
+        action="store",
+        default=os.environ.get("HYPHA_TOKEN"),
+        help="Token for connecting to the Hypha server",
+    )
+    parser.addoption(
+        "--service-id",
+        action="store",
+        default="weaviate-test",
+        help="Service ID to use for the Weaviate service",
+    )
+
+
+@pytest.fixture
+def token(request):
+    return request.config.getoption("--token")
+
+
+@pytest.fixture
+def service_id(request):
+    return request.config.getoption("--service-id")
 
 
 async def get_server(server_url: str):

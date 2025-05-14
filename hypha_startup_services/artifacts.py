@@ -8,31 +8,39 @@ async def create_artifact(
     description: str,
     workspace: str,
     parent_id: str | None = None,
+    permissions: dict | None = None,
+    metadata: dict | None = None,
 ) -> dict[str, Any]:
     """Create a new application artifact in the workspace.
 
     Adds workspace prefix to the collection name before creating it.
     Returns the application configuration with the workspace prefix removed.
     """
+    if metadata is None:
+        metadata = {}
 
     galleryManifest = {
         "name": artifact_name,
         "description": description,
         "collection": [],
+        "metadata": metadata,
     }
 
     artifact_manager = await server.get_service("public/artifact-manager")
 
     try:
-        await artifact_manager.create(
+        result = await artifact_manager.create(
             type="collection",
-            workspace=workspace,  # TODO: decide workspace
+            workspace=workspace,
             alias=artifact_name,
             manifest=galleryManifest,
             parent_id=parent_id,
+            permissions=permissions,
         )
+        return result
     except RemoteException as e:
-        print(f"Collection couldn't be created. It likely already exists. Error: {e}")
+        print(f"Artifact couldn't be created. It likely already exists. Error: {e}")
+        return {"error": str(e)}
 
 
 async def list_artifacts(
