@@ -12,25 +12,32 @@ from weaviate.classes.tenants import Tenant
 from weaviate.collections.classes.internal import QueryReturn, GenerativeReturn
 from weaviate.collections.classes.batch import DeleteManyReturn
 from hypha_rpc.rpc import RemoteService
-from hypha_startup_services.collection_utils import (
+from hypha_startup_services.utils.collection_utils import (
     full_collection_name,
-    config_minus_workspace,
+    acquire_collection,
+    objects_without_workspace,
+    create_application_filter,
     name_without_workspace,
+    apply_query_filter,
+)
+from hypha_startup_services.utils.format_utils import (
+    collection_to_config_dict,
+    config_minus_workspace,
     is_in_workspace,
     ws_from_context,
-    objects_without_workspace,
-    acquire_collection,
     stringify_keys,
-    collection_to_config_dict,
-    application_artifact_name,
-    collection_artifact_name,
-    session_artifact_name,
-    get_artifact_permissions,
-    SHARED_WORKSPACE,
-    is_admin,
+    get_settings_with_workspace,
+)
+from hypha_startup_services.utils.artifact_utils import (
     create_artifact_metadata,
-    create_application_filter,
-    apply_query_filter,
+    get_artifact_permissions,
+    collection_artifact_name,
+    application_artifact_name,
+    session_artifact_name,
+    is_admin,
+    check_collection_delete_permissions,
+    create_collection_artifact,
+    delete_collection_artifacts,
 )
 from hypha_startup_services.artifacts import (
     create_artifact,
@@ -65,33 +72,17 @@ async def collections_create(
             "error": "You do not have permission to create collections in this workspace."
         }
 
-    settings_with_workspace = settings.copy()
-    original_class_name = settings_with_workspace["class"]
-    settings_with_workspace["class"] = full_collection_name(original_class_name)
+    settings_with_workspace = get_settings_with_workspace(settings)
 
-    # Create the collection in Weaviate
     collection = await client.collections.create_from_dict(
         settings_with_workspace,
     )
 
-    # Create an artifact in the shared workspace for the collection
-    # This artifact will be used for permission management
     workspace = ws_from_context(context)
-    permissions = get_artifact_permissions(owner=True, admin=True)
-    metadata = create_artifact_metadata(
-        workspace=workspace,
-        description=settings_with_workspace.get("description", ""),
-        collection_type="weaviate",
-        settings=settings,
-    )
-
-    await create_artifact(
+    await create_collection_artifact(
         server,
-        settings_with_workspace["class"],
-        settings_with_workspace.get("description", ""),
-        SHARED_WORKSPACE,  # Store collection artifacts in shared workspace
-        permissions=permissions,
-        metadata=metadata,
+        settings_with_workspace,
+        workspace,
     )
 
     return await collection_to_config_dict(collection)
@@ -142,7 +133,7 @@ async def collections_delete(
     server: RemoteService,
     name: str | list[str],
     context: dict[str, Any],
-) -> None:
+) -> dict | None:
     """Delete a collection or multiple collections by name.
 
     Adds workspace prefix to collection names before deletion.
@@ -151,25 +142,21 @@ async def collections_delete(
     # Check if single name or list of names
     names = [name] if isinstance(name, str) else name
 
-    # Check permissions for each collection
-    for coll_name in names:
-        if not await is_admin(server, context, coll_name):
-            return {
-                "error": f"You do not have permission to delete collection '{coll_name}'."
-            }
+    # Check permissions
+    perm_error = await check_collection_delete_permissions(server, names, context)
+    if perm_error:
+        return perm_error
 
-    # Delete each collection
+    # Delete collections and their artifacts
     for coll_name in names:
         # Delete from Weaviate
         full_name = full_collection_name(coll_name)
         await client.collections.delete(full_name)
 
-        # Delete collection artifact
-        await delete_artifact(
-            server,
-            full_name,
-            SHARED_WORKSPACE,
-        )
+    # Delete collection artifacts
+    await delete_collection_artifacts(server, names)
+
+    return {"success": True}
 
 
 async def add_tenant_if_not_exists(
@@ -184,6 +171,81 @@ async def add_tenant_if_not_exists(
         await collection.tenants.create(
             tenants=[Tenant(name=tenant_name)],
         )
+
+
+async def prepare_application_creation(
+    client: WeaviateAsyncClient,
+    collection_name: str,
+    tenant_ws: str,
+    context: dict[str, Any],
+) -> dict | None:
+    """Prepare for application creation by checking collection existence and adding tenant.
+
+    Args:
+        client: WeaviateAsyncClient instance
+        collection_name: Name of the collection for the application
+        tenant_ws: Tenant workspace
+        context: Request context
+
+    Returns:
+        Error dict if preparation fails, None if successful
+    """
+    # Make sure the collection exists and the user has the tenant
+    if not await collections_exists(client, collection_name, context):
+        return {"error": f"Collection '{collection_name}' does not exist."}
+
+    # Add tenant for this user if it doesn't exist
+    await add_tenant_if_not_exists(
+        client,
+        collection_name,
+        tenant_ws,
+    )
+
+    return None
+
+
+async def create_application_artifact(
+    server: RemoteService,
+    ws_collection_name: str,
+    application_id: str,
+    description: str,
+    tenant_ws: str,
+) -> dict:
+    """Create an application artifact.
+
+    Args:
+        server: RemoteService instance
+        ws_collection_name: Workspace-prefixed collection name
+        application_id: Application ID
+        description: Application description
+        tenant_ws: Tenant workspace
+
+    Returns:
+        Result of artifact creation
+    """
+    # Create application artifact
+    artifact_name = application_artifact_name(ws_collection_name, application_id)
+    parent_artifact_name = collection_artifact_name(collection_name)
+
+    # Set up application metadata
+    metadata = create_artifact_metadata(
+        application_id=application_id,
+        collection_name=name_without_workspace(ws_collection_name),
+        workspace=tenant_ws,
+    )
+
+    # Set up permissions - owner can write, everyone can read
+    permissions = get_artifact_permissions(owner=True)
+
+    return await create_artifact(
+        server=server,
+        artifact_name=artifact_name,
+        description=description,
+        workspace=tenant_ws,  # Application artifacts are in user's workspace
+        parent_id=parent_artifact_name,
+        permissions=permissions,
+        metadata=metadata,
+    )
 
 
 async def applications_create(
@@ -202,42 +264,23 @@ async def applications_create(
     """
     tenant_ws = ws_from_context(context)
 
-    # Make sure the collection exists and the user has the tenant
-    if not await collections_exists(client, collection_name, context):
-        return {"error": f"Collection '{collection_name}' does not exist."}
-
-    # Add tenant for this user if it doesn't exist
-    await add_tenant_if_not_exists(
-        client,
-        collection_name,
-        tenant_ws,
+    # Prepare for application creation
+    prep_error = await prepare_application_creation(
+        client, collection_name, tenant_ws, context
     )
+    if prep_error:
+        return prep_error
 
-    # Create application artifact
+    # Get workspace-prefixed collection name
     ws_collection_name = full_collection_name(collection_name)
+
+    # Create the application artifact
+    result = await create_application_artifact(
+        server, ws_collection_name, application_id, description, tenant_ws
+    )
+
+    # Format and return the result
     artifact_name = application_artifact_name(ws_collection_name, application_id)
-    parent_artifact_name = collection_artifact_name(collection_name)
-
-    # Set up application metadata
-    metadata = create_artifact_metadata(
-        application_id=application_id,
-        collection_name=collection_name,
-        workspace=tenant_ws,
-    )
-
-    # Set up permissions - owner can write, everyone can read
-    permissions = get_artifact_permissions(owner=True)
-
-    result = await create_artifact(
-        server=server,
-        artifact_name=artifact_name,
-        description=description,
-        workspace=tenant_ws,  # Application artifacts are in user's workspace
-        parent_id=parent_artifact_name,
-        permissions=permissions,
-        metadata=metadata,
-    )
-
     return {
         "application_id": application_id,
         "collection_name": collection_name,
@@ -260,22 +303,42 @@ async def applications_list_all(
     return {artifact["name"]: artifact for artifact in artifacts}
 
 
-async def applications_delete(
-    client: WeaviateAsyncClient,
-    server: RemoteService,
-    collection_name: str,
-    application_id: str,
-    context: dict[str, Any],
+async def delete_application_artifact(
+    server: RemoteService, ws_collection_name: str, application_id: str, tenant_ws: str
 ) -> None:
-    """Delete an application by ID from the collection."""
-    tenant_ws = ws_from_context(context)
-    ws_collection_name = full_collection_name(collection_name)
+    """Delete an application artifact.
+
+    Args:
+        server: RemoteService instance
+        ws_collection_name: Workspace-prefixed collection name
+        application_id: Application ID
+        tenant_ws: Tenant workspace
+    """
     artifact_name = application_artifact_name(ws_collection_name, application_id)
     await delete_artifact(
         server,
         artifact_name,
         tenant_ws,
     )
+
+
+async def delete_application_objects(
+    client: WeaviateAsyncClient,
+    collection_name: str,
+    application_id: str,
+    tenant_ws: str,
+) -> dict:
+    """Delete all objects associated with an application.
+
+    Args:
+        client: WeaviateAsyncClient instance
+        collection_name: Collection name
+        application_id: Application ID
+        tenant_ws: Tenant workspace
+
+    Returns:
+        Response from delete operation
+    """
     collection = acquire_collection(client, collection_name)
     tenant_collection = collection.with_tenant(tenant_ws)
 
@@ -290,6 +353,30 @@ async def applications_delete(
         "objects": objects_without_workspace(response.objects),
         "successful": response.successful,
     }
+
+
+async def applications_delete(
+    client: WeaviateAsyncClient,
+    server: RemoteService,
+    collection_name: str,
+    application_id: str,
+    context: dict[str, Any],
+) -> dict:
+    """Delete an application by ID from the collection."""
+    tenant_ws = ws_from_context(context)
+    ws_collection_name = full_collection_name(collection_name)
+
+    # Delete application artifact
+    await delete_application_artifact(
+        server, ws_collection_name, application_id, tenant_ws
+    )
+
+    # Delete application objects
+    result = await delete_application_objects(
+        client, collection_name, application_id, tenant_ws
+    )
+
+    return result
 
 
 async def applications_get(
@@ -548,23 +635,25 @@ async def data_exists(
     return await collection.data.exists(uuid=uuid_input)
 
 
-async def sessions_create(
+async def verify_application_exists(
     server: RemoteService,
-    collection_name: str,
+    ws_collection_name: str,
     application_id: str,
-    session_id: str,
-    description: str,
-    context: dict[str, Any],
-) -> dict[str, Any]:
-    """Create a new session for an application.
+    tenant_ws: str,
+    collection_name: str,
+) -> dict | None:
+    """Verify that an application exists.
 
-    Creates a session artifact in the user's workspace as a child of the application artifact.
-    Returns the session configuration.
+    Args:
+        server: RemoteService instance
+        ws_collection_name: Workspace-prefixed collection name
+        application_id: Application ID
+        tenant_ws: Tenant workspace
+        collection_name: Original collection name
+
+    Returns:
+        Error dict if application doesn't exist, None if it exists
     """
-    tenant_ws = ws_from_context(context)
-
-    # Verify the application exists
-    ws_collection_name = full_collection_name(collection_name)
     app_artifact_name = application_artifact_name(ws_collection_name, application_id)
 
     if not await artifact_exists(server, app_artifact_name, tenant_ws):
@@ -572,7 +661,33 @@ async def sessions_create(
             "error": f"Application '{application_id}' does not exist in collection '{collection_name}'."
         }
 
-    # Create session artifact
+    return None
+
+
+async def create_session_artifact(
+    server: RemoteService,
+    ws_collection_name: str,
+    application_id: str,
+    session_id: str,
+    description: str,
+    tenant_ws: str,
+    collection_name: str,
+) -> tuple[dict, str]:
+    """Create a session artifact.
+
+    Args:
+        server: RemoteService instance
+        ws_collection_name: Workspace-prefixed collection name
+        application_id: Application ID
+        session_id: Session ID
+        description: Session description
+        tenant_ws: Tenant workspace
+        collection_name: Original collection name
+
+    Returns:
+        Tuple of (result of artifact creation, session artifact name)
+    """
+    app_artifact_name = application_artifact_name(ws_collection_name, application_id)
     session_artifact_name_full = session_artifact_name(
         ws_collection_name, application_id, session_id
     )
@@ -599,6 +714,46 @@ async def sessions_create(
         metadata=metadata,
     )
 
+    return result, session_artifact_name_full
+
+
+async def sessions_create(
+    server: RemoteService,
+    collection_name: str,
+    application_id: str,
+    session_id: str,
+    description: str,
+    context: dict[str, Any],
+) -> dict[str, Any]:
+    """Create a new session for an application.
+
+    Creates a session artifact in the user's workspace as a child of the application artifact.
+    Returns the session configuration.
+    """
+    tenant_ws = ws_from_context(context)
+
+    # Get workspace-prefixed collection name
+    ws_collection_name = full_collection_name(collection_name)
+
+    # Verify the application exists
+    error = await verify_application_exists(
+        server, ws_collection_name, application_id, tenant_ws, collection_name
+    )
+    if error:
+        return error
+
+    # Create session artifact
+    result, session_artifact_name_full = await create_session_artifact(
+        server,
+        ws_collection_name,
+        application_id,
+        session_id,
+        description,
+        tenant_ws,
+        collection_name,
+    )
+
+    # Format and return the result
     return {
         "session_id": session_id,
         "application_id": application_id,
