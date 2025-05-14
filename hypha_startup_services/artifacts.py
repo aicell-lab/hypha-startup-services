@@ -7,7 +7,6 @@ async def create_artifact(
     artifact_name: str,
     description: str,
     workspace: str,
-    parent_id: str | None = None,
     permissions: dict | None = None,
     metadata: dict | None = None,
 ) -> dict[str, Any]:
@@ -34,7 +33,6 @@ async def create_artifact(
             workspace=workspace,
             alias=artifact_name,
             manifest=galleryManifest,
-            parent_id=parent_id,
             permissions=permissions,
         )
         return result
@@ -45,7 +43,6 @@ async def create_artifact(
 
 async def list_artifacts(
     server: RemoteService,
-    parent_id: str,
     tenant: str,
 ) -> list[dict[str, Any]]:
     """List all artifacts in the workspace.
@@ -57,9 +54,7 @@ async def list_artifacts(
     artifact_manager = await server.get_service("public/artifact-manager")
 
     try:
-        artifacts = await artifact_manager.list(
-            workspace=tenant, parent_id=parent_id
-        )  # TODO: decide workspace
+        artifacts = await artifact_manager.list(workspace=tenant)
         return artifacts
     except RemoteException as e:
         print(f"Error listing artifacts. Error: {e}")
@@ -78,9 +73,7 @@ async def delete_artifact(
     artifact_manager = await server.get_service("public/artifact-manager")
 
     try:
-        await artifact_manager.delete(
-            workspace=tenant, alias=artifact_name
-        )  # TODO: decide workspace
+        await artifact_manager.delete(workspace=tenant, alias=artifact_name)
     except RemoteException as e:
         print(f"Error deleting artifact. Error: {e}")
 

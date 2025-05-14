@@ -35,59 +35,30 @@ def create_application_filter(application_id: str) -> dict:
     }
 
 
-def create_session_filter(session_id: str) -> dict:
-    """Create a filter for session_id."""
-    return {
-        "path": ["session_id"],
-        "operator": "Equal",
-        "valueString": session_id,
-    }
-
-
-def build_query_filter(
-    application_id: str = None, session_id: str = None
-) -> dict | None:
-    """Build a query filter for application_id and optionally session_id.
-
-    Args:
-        application_id: The application ID to filter by
-        session_id: The optional session ID to filter by
-
-    Returns:
-        A Weaviate filter object or None if no filters are requested
-    """
-    if not application_id:
-        return None
-
-    app_filter = create_application_filter(application_id)
-
-    if session_id:
-        session_filter = create_session_filter(session_id)
-        return {
-            "operator": "And",
-            "operands": [app_filter, session_filter],
-        }
-
-    return app_filter
-
-
-def apply_query_filter(
-    kwargs: dict, application_id: str = None, session_id: str = None
-) -> dict:
-    """Apply application and session filters to query kwargs if needed.
+def filter_app_kwargs(kwargs: dict, application_id: str) -> dict:
+    """Apply application filters to query kwargs if needed.
 
     Args:
         kwargs: The existing query kwargs
         application_id: The application ID to filter by
-        session_id: The optional session ID to filter by
 
     Returns:
         Updated kwargs dict with filters added
     """
-    query_filter = build_query_filter(application_id, session_id)
-    if query_filter:
-        kwargs["where"] = query_filter
-    return kwargs
+
+    new_kwargs = kwargs.copy()
+    if "where" in kwargs:
+        new_kwargs["where"] = {
+            "operator": "And",
+            "operands": [
+                kwargs["where"],
+                create_application_filter(application_id),
+            ],
+        }
+    else:
+        new_kwargs["where"] = create_application_filter(application_id)
+
+    return new_kwargs
 
 
 async def add_tenant_if_not_exists(

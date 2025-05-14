@@ -17,7 +17,7 @@ from hypha_startup_services.utils.collection_utils import (
     objects_without_workspace,
     create_application_filter,
     name_without_workspace,
-    apply_query_filter,
+    filter_app_kwargs,
     add_tenant_if_not_exists,
     get_tenant_collection,
 )
@@ -28,25 +28,20 @@ from hypha_startup_services.utils.format_utils import (
     ws_from_context,
     stringify_keys,
     get_settings_with_workspace,
-    append_app_session,
+    add_app_id,
 )
 from hypha_startup_services.utils.artifact_utils import (
-    collection_artifact_name,
     application_artifact_name,
-    session_artifact_name,
     is_admin,
     check_collection_delete_permissions,
     create_collection_artifact,
     delete_collection_artifacts,
     create_application_artifact,
     delete_application_artifact,
-    create_session_artifact,
-    verify_application_exists,
 )
 from hypha_startup_services.artifacts import (
     list_artifacts,
     get_artifact,
-    delete_artifact,
     artifact_exists,
 )
 
@@ -270,11 +265,14 @@ async def applications_list_all(
     collection_name: str,
     context: dict[str, Any],
 ) -> dict[str, dict]:
+    """List all applications in the collection.
+    Returns a dictionary of application artifacts with their names as keys.
+    """
+    # TODO: Implement this function
     tenant_ws = ws_from_context(context)
-    parent_artifact_name = collection_artifact_name(collection_name)
-    artifacts = await list_artifacts(server, parent_artifact_name, tenant_ws)
+    artifacts = await list_artifacts(server, tenant_ws)
 
-    return {artifact["name"]: artifact for artifact in artifacts}
+    # return {artifact["name"]: artifact for artifact in artifacts}
 
 
 async def applications_delete(
@@ -336,14 +334,13 @@ async def data_insert_many(
     collection_name: str,
     application_id: str,
     objects: list[dict[str, Any]],
-    session_id: str | None = None,
     context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Insert many objects into the collection."""
     tenant_collection = get_tenant_collection(client, collection_name, context)
-    app_session_objects = append_app_session(objects, application_id, session_id)
+    app_objects = add_app_id(objects, application_id)
 
-    response = await tenant_collection.data.insert_many(objects=app_session_objects)
+    response = await tenant_collection.data.insert_many(objects=app_objects)
 
     return {
         "elapsed_seconds": response.elapsed_seconds,
@@ -359,7 +356,6 @@ async def data_insert(
     application_id: str,
     properties: dict[str, Any],
     *args,
-    session_id: str | None = None,
     context: dict[str, Any] | None = None,
     **kwargs,
 ) -> uuid.UUID:
@@ -368,27 +364,25 @@ async def data_insert(
     Forwards all kwargs to collection.data.insert().
     """
     tenant_collection = get_tenant_collection(client, collection_name, context)
-    app_session_properties = append_app_session(properties, application_id, session_id)
+    app_properties = add_app_id(properties, application_id)
 
-    return await tenant_collection.data.insert(app_session_properties, *args, **kwargs)
+    return await tenant_collection.data.insert(app_properties, *args, **kwargs)
 
 
 async def query_near_vector(
     client: WeaviateAsyncClient,
     collection_name: str,
     application_id: str,
-    session_id: str = None,
     context: dict[str, Any] = None,
     **kwargs,
 ) -> dict[str, Any]:
     """Query the collection using a vector.
 
     Forwards all kwargs to collection.query.near_vector().
-    Filters results by application_id and optionally by session_id.
+    Filters results by application_id.
     """
     tenant_collection = get_tenant_collection(client, collection_name, context)
-
-    kwargs = apply_query_filter(kwargs, application_id, session_id)
+    kwargs = filter_app_kwargs(kwargs, application_id)
 
     response: QueryReturn = await tenant_collection.query.near_vector(**kwargs)
 
@@ -401,18 +395,16 @@ async def query_fetch_objects(
     client: WeaviateAsyncClient,
     collection_name: str,
     application_id: str = None,
-    session_id: str = None,
     context: dict[str, Any] = None,
     **kwargs,
 ) -> dict[str, Any]:
     """Query the collection to fetch objects.
 
     Forwards all kwargs to collection.query.fetch_objects().
-    Filters results by application_id and optionally by session_id if provided.
+    Filters results by application_id.
     """
     tenant_collection = get_tenant_collection(client, collection_name, context)
-
-    kwargs = apply_query_filter(kwargs, application_id, session_id)
+    kwargs = filter_app_kwargs(kwargs, application_id)  # TODO: use [filter], not where
 
     response: QueryReturn = await tenant_collection.query.fetch_objects(**kwargs)
 
@@ -425,18 +417,16 @@ async def query_hybrid(
     client: WeaviateAsyncClient,
     collection_name: str,
     application_id: str = None,
-    session_id: str = None,
     context: dict[str, Any] = None,
     **kwargs,
 ) -> dict[str, Any]:
     """Query the collection using hybrid search.
 
     Forwards all kwargs to collection.query.hybrid().
-    Filters results by application_id and optionally by session_id if provided.
+    Filters results by application_id.
     """
     tenant_collection = get_tenant_collection(client, collection_name, context)
-
-    kwargs = apply_query_filter(kwargs, application_id, session_id)
+    kwargs = filter_app_kwargs(kwargs, application_id)
 
     response: QueryReturn = await tenant_collection.query.hybrid(**kwargs)
 
@@ -448,7 +438,7 @@ async def query_hybrid(
 async def generate_near_text(
     client: WeaviateAsyncClient,
     collection_name: str,
-    *args,
+    application_id: str,
     context: dict[str, Any],
     **kwargs,
 ) -> dict[str, Any]:
@@ -457,9 +447,9 @@ async def generate_near_text(
     Forwards all kwargs to collection.query.near_text().
     """
     tenant_collection = get_tenant_collection(client, collection_name, context)
-    response: GenerativeReturn = await tenant_collection.generate.near_text(
-        *args, **kwargs
-    )
+    kwargs = filter_app_kwargs(kwargs, application_id)
+
+    response: GenerativeReturn = await tenant_collection.generate.near_text(**kwargs)
 
     return {
         "objects": objects_without_workspace(response.objects),
@@ -470,7 +460,7 @@ async def generate_near_text(
 async def data_update(
     client: WeaviateAsyncClient,
     collection_name: str,
-    *args,
+    application_id: str,
     context: dict[str, Any],
     **kwargs,
 ) -> None:
@@ -478,13 +468,16 @@ async def data_update(
 
     Forwards all kwargs to collection.data.update().
     """
+    # TODO: only update if the object exists in the application
     tenant_collection = get_tenant_collection(client, collection_name, context)
-    await tenant_collection.data.update(*args, **kwargs)
+
+    await tenant_collection.data.update(**kwargs)
 
 
 async def data_delete_by_id(
     client: WeaviateAsyncClient,
     collection_name: str,
+    application_id: str,
     uuid_input: uuid.UUID,
     context: dict[str, Any],
 ) -> bool:
@@ -492,6 +485,7 @@ async def data_delete_by_id(
 
     Forwards all kwargs to collection.data.delete_by_id().
     """
+    # TODO: only delete if the object exists in the application
     tenant_collection = get_tenant_collection(client, collection_name, context)
     await tenant_collection.data.delete_by_id(uuid=uuid_input)
 
@@ -499,7 +493,7 @@ async def data_delete_by_id(
 async def data_delete_many(
     client: WeaviateAsyncClient,
     collection_name: str,
-    *args,
+    application_id: str,
     context: dict[str, Any],
     **kwargs,
 ) -> dict[str, Any]:
@@ -508,9 +502,8 @@ async def data_delete_many(
     Forwards all kwargs to collection.data.delete_many().
     """
     tenant_collection = get_tenant_collection(client, collection_name, context)
-    response: DeleteManyReturn = await tenant_collection.data.delete_many(
-        *args, **kwargs
-    )
+    kwargs = filter_app_kwargs(kwargs, application_id)
+    response: DeleteManyReturn = await tenant_collection.data.delete_many(**kwargs)
 
     return {
         "failed": response.failed,
@@ -523,6 +516,7 @@ async def data_delete_many(
 async def data_exists(
     client: WeaviateAsyncClient,
     collection_name: str,
+    application_id: str,
     uuid_input: uuid.UUID,
     context: dict[str, Any],
 ) -> bool:
@@ -531,90 +525,5 @@ async def data_exists(
     Forwards all kwargs to collection.data.exists().
     """
     tenant_collection = get_tenant_collection(client, collection_name, context)
+    # TODO: only check if the object exists in the application
     return await tenant_collection.data.exists(uuid=uuid_input)
-
-
-async def sessions_create(
-    server: RemoteService,
-    collection_name: str,
-    application_id: str,
-    session_id: str,
-    description: str,
-    context: dict[str, Any],
-) -> dict[str, Any]:
-    """Create a new session for an application.
-
-    Creates a session artifact in the user's workspace as a child of the application artifact.
-    Returns the session configuration.
-    """
-    tenant_ws = ws_from_context(context)
-    ws_collection_name = full_collection_name(collection_name)
-
-    error = await verify_application_exists(
-        server, ws_collection_name, application_id, tenant_ws, collection_name
-    )
-    if error:
-        return error
-
-    result, session_artifact_name_full = await create_session_artifact(
-        server,
-        ws_collection_name,
-        application_id,
-        session_id,
-        description,
-        tenant_ws,
-        collection_name,
-    )
-
-    return {
-        "session_id": session_id,
-        "application_id": application_id,
-        "collection_name": collection_name,
-        "description": description,
-        "owner": tenant_ws,
-        "artifact_name": session_artifact_name_full,
-        "result": result,
-    }
-
-
-async def sessions_list_all(
-    server: RemoteService,
-    collection_name: str,
-    application_id: str,
-    context: dict[str, Any],
-) -> dict[str, dict]:
-    """List all sessions for an application."""
-    tenant_ws = ws_from_context(context)
-    ws_collection_name = full_collection_name(collection_name)
-
-    app_artifact_name = application_artifact_name(ws_collection_name, application_id)
-
-    # List all child artifacts (sessions)
-    sessions = await list_artifacts(server, app_artifact_name, tenant_ws)
-
-    return {session["name"]: session for session in sessions}
-
-
-async def sessions_delete(
-    server: RemoteService,
-    collection_name: str,
-    application_id: str,
-    session_id: str,
-    context: dict[str, Any],
-) -> None:
-    """Delete a session artifact."""
-    tenant_ws = ws_from_context(context)
-    ws_collection_name = full_collection_name(collection_name)
-
-    session_artifact_name_full = session_artifact_name(
-        ws_collection_name, application_id, session_id
-    )
-
-    # Delete the session artifact
-    await delete_artifact(
-        server,
-        session_artifact_name_full,
-        tenant_ws,
-    )
-
-    return {"success": True}

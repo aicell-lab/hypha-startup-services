@@ -5,13 +5,11 @@ from hypha_startup_services.artifacts import (
     create_artifact,
     delete_artifact,
     get_artifact,
-    artifact_exists,
 )
 from hypha_startup_services.utils.constants import (
     SHARED_WORKSPACE,
     ADMIN_WORKSPACES,
     ARTIFACT_DELIMITER,
-    SESSION_DELIMITER,
 )
 from hypha_startup_services.utils.format_utils import (
     full_collection_name,
@@ -31,15 +29,6 @@ def application_artifact_name(ws_collection_name: str, application_id: str) -> s
     assert_valid_collection_name(ws_collection_name)
     assert_valid_application_name(application_id)
     return f"{ws_collection_name}{ARTIFACT_DELIMITER}{application_id}"
-
-
-def session_artifact_name(
-    ws_collection_name: str, application_id: str, session_id: str
-) -> str:
-    """Create a full session artifact name."""
-    assert_valid_collection_name(ws_collection_name)
-    assert_valid_application_name(application_id)
-    return f"{ws_collection_name}{ARTIFACT_DELIMITER}{application_id}{SESSION_DELIMITER}{session_id}"
 
 
 def is_admin_workspace(workspace: str) -> bool:
@@ -85,7 +74,6 @@ def get_artifact_permissions(
 def create_artifact_metadata(
     collection_name: str = None,
     application_id: str = None,
-    session_id: str = None,
     workspace: str = None,
     **kwargs,
 ) -> dict:
@@ -94,7 +82,6 @@ def create_artifact_metadata(
     Args:
         collection_name: The collection name
         application_id: The application ID
-        session_id: The session ID
         workspace: The creator's workspace
         **kwargs: Additional metadata fields
 
@@ -111,9 +98,6 @@ def create_artifact_metadata(
 
     if application_id:
         metadata["application_id"] = application_id
-
-    if session_id:
-        metadata["session_id"] = session_id
 
     # Add any additional metadata
     metadata.update(kwargs)
@@ -157,7 +141,7 @@ async def create_collection_artifact(
         server,
         settings_with_workspace["class"],
         settings_with_workspace.get("description", ""),
-        SHARED_WORKSPACE,  # Store collection artifacts in shared workspace
+        SHARED_WORKSPACE,
         permissions=permissions,
         metadata=metadata,
     )
@@ -260,7 +244,7 @@ async def create_application_artifact(
         server=server,
         artifact_name=artifact_name,
         description=description,
-        workspace=tenant_ws,  # Application artifacts are in user's workspace
+        workspace=tenant_ws,
         permissions=permissions,
         metadata=metadata,
     )
@@ -283,83 +267,3 @@ async def delete_application_artifact(
         artifact_name,
         tenant_ws,
     )
-
-
-async def create_session_artifact(
-    server: RemoteService,
-    ws_collection_name: str,
-    application_id: str,
-    session_id: str,
-    description: str,
-    tenant_ws: str,
-    collection_name: str,
-) -> tuple[dict, str]:
-    """Create a session artifact.
-
-    Args:
-        server: RemoteService instance
-        ws_collection_name: Workspace-prefixed collection name
-        application_id: Application ID
-        session_id: Session ID
-        description: Session description
-        tenant_ws: Tenant workspace
-        collection_name: Original collection name
-
-    Returns:
-        Tuple of (result of artifact creation, session artifact name)
-    """
-    session_artifact_name_full = session_artifact_name(
-        ws_collection_name, application_id, session_id
-    )
-
-    # Set up session metadata
-    metadata = create_artifact_metadata(
-        application_id=application_id,
-        collection_name=collection_name,
-        session_id=session_id,
-        workspace=tenant_ws,
-    )
-
-    # Set up permissions - only owner can read and write by default
-    # This restricts session artifacts to only be readable by the session user
-    permissions = get_artifact_permissions(owner=True, read_public=False)
-
-    result = await create_artifact(
-        server=server,
-        artifact_name=session_artifact_name_full,
-        description=description,
-        workspace=tenant_ws,  # Session artifacts are in user's workspace
-        permissions=permissions,
-        metadata=metadata,
-    )
-
-    return result, session_artifact_name_full
-
-
-async def verify_application_exists(
-    server: RemoteService,
-    ws_collection_name: str,
-    application_id: str,
-    tenant_ws: str,
-    collection_name: str,
-) -> dict | None:
-    """Verify that an application exists.
-
-    Args:
-        server: RemoteService instance
-        ws_collection_name: Workspace-prefixed collection name
-        application_id: Application ID
-        tenant_ws: Tenant workspace
-        collection_name: Original collection name
-
-    Returns:
-        Error dict if application doesn't exist, None if it exists
-    """
-    app_artifact_name = application_artifact_name(ws_collection_name, application_id)
-
-    if not await artifact_exists(server, app_artifact_name, tenant_ws):
-        return {
-            "error": f"Application '{application_id}' does not exist in collection '{collection_name}'."
-        }
-
-    return None
