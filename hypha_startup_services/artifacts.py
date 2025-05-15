@@ -90,7 +90,7 @@ async def get_artifact(
     artifact_manager = await server.get_service("public/artifact-manager")
 
     try:
-        artifact = await artifact_manager.get(workspace=tenant, alias=artifact_name)
+        artifact = await artifact_manager.read(workspace=tenant, alias=artifact_name)
         return artifact
     except RemoteException as e:
         print(f"Error getting artifact. Error: {e}")

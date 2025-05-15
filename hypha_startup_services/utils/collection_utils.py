@@ -4,6 +4,7 @@ from typing import Any
 from weaviate import WeaviateAsyncClient
 from weaviate.collections import CollectionAsync
 from weaviate.classes.tenants import Tenant
+from weaviate.classes.query import Filter
 from hypha_startup_services.utils.format_utils import (
     full_collection_name,
     name_without_workspace,
@@ -26,53 +27,29 @@ def objects_without_workspace(objects: list[dict]) -> list[dict]:
     return objects
 
 
-def create_application_filter(application_id: str) -> dict:
+def create_application_filter(application_id: str) -> Filter:
     """Create a filter for application_id."""
-    return {
-        "path": ["application_id"],
-        "operator": "Equal",
-        "valueString": application_id,
-    }
+    return Filter.by_property("application_id").equal(application_id)
 
 
-def where_app_kwargs(kwargs: dict, application_id: str) -> dict:
-    """Apply application filters to query kwargs if needed.
+def and_app_filter(
+    application_id: str,
+    current_filter: Filter | None = None,
+) -> dict:
+    """Add application filter to filters.
 
     Args:
-        kwargs: The existing query kwargs
         application_id: The application ID to filter by
+        param_name: The name of the parameter to filter on
 
     Returns:
         Updated kwargs dict with filters added
     """
+    app_filter = create_application_filter(application_id)
+    if current_filter is None:
+        return app_filter
 
-    new_kwargs = kwargs.copy()
-    if "where" in kwargs:
-        new_kwargs["where"] = {
-            "operator": "And",
-            "operands": [
-                kwargs["where"],
-                create_application_filter(application_id),
-            ],
-        }
-    else:
-        new_kwargs["where"] = create_application_filter(application_id)
-
-    return new_kwargs
-
-
-def filters_app_kwargs(
-    kwargs: dict,
-    application_id: str,
-) -> dict:
-    """Filter query kwargs to include only those relevant to the application ID."""
-    new_kwargs = kwargs.copy()
-    if "filters" in kwargs:
-        new_kwargs["filters"].append(create_application_filter(application_id))
-    else:
-        new_kwargs["filters"] = [create_application_filter(application_id)]
-
-    return new_kwargs
+    return current_filter & app_filter
 
 
 async def add_tenant_if_not_exists(
@@ -92,9 +69,8 @@ async def add_tenant_if_not_exists(
 def get_tenant_collection(
     client: WeaviateAsyncClient,
     collection_name: str,
-    context: dict[str, Any],
+    user_ws: str,
 ) -> CollectionAsync:
     """Get the tenant collection from the client."""
-    tenant_ws = ws_from_context(context)
     collection = acquire_collection(client, collection_name)
-    return collection.with_tenant(tenant_ws)
+    return collection.with_tenant(user_ws)

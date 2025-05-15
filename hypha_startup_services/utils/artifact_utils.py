@@ -15,7 +15,6 @@ from hypha_startup_services.utils.format_utils import (
     full_collection_name,
     assert_valid_collection_name,
     assert_valid_application_name,
-    ws_from_context,
 )
 
 
@@ -147,64 +146,86 @@ async def create_collection_artifact(
     )
 
 
-async def is_admin(
-    server: RemoteService, context: dict[str, Any], collection_name: str = None
+async def has_permission_single(
+    server: RemoteService, user_ws: str, collection_name: str
+) -> bool:
+    """Check if the user has admin permissions for a specific collection.
+
+    Args:
+        server: The RemoteService instance
+        user_ws: The user's workspace
+        collection_name: The name of the collection to check permissions for
+
+    Returns:
+        True if the user has admin permissions, False otherwise
+    """
+    artifact_name = collection_artifact_name(collection_name)
+
+    artifact = await get_artifact(server, artifact_name, user_ws)
+    if "permissions" in artifact and "admin" in artifact["permissions"]:
+        if user_ws in artifact["permissions"]["admin"]:
+            return True
+
+    return False
+
+
+async def has_permission(
+    server: RemoteService, user_ws: str, collection_names: str | list[str]
 ) -> bool:
     """Check if the user has admin permissions for collections.
 
     Args:
         server: The RemoteService instance
-        context: The request context containing workspace info
-        collection_name: Optional collection name to check permissions for
+        user_ws: The user's workspace
+        collection_names: Optional collection names to check permissions for
 
     Returns:
         True if the user has admin permissions, False otherwise
     """
-    workspace = ws_from_context(context)
 
     # First check if the user is in the admin workspaces list
-    if is_admin_workspace(workspace):
+    if is_admin_workspace(user_ws):
         return True
 
-    # If no specific collection is provided, return False for non-admins
-    if collection_name is None:
-        return False
+    if isinstance(collection_names, str):
+        collection_names = [collection_names]
 
-    # Check if the user has admin permissions for this specific collection artifact
-    collection_artifact = collection_artifact_name(collection_name)
+    for collection_name in collection_names:
+        if not await has_permission_single(server, user_ws, collection_name):
+            return False
 
-    try:
-        artifact = await get_artifact(server, collection_artifact, workspace)
-        # Check if current user has admin permissions in this artifact
-        # This would depend on how permissions are stored in the artifact
-        if "permissions" in artifact and "admin" in artifact["permissions"]:
-            if workspace in artifact["permissions"]["admin"]:
-                return True
-    except Exception:
-        pass
-
-    return False
+    return True
 
 
-async def check_collection_delete_permissions(
-    server: RemoteService, names: list[str], context: dict[str, Any]
-) -> dict | None:
+def assert_is_admin_ws(user_ws: str):
+    """Check if user has admin permissions for collections.
+
+    Args:
+        user_ws: The user's workspace
+
+    Returns:
+        None if all permissions are granted, raises an error if permissions are missing
+    """
+    assert is_admin_workspace(user_ws), "You are not an admin user."
+
+
+async def assert_has_permission(
+    server: RemoteService, user_ws: str, names: str | list[str]
+) -> None:
     """Check if user has permission to delete these collections.
 
     Args:
         server: The RemoteService instance
-        names: List of collection names to delete
-        context: The request context
+        names: Collection name or list of collection names to access
+        user_ws: The user's workspace
 
     Returns:
-        An error dict if permissions are missing, None if all permissions are granted
+        None if all permissions are granted, raises an error if permissions are missing
     """
-    for coll_name in names:
-        if not await is_admin(server, context, coll_name):
-            return {
-                "error": f"You do not have permission to delete collection '{coll_name}'."
-            }
-    return None
+
+    assert await has_permission(
+        server, user_ws, names
+    ), "You do not have permission to access the collection(s)."
 
 
 async def create_application_artifact(
@@ -212,7 +233,7 @@ async def create_application_artifact(
     collection_name: str,
     application_id: str,
     description: str,
-    tenant_ws: str,
+    user_ws: str,
 ) -> dict:
     """Create an application artifact.
 
@@ -221,7 +242,7 @@ async def create_application_artifact(
         collection_name: Collection name (without workspace prefix)
         application_id: Application ID
         description: Application description
-        tenant_ws: Tenant workspace
+        user_ws: User workspace
 
     Returns:
         Result of artifact creation
@@ -234,7 +255,7 @@ async def create_application_artifact(
     metadata = create_artifact_metadata(
         application_id=application_id,
         collection_name=collection_name,
-        workspace=tenant_ws,
+        workspace=user_ws,
     )
 
     # Set up permissions - owner can write, everyone can read
@@ -244,7 +265,7 @@ async def create_application_artifact(
         server=server,
         artifact_name=artifact_name,
         description=description,
-        workspace=tenant_ws,
+        workspace=user_ws,
         permissions=permissions,
         metadata=metadata,
     )

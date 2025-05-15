@@ -1,7 +1,6 @@
 """Common test fixtures for weaviate tests."""
 
 import os
-import pytest
 import pytest_asyncio
 from dotenv import load_dotenv
 from hypha_rpc import connect_to_server
@@ -37,9 +36,11 @@ async def get_server(request):
     token = request.config.getoption("--token")
     service_id = request.config.getoption("--service-id")
     server_url = request.config.getoption("--server-url")
-    
-    assert token is not None, "Token is not provided. Set HYPHA_TOKEN environment variable or use --token option"
-    
+
+    assert (
+        token is not None
+    ), "Token is not provided. Set HYPHA_TOKEN environment variable or use --token option"
+
     server = await connect_to_server(
         {
             "server_url": server_url,
@@ -47,6 +48,8 @@ async def get_server(request):
         }
     )
     await register_weaviate(server, service_id)
+    print("LOOK HERE!!!!!!!")
+    print(server.config)
 
     return server
 
