@@ -8,11 +8,11 @@ from hypha_startup_services.utils.constants import (
 )
 
 
-def ws_from_context(context: dict) -> str:
-    """Get workspace from context."""
+def id_from_context(context: dict) -> str:
+    """Get ID from context."""
     assert context is not None
-    workspace = context.get("ws")
-    return workspace
+    user_id = context["user"]["id"]
+    return user_id
 
 
 def format_workspace(workspace: str) -> str:

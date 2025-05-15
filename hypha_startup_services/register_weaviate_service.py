@@ -71,7 +71,7 @@ async def register_weaviate_service(server, client, service_id):
             "collections": {
                 "create": partial(collections_create, client, server),
                 "delete": partial(collections_delete, client, server),
-                "list_all": partial(collections_list_all, client, server),
+                "list_all": partial(collections_list_all, client),
                 "get": partial(collections_get, client, server),
                 "exists": partial(collections_exists, client),
             },

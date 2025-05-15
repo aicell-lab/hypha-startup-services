@@ -1,6 +1,5 @@
 """Utility functions for managing Weaviate collections."""
 
-from typing import Any
 from weaviate import WeaviateAsyncClient
 from weaviate.collections import CollectionAsync
 from weaviate.classes.tenants import Tenant
@@ -8,7 +7,6 @@ from weaviate.classes.query import Filter
 from hypha_startup_services.utils.format_utils import (
     full_collection_name,
     name_without_workspace,
-    ws_from_context,
 )
 
 
@@ -69,8 +67,8 @@ async def add_tenant_if_not_exists(
 def get_tenant_collection(
     client: WeaviateAsyncClient,
     collection_name: str,
-    user_ws: str,
+    user_id: str,
 ) -> CollectionAsync:
     """Get the tenant collection from the client."""
     collection = acquire_collection(client, collection_name)
-    return collection.with_tenant(user_ws)
+    return collection.with_tenant(user_id)
