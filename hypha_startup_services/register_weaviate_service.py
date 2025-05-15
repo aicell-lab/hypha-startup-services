@@ -14,7 +14,6 @@ from hypha_startup_services.weaviate_methods import (
     collections_exists,
     applications_create,
     applications_delete,
-    applications_list_all,
     applications_get,
     applications_exists,
     data_insert_many,
@@ -79,7 +78,6 @@ def register_weaviate_service(server, client, service_id):
             "applications": {
                 "create": partial(applications_create, client, server),
                 "delete": partial(applications_delete, client, server),
-                "list_all": partial(applications_list_all, server),
                 "get": partial(applications_get, server),
                 "exists": partial(applications_exists, server),
             },

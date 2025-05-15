@@ -41,7 +41,6 @@ from hypha_startup_services.utils.artifact_utils import (
     delete_application_artifact,
 )
 from hypha_startup_services.artifacts import (
-    list_artifacts,
     get_artifact,
     artifact_exists,
 )
@@ -112,7 +111,9 @@ async def prepare_application_creation(
 
 
 async def collections_exists(
-    client: WeaviateAsyncClient, collection_name: str, context: dict[str, Any]
+    client: WeaviateAsyncClient,
+    collection_name: str,
+    context: dict[str, Any],
 ) -> bool:
     """Check if a collection exists in the workspace."""
     collection_name = full_collection_name(collection_name)
@@ -259,21 +260,6 @@ async def applications_create(
         "artifact_name": artifact_name,
         "result": result,
     }
-
-
-async def applications_list_all(
-    server: RemoteService,
-    collection_name: str,
-    context: dict[str, Any],
-) -> dict[str, dict]:
-    """List all applications in the collection.
-    Returns a dictionary of application artifacts with their names as keys.
-    """
-    # TODO: Implement this function
-    tenant_ws = ws_from_context(context)
-    artifacts = await list_artifacts(server, tenant_ws)
-
-    # return {artifact["name"]: artifact for artifact in artifacts}
 
 
 async def applications_delete(
@@ -461,7 +447,6 @@ async def generate_near_text(
 async def data_update(
     client: WeaviateAsyncClient,
     collection_name: str,
-    application_id: str,
     context: dict[str, Any],
     **kwargs,
 ) -> None:
@@ -469,7 +454,6 @@ async def data_update(
 
     Forwards all kwargs to collection.data.update().
     """
-    # TODO: only update if the object exists in the application
     tenant_collection = get_tenant_collection(client, collection_name, context)
 
     await tenant_collection.data.update(**kwargs)
@@ -478,7 +462,6 @@ async def data_update(
 async def data_delete_by_id(
     client: WeaviateAsyncClient,
     collection_name: str,
-    application_id: str,
     uuid_input: uuid.UUID,
     context: dict[str, Any],
 ) -> bool:
@@ -486,7 +469,6 @@ async def data_delete_by_id(
 
     Forwards all kwargs to collection.data.delete_by_id().
     """
-    # TODO: only delete if the object exists in the application
     tenant_collection = get_tenant_collection(client, collection_name, context)
     await tenant_collection.data.delete_by_id(uuid=uuid_input)
 
@@ -517,7 +499,6 @@ async def data_delete_many(
 async def data_exists(
     client: WeaviateAsyncClient,
     collection_name: str,
-    application_id: str,
     uuid_input: uuid.UUID,
     context: dict[str, Any],
 ) -> bool:
@@ -526,5 +507,4 @@ async def data_exists(
     Forwards all kwargs to collection.data.exists().
     """
     tenant_collection = get_tenant_collection(client, collection_name, context)
-    # TODO: only check if the object exists in the application
     return await tenant_collection.data.exists(uuid=uuid_input)

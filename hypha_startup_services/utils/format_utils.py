@@ -1,6 +1,6 @@
 from typing import Any
 from weaviate.collections import CollectionAsync
-from weaviate.collections.config import CollectionConfig
+from weaviate.collections.classes.config import CollectionConfig
 from hypha_startup_services.utils.constants import (
     WORKSPACE_DELIMITER,
     ARTIFACT_DELIMITER,
