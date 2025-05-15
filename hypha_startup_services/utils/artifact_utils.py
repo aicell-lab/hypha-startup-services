@@ -218,7 +218,7 @@ async def create_application_artifact(
 
     Args:
         server: RemoteService instance
-        ws_collection_name: Workspace-prefixed collection name
+        collection_name: Collection name (without workspace prefix)
         application_id: Application ID
         description: Application description
         tenant_ws: Tenant workspace

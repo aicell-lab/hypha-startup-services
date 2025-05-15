@@ -17,7 +17,8 @@ from hypha_startup_services.utils.collection_utils import (
     objects_without_workspace,
     create_application_filter,
     name_without_workspace,
-    filter_app_kwargs,
+    where_app_kwargs,
+    filters_app_kwargs,
     add_tenant_if_not_exists,
     get_tenant_collection,
 )
@@ -382,7 +383,7 @@ async def query_near_vector(
     Filters results by application_id.
     """
     tenant_collection = get_tenant_collection(client, collection_name, context)
-    kwargs = filter_app_kwargs(kwargs, application_id)
+    kwargs = filters_app_kwargs(kwargs, application_id)
 
     response: QueryReturn = await tenant_collection.query.near_vector(**kwargs)
 
@@ -404,7 +405,7 @@ async def query_fetch_objects(
     Filters results by application_id.
     """
     tenant_collection = get_tenant_collection(client, collection_name, context)
-    kwargs = filter_app_kwargs(kwargs, application_id)  # TODO: use [filter], not where
+    kwargs = filters_app_kwargs(kwargs, application_id)
 
     response: QueryReturn = await tenant_collection.query.fetch_objects(**kwargs)
 
@@ -426,7 +427,7 @@ async def query_hybrid(
     Filters results by application_id.
     """
     tenant_collection = get_tenant_collection(client, collection_name, context)
-    kwargs = filter_app_kwargs(kwargs, application_id)
+    kwargs = filters_app_kwargs(kwargs, application_id)
 
     response: QueryReturn = await tenant_collection.query.hybrid(**kwargs)
 
@@ -447,7 +448,7 @@ async def generate_near_text(
     Forwards all kwargs to collection.query.near_text().
     """
     tenant_collection = get_tenant_collection(client, collection_name, context)
-    kwargs = filter_app_kwargs(kwargs, application_id)
+    kwargs = where_app_kwargs(kwargs, application_id)
 
     response: GenerativeReturn = await tenant_collection.generate.near_text(**kwargs)
 
@@ -502,7 +503,7 @@ async def data_delete_many(
     Forwards all kwargs to collection.data.delete_many().
     """
     tenant_collection = get_tenant_collection(client, collection_name, context)
-    kwargs = filter_app_kwargs(kwargs, application_id)
+    kwargs = where_app_kwargs(kwargs, application_id)
     response: DeleteManyReturn = await tenant_collection.data.delete_many(**kwargs)
 
     return {

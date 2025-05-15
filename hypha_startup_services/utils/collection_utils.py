@@ -35,7 +35,7 @@ def create_application_filter(application_id: str) -> dict:
     }
 
 
-def filter_app_kwargs(kwargs: dict, application_id: str) -> dict:
+def where_app_kwargs(kwargs: dict, application_id: str) -> dict:
     """Apply application filters to query kwargs if needed.
 
     Args:
@@ -57,6 +57,20 @@ def filter_app_kwargs(kwargs: dict, application_id: str) -> dict:
         }
     else:
         new_kwargs["where"] = create_application_filter(application_id)
+
+    return new_kwargs
+
+
+def filters_app_kwargs(
+    kwargs: dict,
+    application_id: str,
+) -> dict:
+    """Filter query kwargs to include only those relevant to the application ID."""
+    new_kwargs = kwargs.copy()
+    if "filters" in kwargs:
+        new_kwargs["filters"].append(create_application_filter(application_id))
+    else:
+        new_kwargs["filters"] = [create_application_filter(application_id)]
 
     return new_kwargs
 
