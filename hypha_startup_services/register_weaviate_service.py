@@ -54,13 +54,13 @@ async def register_weaviate(server: RemoteService, service_id: str):
     )
 
 
-def register_weaviate_service(server, client, service_id):
+async def register_weaviate_service(server, client, service_id):
     """Register the Weaviate service with the Hypha server.
 
     Sets up all service endpoints for collections, data operations, and queries.
     """
 
-    return server.register_service(
+    return await server.register_service(
         {
             "name": "Hypha Weaviate Service",
             "id": service_id,
