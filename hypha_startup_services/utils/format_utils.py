@@ -45,7 +45,17 @@ def config_with_short_name(
 
 
 async def collection_to_config_dict(collection: CollectionAsync) -> dict:
-    """Convert collection to dict."""
+    """Convert collection to a dictionary with shortened collection name.
+
+    Gets the collection's configuration and converts the full collection name
+    to a short name (without workspace prefix).
+
+    Args:
+        collection: The collection object to convert
+
+    Returns:
+        Dictionary representation of the collection configuration with short name
+    """
     config = await collection.config.get()
     config_dict = config_with_short_name(config)
     return config_dict
@@ -98,7 +108,18 @@ def add_app_id(
     objects: dict[str, Any] | list[dict[str, Any]],
     application_id: str,
 ) -> list[dict[str, Any]]:
-    """Append the application ID to each object in the list."""
+    """Append the application ID to each object in the list or to a single object.
+
+    If objects is a single dictionary, it gets converted to a list with one item.
+    The application_id is added as a property to each object.
+
+    Args:
+        objects: Single object or list of objects to add application_id to
+        application_id: Application ID to add to each object
+
+    Returns:
+        List of objects with application_id added
+    """
     object_list = objects if isinstance(objects, list) else [objects]
     for obj in object_list:
         obj["application_id"] = application_id

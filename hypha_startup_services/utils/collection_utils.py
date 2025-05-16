@@ -34,14 +34,14 @@ def and_app_filter(
     application_id: str,
     current_filter: Filter | None = None,
 ) -> dict:
-    """Add application filter to filters.
+    """Add application filter to existing filter.
 
     Args:
         application_id: The application ID to filter by
-        param_name: The name of the parameter to filter on
+        current_filter: The existing filter to combine with application filter
 
     Returns:
-        Updated kwargs dict with filters added
+        Combined filter with application_id condition
     """
     app_filter = create_application_filter(application_id)
     if current_filter is None:

@@ -125,8 +125,18 @@ async def collections_create(
 ) -> dict[str, Any]:
     """Create a new collection.
 
-    Lengthens collection name before creating it.
-    Returns the collection configuration with the short collection name.
+    Verifies that the caller has admin permissions.
+    Adds workspace prefix to collection name before creating it.
+    Creates a collection artifact to track the collection.
+
+    Args:
+        client: WeaviateAsyncClient instance
+        server: RemoteService instance for artifact creation
+        settings: Collection configuration settings
+        context: Context containing caller information
+
+    Returns:
+        The collection configuration with the short collection name
     """
 
     caller_id = id_from_context(context)
@@ -146,9 +156,17 @@ async def collections_create(
 async def collections_list_all(
     client: WeaviateAsyncClient, context: dict[str, Any]
 ) -> dict[str, dict]:
-    """List all collections.
+    """List all collections in the database.
 
-    Returns collections with shortened names.
+    Verifies that the caller has admin permissions.
+    Retrieves all collections and converts their names to short names (without workspace prefix).
+
+    Args:
+        client: WeaviateAsyncClient instance
+        context: Context containing caller information
+
+    Returns:
+        Dictionary mapping short collection names to their configuration
     """
     caller_id = id_from_context(context)
     assert_is_admin_id(caller_id)
@@ -168,7 +186,11 @@ async def collections_get(
 ) -> dict[str, Any]:
     """Get a collection's configuration by name.
 
-    Returns the collection configuration with its short collection name.
+    Verifies that the caller has permission to access the collection.
+    Converts the full collection name to a short name in the returned config.
+
+    Returns:
+        The collection configuration with its short collection name.
     """
     caller_id = id_from_context(context)
     await assert_has_collection_permission(server, caller_id, name)
@@ -183,10 +205,20 @@ async def collections_delete(
     name: str | list[str],
     context: dict[str, Any],
 ) -> dict | None:
-    """Delete a collection or multiple collections by name.
+    """Delete one or multiple collections by name.
 
-    Lengthens collection names before deletion.
-    Also deletes the collection artifact.
+    Verifies that the caller has permission to access the collections.
+    Adds workspace prefix to collection names before deletion.
+    Also deletes the associated collection artifacts.
+
+    Args:
+        client: WeaviateAsyncClient instance
+        server: RemoteService instance for artifact deletion
+        name: Collection name(s) to delete
+        context: Context containing caller information
+
+    Returns:
+        Success dictionary or None if operation fails
     """
     caller_id = id_from_context(context)
     await assert_has_collection_permission(server, caller_id, name)
@@ -210,9 +242,19 @@ async def applications_create(
 ) -> dict[str, Any]:
     """Create a new application.
 
-    Lengthens the collection name before creating it.
+    Prepares the collection by ensuring it exists and adding the user as a tenant if needed.
     Creates an application artifact as a child of the collection artifact.
-    Returns the application configuration.
+
+    Args:
+        client: WeaviateAsyncClient instance
+        server: RemoteService instance for artifact operations
+        collection_name: Name of the collection for the application
+        application_id: ID for the new application
+        description: Description of the application
+        context: Context containing user information
+
+    Returns:
+        Dictionary with application details and artifact information
     """
     caller_id = id_from_context(context)
 
@@ -245,9 +287,22 @@ async def applications_delete(
     application_id: str,
     context: dict[str, Any],
 ) -> dict:
-    """Delete an application by ID from the collection."""
-    caller_id = id_from_context(context)
+    """Delete an application by ID from the collection.
+
+    Deletes the application artifact and all associated objects in the collection.
+
+    Args:
+        client: WeaviateAsyncClient instance
+        server: RemoteService instance for artifact operations
+        collection_name: Name of the collection containing the application
+        application_id: ID of the application to delete
+        context: Context containing user information
+
+    Returns:
+        Dictionary with deletion operation results
+    """
     full_collection_name = get_full_collection_name(collection_name)
+    caller_id = id_from_context(context)
 
     await delete_application_artifact(
         server, full_collection_name, application_id, caller_id
@@ -266,7 +321,19 @@ async def applications_get(
     application_id: str,
     context: dict[str, Any],
 ) -> dict[str, Any]:
-    """Get an application by ID from the collection."""
+    """Get application metadata by retrieving its artifact.
+
+    Retrieves the application artifact using the caller's ID and application ID.
+
+    Args:
+        server: RemoteService instance for artifact retrieval (Note: This is actually WeaviateAsyncClient, param name is incorrect)
+        collection_name: Name of the collection containing the application
+        application_id: ID of the application to retrieve
+        context: Context containing caller information
+
+    Returns:
+        Dictionary with application artifact information
+    """
     full_collection_name = get_full_collection_name(collection_name)
     caller_id = id_from_context(context)
     artifact_name = get_application_artifact_name(
@@ -287,9 +354,19 @@ async def applications_exists(
     application_id: str,
     context: dict[str, Any],
 ) -> bool:
-    """Check if an application exists in the collection."""
-    caller_id = id_from_context(context)
+    """Check if an application exists by checking if its artifact exists.
+
+    Args:
+        server: RemoteService instance for artifact checking (Note: This is actually WeaviateAsyncClient, param name is incorrect)
+        collection_name: Name of the collection to check
+        application_id: ID of the application to check
+        context: Context containing caller information
+
+    Returns:
+        Boolean indicating whether the application exists
+    """
     full_collection_name = get_full_collection_name(collection_name)
+    caller_id = id_from_context(context)
     artifact_name = get_application_artifact_name(
         full_collection_name, caller_id, application_id
     )
@@ -305,7 +382,23 @@ async def data_insert_many(
     user_id: str | None = None,
     context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Insert many objects into the collection."""
+    """Insert multiple objects into the collection.
+
+    Gets a tenant-specific collection after verifying permissions.
+    Automatically adds application_id to each object before insertion.
+
+    Args:
+        client: WeaviateAsyncClient instance
+        server: RemoteService instance for permission checking
+        collection_name: Name of the collection to insert into
+        application_id: ID of the application the objects belong to
+        objects: List of objects to insert
+        user_id: Optional user ID to use as tenant (if different from caller)
+        context: Context containing caller information
+
+    Returns:
+        Dictionary with insertion results including UUIDs and any errors
+    """
     caller_id = id_from_context(context)
 
     if user_id is not None:
@@ -338,9 +431,24 @@ async def data_insert(
     context: dict[str, Any] | None = None,
     **kwargs,
 ) -> uuid.UUID:
-    """Insert an object into the collection.
+    """Insert a single object into the collection.
 
+    Gets a tenant-specific collection after verifying permissions.
+    Automatically adds application_id to the object before insertion.
     Forwards all kwargs to collection.data.insert().
+
+    Args:
+        client: WeaviateAsyncClient instance
+        server: RemoteService instance for permission checking
+        collection_name: Name of the collection to insert into
+        application_id: ID of the application the object belongs to
+        properties: Object properties to insert
+        user_id: Optional user ID to use as tenant (if different from caller)
+        context: Context containing caller information
+        **kwargs: Additional arguments to pass to insert()
+
+    Returns:
+        UUID of the inserted object
     """
     caller_id = id_from_context(context)
     if user_id is not None:
@@ -363,7 +471,22 @@ async def get_permitted_collection(
     user_id: str | None = None,
     context: dict[str, Any] | None = None,
 ):
-    """Get a collection with tenant permissions."""
+    """Get a collection with appropriate tenant permissions.
+
+    Verifies that the caller has permission to access the application.
+    Returns a collection object with the appropriate tenant configured.
+
+    Args:
+        client: WeaviateAsyncClient instance
+        server: RemoteService instance for permission checking
+        collection_name: Name of the collection to access
+        application_id: ID of the application being accessed
+        user_id: Optional user ID to use as tenant (if different from caller)
+        context: Context containing caller information
+
+    Returns:
+        Collection object with tenant permissions configured
+    """
     caller_id = id_from_context(context)
     if user_id is not None:
         await assert_has_application_permission(
@@ -383,10 +506,23 @@ async def query_near_vector(
     context: dict[str, Any] = None,
     **kwargs,
 ) -> dict[str, Any]:
-    """Query the collection using a vector.
+    """Query the collection using vector similarity search.
 
+    Gets a tenant-specific collection after verifying permissions.
+    Automatically adds application_id filter to limit results to the specified application.
     Forwards all kwargs to collection.query.near_vector().
-    Filters results by application_id.
+
+    Args:
+        client: WeaviateAsyncClient instance
+        server: RemoteService instance for permission checking
+        collection_name: Name of the collection to query
+        application_id: ID of the application to filter results by
+        user_id: Optional user ID to use as tenant (if different from caller)
+        context: Context containing caller information
+        **kwargs: Additional arguments to pass to near_vector()
+
+    Returns:
+        Dictionary containing objects with shortened collection names
     """
     tenant_collection = await get_permitted_collection(
         client,
@@ -415,10 +551,23 @@ async def query_fetch_objects(
     context: dict[str, Any] = None,
     **kwargs,
 ) -> dict[str, Any]:
-    """Query the collection to fetch objects.
+    """Query the collection to fetch objects based on filters.
 
+    Gets a tenant-specific collection after verifying permissions.
+    Automatically adds application_id filter to limit results to the specified application.
     Forwards all kwargs to collection.query.fetch_objects().
-    Filters results by application_id.
+
+    Args:
+        client: WeaviateAsyncClient instance
+        server: RemoteService instance for permission checking
+        collection_name: Name of the collection to query
+        application_id: ID of the application to filter results by (optional)
+        user_id: Optional user ID to use as tenant (if different from caller)
+        context: Context containing caller information
+        **kwargs: Additional arguments to pass to fetch_objects()
+
+    Returns:
+        Dictionary containing objects with shortened collection names
     """
     tenant_collection = await get_permitted_collection(
         client,
@@ -446,10 +595,23 @@ async def query_hybrid(
     context: dict[str, Any] = None,
     **kwargs,
 ) -> dict[str, Any]:
-    """Query the collection using hybrid search.
+    """Query the collection using hybrid search (combination of vector and keyword search).
 
+    Gets a tenant-specific collection after verifying permissions.
+    Automatically adds application_id filter to limit results to the specified application.
     Forwards all kwargs to collection.query.hybrid().
-    Filters results by application_id.
+
+    Args:
+        client: WeaviateAsyncClient instance
+        server: RemoteService instance for permission checking
+        collection_name: Name of the collection to query
+        application_id: ID of the application to filter results by (optional)
+        user_id: Optional user ID to use as tenant (if different from caller)
+        context: Context containing caller information
+        **kwargs: Additional arguments to pass to hybrid()
+
+    Returns:
+        Dictionary containing objects with shortened collection names
     """
     tenant_collection = await get_permitted_collection(
         client,
@@ -477,9 +639,23 @@ async def generate_near_text(
     context: dict[str, Any] = None,
     **kwargs,
 ) -> dict[str, Any]:
-    """Query the collection using near text search.
+    """Generate content based on query text and similar objects in the collection.
 
-    Forwards all kwargs to collection.query.near_text().
+    Gets a tenant-specific collection after verifying permissions.
+    Automatically adds application_id filter to limit context to the specified application.
+    Forwards all kwargs to collection.generate.near_text().
+
+    Args:
+        client: WeaviateAsyncClient instance
+        server: RemoteService instance for permission checking
+        collection_name: Name of the collection to search
+        application_id: ID of the application to filter results by
+        user_id: Optional user ID to use as tenant (if different from caller)
+        context: Context containing caller information
+        **kwargs: Additional arguments to pass to near_text()
+
+    Returns:
+        Dictionary containing objects with shortened collection names and generated content
     """
     tenant_collection = await get_permitted_collection(
         client,
@@ -510,7 +686,20 @@ async def data_update(
 ) -> None:
     """Update an object in the collection.
 
+    Gets a tenant-specific collection after verifying permissions.
     Forwards all kwargs to collection.data.update().
+
+    Args:
+        client: WeaviateAsyncClient instance
+        server: RemoteService instance for permission checking
+        collection_name: Name of the collection containing the object
+        application_id: ID of the application the object belongs to
+        user_id: Optional user ID to use as tenant (if different from caller)
+        context: Context containing caller information
+        **kwargs: Additional arguments to pass to update() including uuid and properties
+
+    Returns:
+        None
     """
     tenant_collection = await get_permitted_collection(
         client,
@@ -534,7 +723,20 @@ async def data_delete_by_id(
 ) -> bool:
     """Delete an object by ID from the collection.
 
-    Forwards all kwargs to collection.data.delete_by_id().
+    Gets a tenant-specific collection after verifying permissions.
+    Calls collection.data.delete_by_id() with the specified UUID.
+
+    Args:
+        client: WeaviateAsyncClient instance
+        server: RemoteService instance for permission checking
+        collection_name: Name of the collection containing the object
+        application_id: ID of the application the object belongs to
+        uuid_input: UUID of the object to delete
+        user_id: Optional user ID to use as tenant (if different from caller)
+        context: Context containing caller information
+
+    Returns:
+        True if deletion was successful (implicitly, as no error is raised)
     """
     tenant_collection = await get_permitted_collection(
         client,
@@ -556,9 +758,23 @@ async def data_delete_many(
     context: dict[str, Any] = None,
     **kwargs,
 ) -> dict[str, Any]:
-    """Delete many objects from the collection.
+    """Delete many objects from the collection based on filter criteria.
 
+    Gets a tenant-specific collection after verifying permissions.
+    Automatically adds application_id filter to limit deletion to objects in the specified application.
     Forwards all kwargs to collection.data.delete_many().
+
+    Args:
+        client: WeaviateAsyncClient instance
+        server: RemoteService instance for permission checking
+        collection_name: Name of the collection containing the objects
+        application_id: ID of the application to filter objects by
+        user_id: Optional user ID to use as tenant (if different from caller)
+        context: Context containing caller information
+        **kwargs: Additional arguments to pass to delete_many() including where filters
+
+    Returns:
+        Dictionary with deletion operation results including match counts
     """
     tenant_collection = await get_permitted_collection(
         client,
@@ -588,9 +804,21 @@ async def data_exists(
     context: dict[str, Any],
     user_id: str | None = None,
 ) -> bool:
-    """Check if an object exists in the collection.
+    """Check if an object with the specified UUID exists in the collection.
 
-    Forwards all kwargs to collection.data.exists().
+    Gets a tenant-specific collection after verifying permissions.
+
+    Args:
+        client: WeaviateAsyncClient instance
+        server: RemoteService instance for permission checking
+        collection_name: Name of the collection to check
+        application_id: ID of the application the object belongs to
+        uuid_input: UUID of the object to check
+        context: Context containing caller information
+        user_id: Optional user ID to use as tenant (if different from caller)
+
+    Returns:
+        Boolean indicating whether the object exists
     """
     tenant_collection = await get_permitted_collection(
         client,
