@@ -67,8 +67,8 @@ async def add_tenant_if_not_exists(
 def get_tenant_collection(
     client: WeaviateAsyncClient,
     collection_name: str,
-    user_id: str,
+    user_ws: str,
 ) -> CollectionAsync:
     """Get the tenant collection from the client."""
     collection = acquire_collection(client, collection_name)
-    return collection.with_tenant(user_id)
+    return collection.with_tenant(user_ws)

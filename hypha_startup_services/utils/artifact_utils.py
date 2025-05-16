@@ -7,7 +7,7 @@ from hypha_startup_services.artifacts import (
     get_artifact,
 )
 from hypha_startup_services.utils.constants import (
-    ADMIN_IDS,
+    ADMIN_WORKSPACES,
     ARTIFACT_DELIMITER,
 )
 from hypha_startup_services.utils.format_utils import (
@@ -26,17 +26,17 @@ def get_collection_artifact_name(names: str | list[str]) -> str | list[str]:
 
 
 def get_application_artifact_name(
-    full_collection_name: str, user_id: str, application_id: str
+    full_collection_name: str, user_ws: str, application_id: str
 ) -> str:
     """Create a full application artifact name."""
     assert_valid_collection_name(full_collection_name)
     assert_valid_application_name(application_id)
-    return f"{full_collection_name}{ARTIFACT_DELIMITER}{user_id}{ARTIFACT_DELIMITER}{application_id}"
+    return f"{full_collection_name}{ARTIFACT_DELIMITER}{user_ws}{ARTIFACT_DELIMITER}{application_id}"
 
 
-def is_admin_id(user_id: str) -> bool:
+def is_admin_ws(user_ws: str) -> bool:
     """Check if a user has admin privileges."""
-    return user_id in ADMIN_IDS
+    return user_ws in ADMIN_WORKSPACES
 
 
 def get_artifact_permissions(owners: str | list[str]) -> dict:
@@ -103,7 +103,7 @@ async def create_collection_artifact(
     server: RemoteService,
     settings_full_name: dict[str, Any],
 ) -> None:
-    permissions = get_artifact_permissions(ADMIN_IDS)
+    permissions = get_artifact_permissions(ADMIN_WORKSPACES)
     metadata = create_artifact_metadata(
         description=settings_full_name.get("description", ""),
         collection_type="weaviate",
@@ -120,13 +120,13 @@ async def create_collection_artifact(
 
 
 async def has_permission_single(
-    server: RemoteService, user_id: str, collection_name: str
+    server: RemoteService, user_ws: str, collection_name: str
 ) -> bool:
     """Check if the user has admin permissions for a specific collection.
 
     Args:
         server: The RemoteService instance
-        user_id: The user ID
+        user_ws: The user workspace
         collection_name: The name of the collection to check permissions for
 
     Returns:
@@ -136,7 +136,7 @@ async def has_permission_single(
 
     artifact = await get_artifact(server, artifact_name)
     permissions = artifact.config.get("permissions", {})
-    user_permissions = permissions.get(user_id, {})
+    user_permissions = permissions.get(user_ws, {})
     if user_permissions in ("*", "rw+"):
         return True
 
@@ -144,16 +144,16 @@ async def has_permission_single(
 
 
 async def has_artifact_permission(
-    server: RemoteService, user_id: str, artifact_names: str | list[str]
+    server: RemoteService, user_ws: str, artifact_names: str | list[str]
 ) -> bool:
-    if user_id in ADMIN_IDS:
+    if user_ws in ADMIN_WORKSPACES:
         return True
 
     if isinstance(artifact_names, str):
         artifact_names = [artifact_names]
 
     for artifact_name in artifact_names:
-        if not await has_permission_single(server, user_id, artifact_name):
+        if not await has_permission_single(server, user_ws, artifact_name):
             return False
 
     return True
@@ -163,27 +163,28 @@ async def has_application_permission(
     server: RemoteService,
     collection_name: str,
     application_id: str,
-    accesser_id: str,
-    application_user_id: str,
+    accesser_ws: str,
+    application_user_ws: str,
 ) -> bool:
     """Check if the user has admin permissions for a specific application.
 
     Args:
         server: The RemoteService instance
-        user_id: The user ID
         collection_name: The name of the collection to check permissions for
         application_id: The ID of the application to check permissions for
+        accesser_ws: The workspace of the user checking permissions
+        application_user_ws: The workspace of the application user
 
     Returns:
         True if the user has admin permissions, False otherwise
     """
     artifact_name = get_application_artifact_name(
-        collection_name, application_user_id, application_id
+        collection_name, application_user_ws, application_id
     )
 
     return await has_artifact_permission(
         server,
-        accesser_id,
+        accesser_ws,
         artifact_name,
     )
 
@@ -192,16 +193,17 @@ async def assert_has_application_permission(
     server: RemoteService,
     collection_name: str,
     application_id: str,
-    accesser_id: str,
-    application_user_id: str,
+    accesser_ws: str,
+    application_user_ws: str,
 ) -> None:
     """Check if the user has admin permissions for a specific application.
 
     Args:
         server: The RemoteService instance
-        user_id: The user ID
         collection_name: The name of the collection to check permissions for
         application_id: The ID of the application to check permissions for
+        accesser_ws: The workspace of the user checking permissions
+        application_user_ws: The workspace of the application user
 
     Returns:
         None if all permissions are granted, raises an error if permissions are missing
@@ -210,21 +212,21 @@ async def assert_has_application_permission(
         server,
         collection_name,
         application_id,
-        accesser_id,
-        application_user_id,
+        accesser_ws,
+        application_user_ws,
     ), "You do not have permission to access the application."
 
 
 async def has_collection_permission(
     server: RemoteService,
-    user_id: str,
+    user_ws: str,
     collection_names: str | list[str],
 ) -> bool:
     """Check if the user has admin permissions for collections.
 
     Args:
         server: The RemoteService instance
-        user_id: The user ID
+        user_ws: The user workspace
         collection_names: Optional collection names to check permissions for
 
     Returns:
@@ -235,26 +237,26 @@ async def has_collection_permission(
 
     return await has_artifact_permission(
         server,
-        user_id,
+        user_ws,
         coll_artifact_name,
     )
 
 
-def assert_is_admin_id(user_id: str):
+def assert_is_admin_ws(user_ws: str):
     """Check if user has admin permissions for collections.
 
     Args:
-        user_id: The user ID
+        user_ws: The user workspace
 
     Returns:
         None if all permissions are granted, raises an error if permissions are missing
     """
-    assert is_admin_id(user_id), "You are not an admin user."
+    assert is_admin_ws(user_ws), "You are not an admin user."
 
 
 async def assert_has_collection_permission(
     server: RemoteService,
-    user_id: str,
+    user_ws: str,
     names: str | list[str],
 ) -> None:
     """Check if user has permission to access these collections.
@@ -262,14 +264,14 @@ async def assert_has_collection_permission(
     Args:
         server: The RemoteService instance
         names: Collection name or list of collection names to access
-        user_id: The user ID
+        user_ws: The user workspace
 
     Returns:
         None if all permissions are granted, raises an error if permissions are missing
     """
 
     assert await has_collection_permission(
-        server, user_id, names
+        server, user_ws, names
     ), "You do not have permission to access the collection(s)."
 
 
@@ -278,7 +280,7 @@ async def create_application_artifact(
     collection_name: str,
     application_id: str,
     description: str,
-    user_id: str,
+    user_ws: str,
 ) -> dict:
     """Create an application artifact.
 
@@ -287,7 +289,7 @@ async def create_application_artifact(
         collection_name: Short collection name
         application_id: Application ID
         description: Application description
-        user_id: User ID
+        user_ws: User workspace
 
     Returns:
         Result of artifact creation
@@ -295,7 +297,7 @@ async def create_application_artifact(
     # Create application artifact
     full_collection_name = get_full_collection_name(collection_name)
     artifact_name = get_application_artifact_name(
-        full_collection_name, user_id, application_id
+        full_collection_name, user_ws, application_id
     )
 
     # Set up application metadata
@@ -305,7 +307,7 @@ async def create_application_artifact(
     )
 
     # Set up permissions - owner can write, everyone can read
-    permissions = get_artifact_permissions(user_id)
+    permissions = get_artifact_permissions(user_ws)
 
     await create_artifact(
         server=server,
@@ -325,7 +327,7 @@ async def create_application_artifact(
 
 
 async def delete_application_artifact(
-    server: RemoteService, full_collection_name: str, application_id: str, user_id: str
+    server: RemoteService, full_collection_name: str, application_id: str, user_ws: str
 ) -> None:
     """Delete an application artifact.
 
@@ -333,10 +335,10 @@ async def delete_application_artifact(
         server: RemoteService instance
         full_collection_name: Full collection name
         application_id: str,
-        user_id: str
+        user_ws: str
     """
     artifact_name = get_application_artifact_name(
-        full_collection_name, user_id, application_id
+        full_collection_name, user_ws, application_id
     )
     await delete_artifact(
         server,

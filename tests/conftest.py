@@ -10,7 +10,7 @@ load_dotenv()
 
 
 async def get_server(server_url: str):
-    token = os.environ.get("HYPHA_TOKEN")
+    token = os.environ.get("PERSONAL_TOKEN")
     assert token is not None, "HYPHA_TOKEN environment variable is not set"
     server = await connect_to_server(
         {

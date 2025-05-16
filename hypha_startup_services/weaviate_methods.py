@@ -24,7 +24,7 @@ from hypha_startup_services.utils.collection_utils import (
 from hypha_startup_services.utils.format_utils import (
     collection_to_config_dict,
     config_with_short_name,
-    id_from_context,
+    ws_from_context,
     stringify_keys,
     get_settings_full_name,
     add_app_id,
@@ -33,7 +33,7 @@ from hypha_startup_services.utils.artifact_utils import (
     get_application_artifact_name,
     assert_has_collection_permission,
     assert_has_application_permission,
-    assert_is_admin_id,
+    assert_is_admin_ws,
     create_collection_artifact,
     delete_collection_artifacts,
     create_application_artifact,
@@ -49,7 +49,7 @@ async def delete_application_objects(
     client: WeaviateAsyncClient,
     collection_name: str,
     application_id: str,
-    user_id: str,
+    user_ws: str,
 ) -> dict:
     """Delete all objects associated with an application.
 
@@ -57,13 +57,13 @@ async def delete_application_objects(
         client: WeaviateAsyncClient instance
         collection_name: Collection name
         application_id: Application ID
-        user_id: User ID
+        user_ws: User workspace
 
     Returns:
         Response from delete operation
     """
     collection = acquire_collection(client, collection_name)
-    tenant_collection = collection.with_tenant(user_id)
+    tenant_collection = collection.with_tenant(user_ws)
 
     # Delete all objects in the collection with the given application ID
     response = await tenant_collection.data.delete_many(
@@ -81,14 +81,14 @@ async def delete_application_objects(
 async def prepare_application_creation(
     client: WeaviateAsyncClient,
     collection_name: str,
-    user_id: str,
+    user_ws: str,
 ) -> dict | None:
     """Prepare for application creation by checking collection existence and adding tenant.
 
     Args:
         client: WeaviateAsyncClient instance
         collection_name: Name of the collection for the application
-        user_id: User ID
+        user_ws: User workspace
 
     Returns:
         Error dict if preparation fails, None if successful
@@ -101,7 +101,7 @@ async def prepare_application_creation(
     await add_tenant_if_not_exists(
         client,
         collection_name,
-        user_id,
+        user_ws,
     )
 
     return None
@@ -139,8 +139,8 @@ async def collections_create(
         The collection configuration with the short collection name
     """
 
-    caller_id = id_from_context(context)
-    assert_is_admin_id(caller_id)
+    caller_ws = ws_from_context(context)
+    assert_is_admin_ws(caller_ws)
 
     settings_full_name = get_settings_full_name(settings)
 
@@ -168,8 +168,8 @@ async def collections_list_all(
     Returns:
         Dictionary mapping short collection names to their configuration
     """
-    caller_id = id_from_context(context)
-    assert_is_admin_id(caller_id)
+    caller_ws = ws_from_context(context)
+    assert_is_admin_ws(caller_ws)
 
     collections = await client.collections.list_all(simple=False)
     return {
@@ -192,8 +192,8 @@ async def collections_get(
     Returns:
         The collection configuration with its short collection name.
     """
-    caller_id = id_from_context(context)
-    await assert_has_collection_permission(server, caller_id, name)
+    caller_ws = ws_from_context(context)
+    await assert_has_collection_permission(server, caller_ws, name)
 
     collection = acquire_collection(client, name)
     return await collection_to_config_dict(collection)
@@ -220,8 +220,8 @@ async def collections_delete(
     Returns:
         Success dictionary or None if operation fails
     """
-    caller_id = id_from_context(context)
-    await assert_has_collection_permission(server, caller_id, name)
+    caller_ws = ws_from_context(context)
+    await assert_has_collection_permission(server, caller_ws, name)
 
     full_names = get_full_collection_name(name)
     await client.collections.delete(full_names)
@@ -256,9 +256,9 @@ async def applications_create(
     Returns:
         Dictionary with application details and artifact information
     """
-    caller_id = id_from_context(context)
+    caller_ws = ws_from_context(context)
 
-    prep_error = await prepare_application_creation(client, collection_name, caller_id)
+    prep_error = await prepare_application_creation(client, collection_name, caller_ws)
     if prep_error:
         return prep_error
 
@@ -267,14 +267,14 @@ async def applications_create(
         collection_name,
         application_id,
         description,
-        caller_id,
+        caller_ws,
     )
 
     return {
         "application_id": application_id,
         "collection_name": collection_name,
         "description": description,
-        "owner": caller_id,
+        "owner": caller_ws,
         "artifact_name": result["artifact_name"],
         "result": result,
     }
@@ -302,14 +302,14 @@ async def applications_delete(
         Dictionary with deletion operation results
     """
     full_collection_name = get_full_collection_name(collection_name)
-    caller_id = id_from_context(context)
+    caller_ws = ws_from_context(context)
 
     await delete_application_artifact(
-        server, full_collection_name, application_id, caller_id
+        server, full_collection_name, application_id, caller_ws
     )
 
     result = await delete_application_objects(
-        client, collection_name, application_id, caller_id
+        client, collection_name, application_id, caller_ws
     )
 
     return result
@@ -335,9 +335,9 @@ async def applications_get(
         Dictionary with application artifact information
     """
     full_collection_name = get_full_collection_name(collection_name)
-    caller_id = id_from_context(context)
+    caller_ws = ws_from_context(context)
     artifact_name = get_application_artifact_name(
-        full_collection_name, caller_id, application_id
+        full_collection_name, caller_ws, application_id
     )
 
     artifact = await get_artifact(server, artifact_name)
@@ -366,9 +366,9 @@ async def applications_exists(
         Boolean indicating whether the application exists
     """
     full_collection_name = get_full_collection_name(collection_name)
-    caller_id = id_from_context(context)
+    caller_ws = ws_from_context(context)
     artifact_name = get_application_artifact_name(
-        full_collection_name, caller_id, application_id
+        full_collection_name, caller_ws, application_id
     )
     return await artifact_exists(server, artifact_name)
 
@@ -379,7 +379,7 @@ async def data_insert_many(
     collection_name: str,
     application_id: str,
     objects: list[dict[str, Any]],
-    user_id: str | None = None,
+    user_ws: str | None = None,
     context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Insert multiple objects into the collection.
@@ -393,21 +393,21 @@ async def data_insert_many(
         collection_name: Name of the collection to insert into
         application_id: ID of the application the objects belong to
         objects: List of objects to insert
-        user_id: Optional user ID to use as tenant (if different from caller)
+        user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
 
     Returns:
         Dictionary with insertion results including UUIDs and any errors
     """
-    caller_id = id_from_context(context)
+    caller_ws = ws_from_context(context)
 
-    if user_id is not None:
+    if user_ws is not None:
         await assert_has_application_permission(
-            server, collection_name, application_id, caller_id, user_id
+            server, collection_name, application_id, caller_ws, user_ws
         )
-        tenant_collection = get_tenant_collection(client, collection_name, user_id)
+        tenant_collection = get_tenant_collection(client, collection_name, user_ws)
     else:
-        tenant_collection = get_tenant_collection(client, collection_name, caller_id)
+        tenant_collection = get_tenant_collection(client, collection_name, caller_ws)
 
     app_objects = add_app_id(objects, application_id)
 
@@ -427,7 +427,7 @@ async def data_insert(
     collection_name: str,
     application_id: str,
     properties: dict[str, Any],
-    user_id: str | None = None,
+    user_ws: str | None = None,
     context: dict[str, Any] | None = None,
     **kwargs,
 ) -> uuid.UUID:
@@ -443,21 +443,21 @@ async def data_insert(
         collection_name: Name of the collection to insert into
         application_id: ID of the application the object belongs to
         properties: Object properties to insert
-        user_id: Optional user ID to use as tenant (if different from caller)
+        user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
         **kwargs: Additional arguments to pass to insert()
 
     Returns:
         UUID of the inserted object
     """
-    caller_id = id_from_context(context)
-    if user_id is not None:
+    caller_ws = ws_from_context(context)
+    if user_ws is not None:
         await assert_has_application_permission(
-            server, collection_name, application_id, caller_id, user_id
+            server, collection_name, application_id, caller_ws, user_ws
         )
-        tenant_collection = get_tenant_collection(client, collection_name, user_id)
+        tenant_collection = get_tenant_collection(client, collection_name, user_ws)
     else:
-        tenant_collection = get_tenant_collection(client, collection_name, caller_id)
+        tenant_collection = get_tenant_collection(client, collection_name, caller_ws)
     app_properties = add_app_id(properties, application_id)
 
     return await tenant_collection.data.insert(app_properties, **kwargs)
@@ -468,7 +468,7 @@ async def get_permitted_collection(
     server: RemoteService,
     collection_name: str,
     application_id: str,
-    user_id: str | None = None,
+    user_ws: str | None = None,
     context: dict[str, Any] | None = None,
 ):
     """Get a collection with appropriate tenant permissions.
@@ -481,20 +481,20 @@ async def get_permitted_collection(
         server: RemoteService instance for permission checking
         collection_name: Name of the collection to access
         application_id: ID of the application being accessed
-        user_id: Optional user ID to use as tenant (if different from caller)
+        user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
 
     Returns:
         Collection object with tenant permissions configured
     """
-    caller_id = id_from_context(context)
-    if user_id is not None:
+    caller_ws = ws_from_context(context)
+    if user_ws is not None:
         await assert_has_application_permission(
-            server, collection_name, application_id, caller_id, user_id
+            server, collection_name, application_id, caller_ws, user_ws
         )
-        return get_tenant_collection(client, collection_name, user_id)
+        return get_tenant_collection(client, collection_name, user_ws)
 
-    return get_tenant_collection(client, collection_name, caller_id)
+    return get_tenant_collection(client, collection_name, caller_ws)
 
 
 async def query_near_vector(
@@ -502,7 +502,7 @@ async def query_near_vector(
     server: RemoteService,
     collection_name: str,
     application_id: str,
-    user_id: str | None = None,
+    user_ws: str | None = None,
     context: dict[str, Any] = None,
     **kwargs,
 ) -> dict[str, Any]:
@@ -517,7 +517,7 @@ async def query_near_vector(
         server: RemoteService instance for permission checking
         collection_name: Name of the collection to query
         application_id: ID of the application to filter results by
-        user_id: Optional user ID to use as tenant (if different from caller)
+        user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
         **kwargs: Additional arguments to pass to near_vector()
 
@@ -529,7 +529,7 @@ async def query_near_vector(
         server,
         collection_name,
         application_id,
-        user_id=user_id,
+        user_ws=user_ws,
         context=context,
     )
 
@@ -547,7 +547,7 @@ async def query_fetch_objects(
     server: RemoteService,
     collection_name: str,
     application_id: str = None,
-    user_id: str | None = None,
+    user_ws: str | None = None,
     context: dict[str, Any] = None,
     **kwargs,
 ) -> dict[str, Any]:
@@ -562,7 +562,7 @@ async def query_fetch_objects(
         server: RemoteService instance for permission checking
         collection_name: Name of the collection to query
         application_id: ID of the application to filter results by (optional)
-        user_id: Optional user ID to use as tenant (if different from caller)
+        user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
         **kwargs: Additional arguments to pass to fetch_objects()
 
@@ -574,7 +574,7 @@ async def query_fetch_objects(
         server,
         collection_name,
         application_id,
-        user_id=user_id,
+        user_ws=user_ws,
         context=context,
     )
     kwargs["filters"] = and_app_filter(application_id, kwargs.get("filters"))
@@ -591,7 +591,7 @@ async def query_hybrid(
     server: RemoteService,
     collection_name: str,
     application_id: str = None,
-    user_id: str | None = None,
+    user_ws: str | None = None,
     context: dict[str, Any] = None,
     **kwargs,
 ) -> dict[str, Any]:
@@ -606,7 +606,7 @@ async def query_hybrid(
         server: RemoteService instance for permission checking
         collection_name: Name of the collection to query
         application_id: ID of the application to filter results by (optional)
-        user_id: Optional user ID to use as tenant (if different from caller)
+        user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
         **kwargs: Additional arguments to pass to hybrid()
 
@@ -618,7 +618,7 @@ async def query_hybrid(
         server,
         collection_name,
         application_id,
-        user_id=user_id,
+        user_ws=user_ws,
         context=context,
     )
     kwargs["filters"] = and_app_filter(application_id, kwargs.get("filters"))
@@ -635,7 +635,7 @@ async def generate_near_text(
     server: RemoteService,
     collection_name: str,
     application_id: str,
-    user_id: str | None = None,
+    user_ws: str | None = None,
     context: dict[str, Any] = None,
     **kwargs,
 ) -> dict[str, Any]:
@@ -650,7 +650,7 @@ async def generate_near_text(
         server: RemoteService instance for permission checking
         collection_name: Name of the collection to search
         application_id: ID of the application to filter results by
-        user_id: Optional user ID to use as tenant (if different from caller)
+        user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
         **kwargs: Additional arguments to pass to near_text()
 
@@ -662,7 +662,7 @@ async def generate_near_text(
         server,
         collection_name,
         application_id,
-        user_id=user_id,
+        user_ws=user_ws,
         context=context,
     )
     kwargs["where"] = and_app_filter(application_id, kwargs.get("where"))
@@ -680,7 +680,7 @@ async def data_update(
     server: RemoteService,
     collection_name: str,
     application_id: str,
-    user_id: str | None = None,
+    user_ws: str | None = None,
     context: dict[str, Any] = None,
     **kwargs,
 ) -> None:
@@ -694,7 +694,7 @@ async def data_update(
         server: RemoteService instance for permission checking
         collection_name: Name of the collection containing the object
         application_id: ID of the application the object belongs to
-        user_id: Optional user ID to use as tenant (if different from caller)
+        user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
         **kwargs: Additional arguments to pass to update() including uuid and properties
 
@@ -706,7 +706,7 @@ async def data_update(
         server,
         collection_name,
         application_id,
-        user_id=user_id,
+        user_ws=user_ws,
         context=context,
     )
     await tenant_collection.data.update(**kwargs)
@@ -718,7 +718,7 @@ async def data_delete_by_id(
     collection_name: str,
     application_id: str,
     uuid_input: uuid.UUID,
-    user_id: str | None = None,
+    user_ws: str | None = None,
     context: dict[str, Any] = None,
 ) -> bool:
     """Delete an object by ID from the collection.
@@ -732,7 +732,7 @@ async def data_delete_by_id(
         collection_name: Name of the collection containing the object
         application_id: ID of the application the object belongs to
         uuid_input: UUID of the object to delete
-        user_id: Optional user ID to use as tenant (if different from caller)
+        user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
 
     Returns:
@@ -743,7 +743,7 @@ async def data_delete_by_id(
         server,
         collection_name,
         application_id,
-        user_id=user_id,
+        user_ws=user_ws,
         context=context,
     )
     await tenant_collection.data.delete_by_id(uuid=uuid_input)
@@ -754,7 +754,7 @@ async def data_delete_many(
     server: RemoteService,
     collection_name: str,
     application_id: str,
-    user_id: str | None = None,
+    user_ws: str | None = None,
     context: dict[str, Any] = None,
     **kwargs,
 ) -> dict[str, Any]:
@@ -769,7 +769,7 @@ async def data_delete_many(
         server: RemoteService instance for permission checking
         collection_name: Name of the collection containing the objects
         application_id: ID of the application to filter objects by
-        user_id: Optional user ID to use as tenant (if different from caller)
+        user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
         **kwargs: Additional arguments to pass to delete_many() including where filters
 
@@ -781,7 +781,7 @@ async def data_delete_many(
         server,
         collection_name,
         application_id,
-        user_id=user_id,
+        user_ws=user_ws,
         context=context,
     )
     kwargs["where"] = and_app_filter(application_id, kwargs.get("where"))
@@ -802,7 +802,7 @@ async def data_exists(
     application_id: str,
     uuid_input: uuid.UUID,
     context: dict[str, Any],
-    user_id: str | None = None,
+    user_ws: str | None = None,
 ) -> bool:
     """Check if an object with the specified UUID exists in the collection.
 
@@ -815,7 +815,7 @@ async def data_exists(
         application_id: ID of the application the object belongs to
         uuid_input: UUID of the object to check
         context: Context containing caller information
-        user_id: Optional user ID to use as tenant (if different from caller)
+        user_ws: Optional user workspace to use as tenant (if different from caller)
 
     Returns:
         Boolean indicating whether the object exists
@@ -825,7 +825,7 @@ async def data_exists(
         server,
         collection_name,
         application_id,
-        user_id=user_id,
+        user_ws=user_ws,
         context=context,
     )
     return await tenant_collection.data.exists(uuid=uuid_input)
