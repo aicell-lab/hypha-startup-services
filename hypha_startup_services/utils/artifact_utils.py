@@ -39,7 +39,7 @@ def is_admin_ws(user_ws: str) -> bool:
     return user_ws in ADMIN_WORKSPACES
 
 
-def get_artifact_permissions(owners: str | list[str]) -> dict:
+def make_artifact_permissions(owners: str | list[str]) -> dict:
     """Generate permissions dictionary for artifacts.
 
     Args:
@@ -103,7 +103,7 @@ async def create_collection_artifact(
     server: RemoteService,
     settings_full_name: dict[str, Any],
 ) -> None:
-    permissions = get_artifact_permissions(ADMIN_WORKSPACES)
+    permissions = make_artifact_permissions(owners=ADMIN_WORKSPACES)
     metadata = create_artifact_metadata(
         description=settings_full_name.get("description", ""),
         collection_type="weaviate",
@@ -306,8 +306,7 @@ async def create_application_artifact(
         collection_name=collection_name,
     )
 
-    # Set up permissions - owner can write, everyone can read
-    permissions = get_artifact_permissions(user_ws)
+    permissions = make_artifact_permissions(owners=user_ws)
 
     await create_artifact(
         server=server,
