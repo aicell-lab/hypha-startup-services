@@ -14,7 +14,7 @@ async def create_artifact(
     if metadata is None:
         metadata = {}
 
-    galleryManifest = {
+    gallery_manifest = {
         "name": artifact_name,
         "description": description,
         "collection": [],
@@ -28,7 +28,7 @@ async def create_artifact(
             parent_id=parent_id,
             alias=artifact_name,
             type="collection",
-            manifest=galleryManifest,
+            manifest=gallery_manifest,
             permissions=permissions,
         )
     except RemoteException as e:

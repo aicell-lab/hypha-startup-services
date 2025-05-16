@@ -5,8 +5,8 @@ allowing them to be serialized and transferred through Hypha RPC.
 """
 
 import uuid
-from weaviate.collections.classes.internal import _Object
 from dataclasses import asdict
+from weaviate.collections.classes.internal import _Object
 
 
 def register_weaviate_codecs(server):
