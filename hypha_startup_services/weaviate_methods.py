@@ -2,7 +2,7 @@
 Weaviate service implementation for Hypha.
 
 This module provides functionality to interface with Weaviate vector database,
-handling collections, data operations, and query functionality with workspace isolation.
+handling collections, data operations, and query functionality with user isolation.
 """
 
 import uuid
@@ -12,26 +12,25 @@ from weaviate.collections.classes.internal import QueryReturn, GenerativeReturn
 from weaviate.collections.classes.batch import DeleteManyReturn
 from hypha_rpc.rpc import RemoteService
 from hypha_startup_services.utils.collection_utils import (
-    full_collection_name,
+    get_full_collection_name,
     acquire_collection,
-    objects_without_workspace,
+    objects_part_coll_name,
     create_application_filter,
-    name_without_workspace,
+    get_short_name,
     and_app_filter,
     add_tenant_if_not_exists,
     get_tenant_collection,
 )
 from hypha_startup_services.utils.format_utils import (
     collection_to_config_dict,
-    config_minus_workspace,
-    is_in_workspace,
+    config_with_short_name,
     id_from_context,
     stringify_keys,
-    get_settings_with_workspace,
+    get_settings_full_name,
     add_app_id,
 )
 from hypha_startup_services.utils.artifact_utils import (
-    application_artifact_name,
+    get_application_artifact_name,
     assert_has_collection_permission,
     assert_has_application_permission,
     assert_is_admin_id,
@@ -44,7 +43,6 @@ from hypha_startup_services.artifacts import (
     get_artifact,
     artifact_exists,
 )
-from hypha_startup_services.utils.constants import SHARED_WORKSPACE
 
 
 async def delete_application_objects(
@@ -59,7 +57,7 @@ async def delete_application_objects(
         client: WeaviateAsyncClient instance
         collection_name: Collection name
         application_id: Application ID
-        caller_id: Tenant workspace
+        user_id: User ID
 
     Returns:
         Response from delete operation
@@ -75,7 +73,7 @@ async def delete_application_objects(
     return {
         "failed": response.failed,
         "matches": response.matches,
-        "objects": objects_without_workspace(response.objects),
+        "objects": objects_part_coll_name(response.objects),
         "successful": response.successful,
     }
 
@@ -90,7 +88,7 @@ async def prepare_application_creation(
     Args:
         client: WeaviateAsyncClient instance
         collection_name: Name of the collection for the application
-        caller_id: Tenant workspace
+        user_id: User ID
 
     Returns:
         Error dict if preparation fails, None if successful
@@ -114,8 +112,8 @@ async def collections_exists(
     collection_name: str,
     context: dict[str, Any] | None = None,
 ) -> bool:
-    """Check if a collection exists in the workspace."""
-    collection_name = full_collection_name(collection_name)
+    """Check if a collection exists."""
+    collection_name = get_full_collection_name(collection_name)
     return await client.collections.exists(collection_name)
 
 
@@ -125,22 +123,22 @@ async def collections_create(
     settings: dict,
     context: dict[str, Any],
 ) -> dict[str, Any]:
-    """Create a new collection in the workspace.
+    """Create a new collection.
 
-    Adds workspace prefix to the collection name before creating it.
-    Returns the collection configuration with the workspace prefix removed.
+    Lengthens collection name before creating it.
+    Returns the collection configuration with the short collection name.
     """
 
     caller_id = id_from_context(context)
     assert_is_admin_id(caller_id)
 
-    settings_with_workspace = get_settings_with_workspace(settings)
+    settings_full_name = get_settings_full_name(settings)
 
     collection = await client.collections.create_from_dict(
-        settings_with_workspace,
+        settings_full_name,
     )
 
-    await create_collection_artifact(server, settings_with_workspace)
+    await create_collection_artifact(server, settings_full_name)
 
     return await collection_to_config_dict(collection)
 
@@ -148,18 +146,17 @@ async def collections_create(
 async def collections_list_all(
     client: WeaviateAsyncClient, context: dict[str, Any]
 ) -> dict[str, dict]:
-    """List all collections in the workspace.
+    """List all collections.
 
-    Returns collections with workspace prefixes removed from their names.
+    Returns collections with shortened names.
     """
     caller_id = id_from_context(context)
     assert_is_admin_id(caller_id)
 
     collections = await client.collections.list_all(simple=False)
     return {
-        name_without_workspace(coll_name): config_minus_workspace(coll_obj)
+        get_short_name(coll_name): config_with_short_name(coll_obj)
         for coll_name, coll_obj in collections.items()
-        if is_in_workspace(coll_name, SHARED_WORKSPACE)
     }
 
 
@@ -171,7 +168,7 @@ async def collections_get(
 ) -> dict[str, Any]:
     """Get a collection's configuration by name.
 
-    Returns the collection configuration with the workspace prefix removed.
+    Returns the collection configuration with its short collection name.
     """
     caller_id = id_from_context(context)
     await assert_has_collection_permission(server, caller_id, name)
@@ -188,13 +185,13 @@ async def collections_delete(
 ) -> dict | None:
     """Delete a collection or multiple collections by name.
 
-    Adds workspace prefix to collection names before deletion.
-    Also deletes the collection artifact from the shared workspace.
+    Lengthens collection names before deletion.
+    Also deletes the collection artifact.
     """
     caller_id = id_from_context(context)
     await assert_has_collection_permission(server, caller_id, name)
 
-    full_names = full_collection_name(name)
+    full_names = get_full_collection_name(name)
     await client.collections.delete(full_names)
 
     # Delete collection artifacts
@@ -211,10 +208,10 @@ async def applications_create(
     description: str,
     context: dict[str, Any],
 ) -> dict[str, Any]:
-    """Create a new application in the workspace.
+    """Create a new application.
 
-    Adds workspace prefix to the collection name before creating it.
-    Creates an application artifact in the user's workspace as a child of the collection artifact.
+    Lengthens the collection name before creating it.
+    Creates an application artifact as a child of the collection artifact.
     Returns the application configuration.
     """
     caller_id = id_from_context(context)
@@ -250,10 +247,10 @@ async def applications_delete(
 ) -> dict:
     """Delete an application by ID from the collection."""
     caller_id = id_from_context(context)
-    ws_collection_name = full_collection_name(collection_name)
+    full_collection_name = get_full_collection_name(collection_name)
 
     await delete_application_artifact(
-        server, ws_collection_name, application_id, caller_id
+        server, full_collection_name, application_id, caller_id
     )
 
     result = await delete_application_objects(
@@ -270,10 +267,10 @@ async def applications_get(
     context: dict[str, Any],
 ) -> dict[str, Any]:
     """Get an application by ID from the collection."""
-    ws_collection_name = full_collection_name(collection_name)
+    full_collection_name = get_full_collection_name(collection_name)
     caller_id = id_from_context(context)
-    artifact_name = application_artifact_name(
-        ws_collection_name, caller_id, application_id
+    artifact_name = get_application_artifact_name(
+        full_collection_name, caller_id, application_id
     )
 
     artifact = await get_artifact(server, artifact_name)
@@ -292,9 +289,9 @@ async def applications_exists(
 ) -> bool:
     """Check if an application exists in the collection."""
     caller_id = id_from_context(context)
-    ws_collection_name = full_collection_name(collection_name)
-    artifact_name = application_artifact_name(
-        ws_collection_name, caller_id, application_id
+    full_collection_name = get_full_collection_name(collection_name)
+    artifact_name = get_application_artifact_name(
+        full_collection_name, caller_id, application_id
     )
     return await artifact_exists(server, artifact_name)
 
@@ -405,7 +402,7 @@ async def query_near_vector(
     response: QueryReturn = await tenant_collection.query.near_vector(**kwargs)
 
     return {
-        "objects": objects_without_workspace(response.objects),
+        "objects": objects_part_coll_name(response.objects),
     }
 
 
@@ -436,7 +433,7 @@ async def query_fetch_objects(
     response: QueryReturn = await tenant_collection.query.fetch_objects(**kwargs)
 
     return {
-        "objects": objects_without_workspace(response.objects),
+        "objects": objects_part_coll_name(response.objects),
     }
 
 
@@ -467,7 +464,7 @@ async def query_hybrid(
     response: QueryReturn = await tenant_collection.query.hybrid(**kwargs)
 
     return {
-        "objects": objects_without_workspace(response.objects),
+        "objects": objects_part_coll_name(response.objects),
     }
 
 
@@ -497,7 +494,7 @@ async def generate_near_text(
     response: GenerativeReturn = await tenant_collection.generate.near_text(**kwargs)
 
     return {
-        "objects": objects_without_workspace(response.objects),
+        "objects": objects_part_coll_name(response.objects),
         "generated": response.generated,
     }
 
@@ -577,7 +574,7 @@ async def data_delete_many(
     return {
         "failed": response.failed,
         "matches": response.matches,
-        "objects": objects_without_workspace(response.objects),
+        "objects": objects_part_coll_name(response.objects),
         "successful": response.successful,
     }
 

@@ -5,8 +5,8 @@ from weaviate.collections import CollectionAsync
 from weaviate.classes.tenants import Tenant
 from weaviate.classes.query import Filter
 from hypha_startup_services.utils.format_utils import (
-    full_collection_name,
-    name_without_workspace,
+    get_full_collection_name,
+    get_short_name,
 )
 
 
@@ -14,14 +14,14 @@ def acquire_collection(
     client: WeaviateAsyncClient, collection_name: str
 ) -> CollectionAsync:
     """Acquire a collection from the client."""
-    collection_name = full_collection_name(collection_name)
+    collection_name = get_full_collection_name(collection_name)
     return client.collections.get(collection_name)
 
 
-def objects_without_workspace(objects: list[dict]) -> list[dict]:
-    """Remove workspace from object IDs."""
+def objects_part_coll_name(objects: list[dict]) -> list[dict]:
+    """Shorten collection names in object IDs."""
     for obj in objects:
-        obj.collection = name_without_workspace(obj.collection)
+        obj.collection = get_short_name(obj.collection)
     return objects
 
 

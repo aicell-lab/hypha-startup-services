@@ -90,7 +90,7 @@ async def test_get_collection(weaviate_service):
 
 @pytest.mark.asyncio
 async def test_list_collections(weaviate_service):
-    """Test listing all available collections in the workspace."""
+    """Test listing all available collections."""
     # First create a collection
     await test_create_collection(weaviate_service)
 

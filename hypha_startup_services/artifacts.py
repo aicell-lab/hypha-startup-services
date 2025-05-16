@@ -39,10 +39,7 @@ async def delete_artifact(
     server: RemoteService,
     artifact_name: str,
 ) -> None:
-    """Delete an artifact in the workspace.
-
-    Adds workspace prefix to the collection name before deleting it.
-    """
+    """Delete an artifact."""
     artifact_manager = await server.get_service("public/artifact-manager")
 
     try:
@@ -55,10 +52,7 @@ async def get_artifact(
     server: RemoteService,
     artifact_name: str,
 ) -> dict[str, Any]:
-    """Get an artifact in the workspace.
-
-    Adds workspace prefix to the collection name before getting it.
-    """
+    """Get an artifact."""
     artifact_manager = await server.get_service("public/artifact-manager")
 
     try:
@@ -73,10 +67,7 @@ async def artifact_exists(
     server: RemoteService,
     artifact_name: str,
 ) -> bool:
-    """Check if an artifact exists in the workspace.
-
-    Adds workspace prefix to the collection name before checking it.
-    """
+    """Check if an artifact exists."""
 
     artifact_response = await get_artifact(
         server=server,

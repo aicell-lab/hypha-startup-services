@@ -2,7 +2,7 @@ from typing import Any
 from weaviate.collections import CollectionAsync
 from weaviate.collections.classes.config import CollectionConfig
 from hypha_startup_services.utils.constants import (
-    WORKSPACE_DELIMITER,
+    COLLECTION_DELIMITER,
     ARTIFACT_DELIMITER,
     SHARED_WORKSPACE,
 )
@@ -24,38 +24,38 @@ def format_workspace(workspace: str) -> str:
     return workspace_formatted
 
 
-def name_without_workspace(collection_name: str) -> str:
+def get_short_name(collection_name: str) -> str:
     """Extract collection name without workspace prefix.
 
     If the collection name contains the workspace delimiter, returns the part after it.
     Otherwise, returns the original collection name.
     """
-    if WORKSPACE_DELIMITER in collection_name:
-        return collection_name.split(WORKSPACE_DELIMITER)[1]
+    if COLLECTION_DELIMITER in collection_name:
+        return collection_name.split(COLLECTION_DELIMITER)[1]
     return collection_name
 
 
-def config_minus_workspace(
+def config_with_short_name(
     collection_config: CollectionConfig,
 ) -> dict:
     """Remove workspace from collection config."""
     config_dict = collection_config.to_dict()
-    config_dict["class"] = name_without_workspace(config_dict["class"])
+    config_dict["class"] = get_short_name(config_dict["class"])
     return config_dict
 
 
 async def collection_to_config_dict(collection: CollectionAsync) -> dict:
     """Convert collection to dict."""
     config = await collection.config.get()
-    config_dict = config_minus_workspace(config)
+    config_dict = config_with_short_name(config)
     return config_dict
 
 
 def assert_valid_collection_name(collection_name: str) -> None:
     """Ensure collection name doesn't contain the workspace delimiter."""
     assert (
-        WORKSPACE_DELIMITER not in collection_name
-    ), f"Collection name should not contain '{WORKSPACE_DELIMITER}'"
+        COLLECTION_DELIMITER not in collection_name
+    ), f"Collection name should not contain '{COLLECTION_DELIMITER}'"
 
 
 def assert_valid_application_name(application_id: str) -> None:
@@ -75,10 +75,10 @@ def full_collection_name_single(workspace: str, collection_name: str) -> str:
     assert_valid_collection_name(collection_name)
 
     workspace_formatted = format_workspace(workspace)
-    return f"{workspace_formatted}{WORKSPACE_DELIMITER}{collection_name}"
+    return f"{workspace_formatted}{COLLECTION_DELIMITER}{collection_name}"
 
 
-def full_collection_name(name: str | list[str]) -> str:
+def get_full_collection_name(name: str | list[str]) -> str:
     """Acquire a collection name from the client."""
     workspace = SHARED_WORKSPACE
     if isinstance(name, list):
@@ -86,18 +86,12 @@ def full_collection_name(name: str | list[str]) -> str:
     return full_collection_name_single(workspace, name)
 
 
-def is_in_workspace(collection_name: str, workspace: str) -> bool:
-    """Check if a collection belongs to the specified workspace."""
-    formatted_workspace = format_workspace(workspace)
-    return collection_name.startswith(f"{formatted_workspace}{WORKSPACE_DELIMITER}")
-
-
-def get_settings_with_workspace(settings: dict[str, Any]) -> dict[str, Any]:
+def get_settings_full_name(settings: dict[str, Any]) -> dict[str, Any]:
     """Add workspace prefix to the collection name in settings."""
-    settings_with_workspace = settings.copy()
-    original_class_name = settings_with_workspace["class"]
-    settings_with_workspace["class"] = full_collection_name(original_class_name)
-    return settings_with_workspace
+    settings_full_name = settings.copy()
+    original_class_name = settings_full_name["class"]
+    settings_full_name["class"] = get_full_collection_name(original_class_name)
+    return settings_full_name
 
 
 def add_app_id(
