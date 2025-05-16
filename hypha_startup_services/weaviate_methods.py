@@ -256,15 +256,14 @@ async def collections_delete(
         Success dictionary or None if operation fails
     """
     caller_ws = ws_from_context(context)
-    await assert_has_collection_permission(server, caller_ws, name)
 
-    full_names = get_full_collection_names(name)
+    short_names = [name] if isinstance(name, str) else name
+    for coll_name in short_names:
+        await assert_has_collection_permission(server, caller_ws, coll_name)
+
+    full_names = get_full_collection_names(short_names)
     await client.collections.delete(full_names)
-
-    # Delete collection artifacts
-    await delete_collection_artifacts(server, full_names)
-
-    return {"success": True}
+    await delete_collection_artifacts(server, short_names)
 
 
 async def applications_create(

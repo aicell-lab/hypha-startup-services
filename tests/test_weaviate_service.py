@@ -77,6 +77,17 @@ async def test_create_collection(weaviate_service):
 
 
 @pytest.mark.asyncio
+async def test_create_application(weaviate_service):
+    """Test creating a Weaviate application with proper schema configuration."""
+    await test_create_collection(weaviate_service)
+    await weaviate_service.applications.create(
+        application_id="Movie",
+        collection_name="movie-database",
+        description="An application for movie data",
+    )
+
+
+@pytest.mark.asyncio
 async def test_get_collection(weaviate_service):
     """Test retrieving a collection's configuration by name."""
     await test_create_collection(weaviate_service)
@@ -121,7 +132,7 @@ async def test_delete_collection(weaviate_service):
 async def test_collection_data_insert_many(weaviate_service):
     """Test inserting multiple objects into a collection using kwargs."""
     # First create a collection
-    await test_create_collection(weaviate_service)
+    await test_create_application(weaviate_service)
 
     # Create test data
     test_objects = [

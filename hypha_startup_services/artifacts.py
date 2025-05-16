@@ -29,7 +29,7 @@ async def create_artifact(
             alias=artifact_name,
             type="collection",
             manifest=gallery_manifest,
-            permissions=permissions,
+            config={"permissions": permissions},
         )
     except RemoteException as e:
         print(f"Artifact couldn't be created. It likely already exists. Error: {e}")

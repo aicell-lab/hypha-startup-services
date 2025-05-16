@@ -12,26 +12,24 @@ from hypha_startup_services.utils.constants import (
 )
 from hypha_startup_services.utils.format_utils import (
     get_full_collection_name,
-    assert_valid_collection_name,
     assert_valid_application_name,
 )
 
 
-def get_collection_artifact_name(name: str) -> str:
+def get_collection_artifact_name(short_name: str) -> str:
     """Create a full collection artifact name."""
-    return get_full_collection_name(name)
+    return get_full_collection_name(short_name)
 
 
-def get_collection_artifact_names(names: list[str]) -> list[str]:
+def get_collection_artifact_names(short_names: list[str]) -> list[str]:
     """Create full collection artifact names."""
-    return [get_full_collection_name(name) for name in names]
+    return [get_full_collection_name(name) for name in short_names]
 
 
 def get_application_artifact_name(
     full_collection_name: str, user_ws: str, application_id: str
 ) -> str:
     """Create a full application artifact name."""
-    assert_valid_collection_name(full_collection_name)
     assert_valid_application_name(application_id)
     return f"{full_collection_name}{ARTIFACT_DELIMITER}{user_ws}{ARTIFACT_DELIMITER}{application_id}"
 
@@ -56,7 +54,7 @@ def make_artifact_permissions(owners: str | list[str]) -> dict:
 
 
 def create_artifact_metadata(
-    collection_name: str = None,
+    short_collection_name: str = None,
     application_id: str = None,
     **kwargs,
 ) -> dict:
@@ -74,8 +72,8 @@ def create_artifact_metadata(
         "created_at": str(uuid.uuid1()),
     }
 
-    if collection_name:
-        metadata["collection_name"] = collection_name
+    if short_collection_name:
+        metadata["collection_name"] = short_collection_name
 
     if application_id:
         metadata["application_id"] = application_id
@@ -86,18 +84,36 @@ def create_artifact_metadata(
     return metadata
 
 
-async def delete_collection_artifacts(server: RemoteService, names: list[str]) -> None:
+async def delete_collection_artifact(
+    server: RemoteService,
+    collection_name: str,
+) -> None:
+    """Delete artifact for a specific collection.
+
+    Args:
+        server: The RemoteService instance
+        collection_name: The name of the collection to delete the artifact for
+    """
+    full_name = get_collection_artifact_name(collection_name)
+    await delete_artifact(
+        server,
+        full_name,
+    )
+
+
+async def delete_collection_artifacts(
+    server: RemoteService, short_names: list[str]
+) -> None:
     """Delete artifacts for a list of collections.
 
     Args:
         server: The RemoteService instance
         names: List of collection names to delete artifacts for
     """
-    for coll_name in names:
-        full_name = get_collection_artifact_name(coll_name)
-        await delete_artifact(
+    for coll_name in short_names:
+        await delete_collection_artifact(
             server,
-            full_name,
+            coll_name,
         )
 
 
@@ -122,7 +138,7 @@ async def create_collection_artifact(
 
 
 async def is_user_in_artifact_permissions(
-    server: RemoteService, user_ws: str, collection_name: str
+    server: RemoteService, user_ws: str, short_collection_name: str
 ) -> bool:
     """Check if the user has admin permissions for a specific collection.
 
@@ -134,7 +150,7 @@ async def is_user_in_artifact_permissions(
     Returns:
         True if the user has admin permissions, False otherwise
     """
-    artifact_name = get_collection_artifact_name(collection_name)
+    artifact_name = get_collection_artifact_name(short_collection_name)
 
     artifact = await get_artifact(server, artifact_name)
     permissions = artifact.config.get("permissions", {})
@@ -176,8 +192,9 @@ async def has_application_permission(
     Returns:
         True if the user has admin permissions, False otherwise
     """
+    full_collection_name = get_full_collection_name(collection_name)
     artifact_name = get_application_artifact_name(
-        collection_name, application_user_ws, application_id
+        full_collection_name, application_user_ws, application_id
     )
 
     return await has_artifact_permission(
@@ -218,7 +235,7 @@ async def assert_has_application_permission(
 async def has_collection_permission(
     server: RemoteService,
     user_ws: str,
-    collection_names: str | list[str],
+    short_coll_names: str | list[str],
 ) -> bool:
     """Check if the user has admin permissions for collections.
 
@@ -231,10 +248,10 @@ async def has_collection_permission(
         True if the user has admin permissions, False otherwise
     """
 
-    if isinstance(collection_names, str):
-        collection_names = [collection_names]
+    if isinstance(short_coll_names, str):
+        short_coll_names = [short_coll_names]
 
-    coll_artifact_name = get_collection_artifact_names(collection_names)
+    coll_artifact_name = get_collection_artifact_names(short_coll_names)
 
     return await has_artifact_permission(
         server,
@@ -258,7 +275,7 @@ def assert_is_admin_ws(user_ws: str):
 async def assert_has_collection_permission(
     server: RemoteService,
     user_ws: str,
-    names: str | list[str],
+    short_coll_names: str | list[str],
 ) -> None:
     """Check if user has permission to access these collections.
 
@@ -272,7 +289,7 @@ async def assert_has_collection_permission(
     """
 
     assert await has_collection_permission(
-        server, user_ws, names
+        server, user_ws, short_coll_names
     ), "You do not have permission to access the collection(s)."
 
 
@@ -304,7 +321,7 @@ async def create_application_artifact(
     # Set up application metadata
     metadata = create_artifact_metadata(
         application_id=application_id,
-        collection_name=collection_name,
+        short_collection_name=collection_name,
     )
 
     permissions = make_artifact_permissions(owners=user_ws)

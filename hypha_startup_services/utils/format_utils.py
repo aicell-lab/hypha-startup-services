@@ -79,17 +79,17 @@ def stringify_keys(d: dict) -> dict:
     return {str(k): v for k, v in d.items()}
 
 
-def get_full_collection_name(name: str) -> str:
+def get_full_collection_name(short_name: str) -> str:
     """Create a full collection name with workspace prefix for a single collection."""
-    assert_valid_collection_name(name)
+    assert_valid_collection_name(short_name)
 
     workspace_formatted = format_workspace(SHARED_WORKSPACE)
-    return f"{workspace_formatted}{COLLECTION_DELIMITER}{name}"
+    return f"{workspace_formatted}{COLLECTION_DELIMITER}{short_name}"
 
 
-def get_full_collection_names(names: list[str]) -> list[str]:
+def get_full_collection_names(short_names: list[str]) -> list[str]:
     """Get full collection names from a list of short names."""
-    return [get_full_collection_name(name) for name in names]
+    return [get_full_collection_name(short_name) for short_name in short_names]
 
 
 def get_settings_full_name(settings: dict[str, Any]) -> dict[str, Any]:
