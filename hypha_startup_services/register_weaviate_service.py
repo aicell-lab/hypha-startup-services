@@ -82,20 +82,20 @@ async def register_weaviate_service(server, client, service_id):
                 "exists": partial(applications_exists, server),
             },
             "data": {
-                "insert_many": partial(data_insert_many, client),
-                "insert": partial(data_insert, client),
-                "update": partial(data_update, client),
-                "delete_by_id": partial(data_delete_by_id, client),
-                "delete_many": partial(data_delete_many, client),
-                "exists": partial(data_exists, client),
+                "insert_many": partial(data_insert_many, client, server),
+                "insert": partial(data_insert, client, server),
+                "update": partial(data_update, client, server),
+                "delete_by_id": partial(data_delete_by_id, client, server),
+                "delete_many": partial(data_delete_many, client, server),
+                "exists": partial(data_exists, client, server),
             },
             "query": {
-                "near_vector": partial(query_near_vector, client),
-                "fetch_objects": partial(query_fetch_objects, client),
-                "hybrid": partial(query_hybrid, client),
+                "near_vector": partial(query_near_vector, client, server),
+                "fetch_objects": partial(query_fetch_objects, client, server),
+                "hybrid": partial(query_hybrid, client, server),
             },
             "generate": {
-                "near_text": partial(generate_near_text, client),
+                "near_text": partial(generate_near_text, client, server),
             },
         }
     )

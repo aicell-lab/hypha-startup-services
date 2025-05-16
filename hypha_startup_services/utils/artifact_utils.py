@@ -17,9 +17,12 @@ from hypha_startup_services.utils.format_utils import (
 )
 
 
-def collection_artifact_name(name: str) -> str:
+def collection_artifact_name(names: str | list[str]) -> str | list[str]:
     """Create a full collection artifact name with workspace prefix."""
-    return full_collection_name(name)
+    if isinstance(names, str):
+        return full_collection_name(names)
+
+    return [full_collection_name(name) for name in names]
 
 
 def application_artifact_name(
@@ -101,9 +104,6 @@ async def create_collection_artifact(
     server: RemoteService,
     settings_with_workspace: dict[str, Any],
 ) -> None:
-    # Create an artifact in the shared workspace for the collection
-    # This artifact will be used for permission management
-
     permissions = get_artifact_permissions(ADMIN_IDS)
     metadata = create_artifact_metadata(
         description=settings_with_workspace.get("description", ""),
@@ -136,14 +136,87 @@ async def has_permission_single(
     artifact_name = collection_artifact_name(collection_name)
 
     artifact = await get_artifact(server, artifact_name)
-    if "permissions" in artifact and "admin" in artifact["permissions"]:
-        if user_id in artifact["permissions"]["admin"]:
-            return True
+    permissions = artifact.config.get("permissions", {})
+    user_permissions = permissions.get(user_id, {})
+    if user_permissions in ("*", "rw+"):
+        return True
 
     return False
 
 
-async def has_permission(
+async def has_artifact_permission(
+    server: RemoteService, user_id: str, artifact_names: str | list[str]
+) -> bool:
+    if user_id in ADMIN_IDS:
+        return True
+
+    if isinstance(artifact_names, str):
+        artifact_names = [artifact_names]
+
+    for artifact_name in artifact_names:
+        if not await has_permission_single(server, user_id, artifact_name):
+            return False
+
+    return True
+
+
+async def has_application_permission(
+    server: RemoteService,
+    collection_name: str,
+    application_id: str,
+    accesser_id: str,
+    application_user_id: str,
+) -> bool:
+    """Check if the user has admin permissions for a specific application.
+
+    Args:
+        server: The RemoteService instance
+        user_id: The user's workspace
+        collection_name: The name of the collection to check permissions for
+        application_id: The ID of the application to check permissions for
+
+    Returns:
+        True if the user has admin permissions, False otherwise
+    """
+    artifact_name = application_artifact_name(
+        collection_name, application_user_id, application_id
+    )
+
+    return await has_artifact_permission(
+        server,
+        accesser_id,
+        artifact_name,
+    )
+
+
+async def assert_has_application_permission(
+    server: RemoteService,
+    collection_name: str,
+    application_id: str,
+    accesser_id: str,
+    application_user_id: str,
+) -> None:
+    """Check if the user has admin permissions for a specific application.
+
+    Args:
+        server: The RemoteService instance
+        user_id: The user's workspace
+        collection_name: The name of the collection to check permissions for
+        application_id: The ID of the application to check permissions for
+
+    Returns:
+        None if all permissions are granted, raises an error if permissions are missing
+    """
+    assert await has_application_permission(
+        server,
+        collection_name,
+        application_id,
+        accesser_id,
+        application_user_id,
+    ), "You do not have permission to access the application."
+
+
+async def has_collection_permission(
     server: RemoteService,
     user_id: str,
     collection_names: str | list[str],
@@ -159,18 +232,13 @@ async def has_permission(
         True if the user has admin permissions, False otherwise
     """
 
-    # First check if the user is in the admin workspaces list
-    if user_id in ADMIN_IDS:
-        return True
+    coll_artifact_name = collection_artifact_name(collection_names)
 
-    if isinstance(collection_names, str):
-        collection_names = [collection_names]
-
-    for collection_name in collection_names:
-        if not await has_permission_single(server, user_id, collection_name):
-            return False
-
-    return True
+    return await has_artifact_permission(
+        server,
+        user_id,
+        coll_artifact_name,
+    )
 
 
 def assert_is_admin_id(user_id: str):
@@ -185,12 +253,12 @@ def assert_is_admin_id(user_id: str):
     assert is_admin_id(user_id), "You are not an admin user."
 
 
-async def assert_has_permission(
+async def assert_has_collection_permission(
     server: RemoteService,
     user_id: str,
     names: str | list[str],
 ) -> None:
-    """Check if user has permission to delete these collections.
+    """Check if user has permission to access these collections.
 
     Args:
         server: The RemoteService instance
@@ -201,7 +269,7 @@ async def assert_has_permission(
         None if all permissions are granted, raises an error if permissions are missing
     """
 
-    assert await has_permission(
+    assert await has_collection_permission(
         server, user_id, names
     ), "You do not have permission to access the collection(s)."
 

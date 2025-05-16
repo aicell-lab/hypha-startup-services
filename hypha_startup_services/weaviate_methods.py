@@ -32,7 +32,8 @@ from hypha_startup_services.utils.format_utils import (
 )
 from hypha_startup_services.utils.artifact_utils import (
     application_artifact_name,
-    assert_has_permission,
+    assert_has_collection_permission,
+    assert_has_application_permission,
     assert_is_admin_id,
     create_collection_artifact,
     delete_collection_artifacts,
@@ -58,7 +59,7 @@ async def delete_application_objects(
         client: WeaviateAsyncClient instance
         collection_name: Collection name
         application_id: Application ID
-        user_id: Tenant workspace
+        caller_id: Tenant workspace
 
     Returns:
         Response from delete operation
@@ -89,7 +90,7 @@ async def prepare_application_creation(
     Args:
         client: WeaviateAsyncClient instance
         collection_name: Name of the collection for the application
-        user_id: Tenant workspace
+        caller_id: Tenant workspace
 
     Returns:
         Error dict if preparation fails, None if successful
@@ -130,8 +131,8 @@ async def collections_create(
     Returns the collection configuration with the workspace prefix removed.
     """
 
-    user_id = id_from_context(context)
-    assert_is_admin_id(user_id)
+    caller_id = id_from_context(context)
+    assert_is_admin_id(caller_id)
 
     settings_with_workspace = get_settings_with_workspace(settings)
 
@@ -151,8 +152,8 @@ async def collections_list_all(
 
     Returns collections with workspace prefixes removed from their names.
     """
-    user_id = id_from_context(context)
-    assert_is_admin_id(user_id)
+    caller_id = id_from_context(context)
+    assert_is_admin_id(caller_id)
 
     collections = await client.collections.list_all(simple=False)
     return {
@@ -172,8 +173,8 @@ async def collections_get(
 
     Returns the collection configuration with the workspace prefix removed.
     """
-    user_id = id_from_context(context)
-    await assert_has_permission(server, user_id, name)
+    caller_id = id_from_context(context)
+    await assert_has_collection_permission(server, caller_id, name)
 
     collection = acquire_collection(client, name)
     return await collection_to_config_dict(collection)
@@ -190,8 +191,8 @@ async def collections_delete(
     Adds workspace prefix to collection names before deletion.
     Also deletes the collection artifact from the shared workspace.
     """
-    user_id = id_from_context(context)
-    await assert_has_permission(server, user_id, name)
+    caller_id = id_from_context(context)
+    await assert_has_collection_permission(server, caller_id, name)
 
     full_names = full_collection_name(name)
     await client.collections.delete(full_names)
@@ -216,9 +217,9 @@ async def applications_create(
     Creates an application artifact in the user's workspace as a child of the collection artifact.
     Returns the application configuration.
     """
-    user_id = id_from_context(context)
+    caller_id = id_from_context(context)
 
-    prep_error = await prepare_application_creation(client, collection_name, user_id)
+    prep_error = await prepare_application_creation(client, collection_name, caller_id)
     if prep_error:
         return prep_error
 
@@ -227,14 +228,14 @@ async def applications_create(
         collection_name,
         application_id,
         description,
-        user_id,
+        caller_id,
     )
 
     return {
         "application_id": application_id,
         "collection_name": collection_name,
         "description": description,
-        "owner": user_id,
+        "owner": caller_id,
         "artifact_name": result["artifact_name"],
         "result": result,
     }
@@ -248,15 +249,15 @@ async def applications_delete(
     context: dict[str, Any],
 ) -> dict:
     """Delete an application by ID from the collection."""
-    user_id = id_from_context(context)
+    caller_id = id_from_context(context)
     ws_collection_name = full_collection_name(collection_name)
 
     await delete_application_artifact(
-        server, ws_collection_name, application_id, user_id
+        server, ws_collection_name, application_id, caller_id
     )
 
     result = await delete_application_objects(
-        client, collection_name, application_id, user_id
+        client, collection_name, application_id, caller_id
     )
 
     return result
@@ -270,9 +271,9 @@ async def applications_get(
 ) -> dict[str, Any]:
     """Get an application by ID from the collection."""
     ws_collection_name = full_collection_name(collection_name)
-    user_id = id_from_context(context)
+    caller_id = id_from_context(context)
     artifact_name = application_artifact_name(
-        ws_collection_name, user_id, application_id
+        ws_collection_name, caller_id, application_id
     )
 
     artifact = await get_artifact(server, artifact_name)
@@ -290,24 +291,34 @@ async def applications_exists(
     context: dict[str, Any],
 ) -> bool:
     """Check if an application exists in the collection."""
-    user_id = id_from_context(context)
+    caller_id = id_from_context(context)
     ws_collection_name = full_collection_name(collection_name)
     artifact_name = application_artifact_name(
-        ws_collection_name, user_id, application_id
+        ws_collection_name, caller_id, application_id
     )
     return await artifact_exists(server, artifact_name)
 
 
 async def data_insert_many(
     client: WeaviateAsyncClient,
+    server: RemoteService,
     collection_name: str,
     application_id: str,
     objects: list[dict[str, Any]],
+    user_id: str | None = None,
     context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Insert many objects into the collection."""
-    user_id = id_from_context(context)
-    tenant_collection = get_tenant_collection(client, collection_name, user_id)
+    caller_id = id_from_context(context)
+
+    if user_id is not None:
+        await assert_has_application_permission(
+            server, collection_name, application_id, caller_id, user_id
+        )
+        tenant_collection = get_tenant_collection(client, collection_name, user_id)
+    else:
+        tenant_collection = get_tenant_collection(client, collection_name, caller_id)
+
     app_objects = add_app_id(objects, application_id)
 
     response = await tenant_collection.data.insert_many(objects=app_objects)
@@ -322,10 +333,11 @@ async def data_insert_many(
 
 async def data_insert(
     client: WeaviateAsyncClient,
+    server: RemoteService,
     collection_name: str,
     application_id: str,
     properties: dict[str, Any],
-    *args,
+    user_id: str | None = None,
     context: dict[str, Any] | None = None,
     **kwargs,
 ) -> uuid.UUID:
@@ -333,17 +345,44 @@ async def data_insert(
 
     Forwards all kwargs to collection.data.insert().
     """
-    user_id = id_from_context(context)
-    tenant_collection = get_tenant_collection(client, collection_name, user_id)
+    caller_id = id_from_context(context)
+    if user_id is not None:
+        await assert_has_application_permission(
+            server, collection_name, application_id, caller_id, user_id
+        )
+        tenant_collection = get_tenant_collection(client, collection_name, user_id)
+    else:
+        tenant_collection = get_tenant_collection(client, collection_name, caller_id)
     app_properties = add_app_id(properties, application_id)
 
-    return await tenant_collection.data.insert(app_properties, *args, **kwargs)
+    return await tenant_collection.data.insert(app_properties, **kwargs)
+
+
+async def get_permitted_collection(
+    client: WeaviateAsyncClient,
+    server: RemoteService,
+    collection_name: str,
+    application_id: str,
+    user_id: str | None = None,
+    context: dict[str, Any] | None = None,
+):
+    """Get a collection with tenant permissions."""
+    caller_id = id_from_context(context)
+    if user_id is not None:
+        await assert_has_application_permission(
+            server, collection_name, application_id, caller_id, user_id
+        )
+        return get_tenant_collection(client, collection_name, user_id)
+
+    return get_tenant_collection(client, collection_name, caller_id)
 
 
 async def query_near_vector(
     client: WeaviateAsyncClient,
+    server: RemoteService,
     collection_name: str,
     application_id: str,
+    user_id: str | None = None,
     context: dict[str, Any] = None,
     **kwargs,
 ) -> dict[str, Any]:
@@ -352,8 +391,15 @@ async def query_near_vector(
     Forwards all kwargs to collection.query.near_vector().
     Filters results by application_id.
     """
-    user_id = id_from_context(context)
-    tenant_collection = get_tenant_collection(client, collection_name, user_id)
+    tenant_collection = await get_permitted_collection(
+        client,
+        server,
+        collection_name,
+        application_id,
+        user_id=user_id,
+        context=context,
+    )
+
     kwargs["filters"] = and_app_filter(application_id, kwargs.get("filters"))
 
     response: QueryReturn = await tenant_collection.query.near_vector(**kwargs)
@@ -365,8 +411,10 @@ async def query_near_vector(
 
 async def query_fetch_objects(
     client: WeaviateAsyncClient,
+    server: RemoteService,
     collection_name: str,
     application_id: str = None,
+    user_id: str | None = None,
     context: dict[str, Any] = None,
     **kwargs,
 ) -> dict[str, Any]:
@@ -375,8 +423,14 @@ async def query_fetch_objects(
     Forwards all kwargs to collection.query.fetch_objects().
     Filters results by application_id.
     """
-    user_id = id_from_context(context)
-    tenant_collection = get_tenant_collection(client, collection_name, user_id)
+    tenant_collection = await get_permitted_collection(
+        client,
+        server,
+        collection_name,
+        application_id,
+        user_id=user_id,
+        context=context,
+    )
     kwargs["filters"] = and_app_filter(application_id, kwargs.get("filters"))
 
     response: QueryReturn = await tenant_collection.query.fetch_objects(**kwargs)
@@ -388,8 +442,10 @@ async def query_fetch_objects(
 
 async def query_hybrid(
     client: WeaviateAsyncClient,
+    server: RemoteService,
     collection_name: str,
     application_id: str = None,
+    user_id: str | None = None,
     context: dict[str, Any] = None,
     **kwargs,
 ) -> dict[str, Any]:
@@ -398,8 +454,14 @@ async def query_hybrid(
     Forwards all kwargs to collection.query.hybrid().
     Filters results by application_id.
     """
-    user_id = id_from_context(context)
-    tenant_collection = get_tenant_collection(client, collection_name, user_id)
+    tenant_collection = await get_permitted_collection(
+        client,
+        server,
+        collection_name,
+        application_id,
+        user_id=user_id,
+        context=context,
+    )
     kwargs["filters"] = and_app_filter(application_id, kwargs.get("filters"))
 
     response: QueryReturn = await tenant_collection.query.hybrid(**kwargs)
@@ -411,17 +473,25 @@ async def query_hybrid(
 
 async def generate_near_text(
     client: WeaviateAsyncClient,
+    server: RemoteService,
     collection_name: str,
     application_id: str,
-    context: dict[str, Any],
+    user_id: str | None = None,
+    context: dict[str, Any] = None,
     **kwargs,
 ) -> dict[str, Any]:
     """Query the collection using near text search.
 
     Forwards all kwargs to collection.query.near_text().
     """
-    user_id = id_from_context(context)
-    tenant_collection = get_tenant_collection(client, collection_name, user_id)
+    tenant_collection = await get_permitted_collection(
+        client,
+        server,
+        collection_name,
+        application_id,
+        user_id=user_id,
+        context=context,
+    )
     kwargs["where"] = and_app_filter(application_id, kwargs.get("where"))
 
     response: GenerativeReturn = await tenant_collection.generate.near_text(**kwargs)
@@ -434,47 +504,73 @@ async def generate_near_text(
 
 async def data_update(
     client: WeaviateAsyncClient,
+    server: RemoteService,
     collection_name: str,
-    context: dict[str, Any],
+    application_id: str,
+    user_id: str | None = None,
+    context: dict[str, Any] = None,
     **kwargs,
 ) -> None:
     """Update an object in the collection.
 
     Forwards all kwargs to collection.data.update().
     """
-    user_id = id_from_context(context)
-    tenant_collection = get_tenant_collection(client, collection_name, user_id)
+    tenant_collection = await get_permitted_collection(
+        client,
+        server,
+        collection_name,
+        application_id,
+        user_id=user_id,
+        context=context,
+    )
     await tenant_collection.data.update(**kwargs)
 
 
 async def data_delete_by_id(
     client: WeaviateAsyncClient,
+    server: RemoteService,
     collection_name: str,
+    application_id: str,
     uuid_input: uuid.UUID,
-    context: dict[str, Any],
+    user_id: str | None = None,
+    context: dict[str, Any] = None,
 ) -> bool:
     """Delete an object by ID from the collection.
 
     Forwards all kwargs to collection.data.delete_by_id().
     """
-    user_id = id_from_context(context)
-    tenant_collection = get_tenant_collection(client, collection_name, user_id)
+    tenant_collection = await get_permitted_collection(
+        client,
+        server,
+        collection_name,
+        application_id,
+        user_id=user_id,
+        context=context,
+    )
     await tenant_collection.data.delete_by_id(uuid=uuid_input)
 
 
 async def data_delete_many(
     client: WeaviateAsyncClient,
+    server: RemoteService,
     collection_name: str,
     application_id: str,
-    context: dict[str, Any],
+    user_id: str | None = None,
+    context: dict[str, Any] = None,
     **kwargs,
 ) -> dict[str, Any]:
     """Delete many objects from the collection.
 
     Forwards all kwargs to collection.data.delete_many().
     """
-    user_id = id_from_context(context)
-    tenant_collection = get_tenant_collection(client, collection_name, user_id)
+    tenant_collection = await get_permitted_collection(
+        client,
+        server,
+        collection_name,
+        application_id,
+        user_id=user_id,
+        context=context,
+    )
     kwargs["where"] = and_app_filter(application_id, kwargs.get("where"))
     response: DeleteManyReturn = await tenant_collection.data.delete_many(**kwargs)
 
@@ -488,14 +584,23 @@ async def data_delete_many(
 
 async def data_exists(
     client: WeaviateAsyncClient,
+    server: RemoteService,
     collection_name: str,
+    application_id: str,
     uuid_input: uuid.UUID,
     context: dict[str, Any],
+    user_id: str | None = None,
 ) -> bool:
     """Check if an object exists in the collection.
 
     Forwards all kwargs to collection.data.exists().
     """
-    user_id = id_from_context(context)
-    tenant_collection = get_tenant_collection(client, collection_name, user_id)
+    tenant_collection = await get_permitted_collection(
+        client,
+        server,
+        collection_name,
+        application_id,
+        user_id=user_id,
+        context=context,
+    )
     return await tenant_collection.data.exists(uuid=uuid_input)
