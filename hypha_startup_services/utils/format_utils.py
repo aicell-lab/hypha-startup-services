@@ -10,7 +10,7 @@ from hypha_startup_services.utils.constants import (
 
 def ws_from_context(context: dict) -> str:
     """Get workspace ID from context."""
-    user_ws = context["scope"]["current_workspace"]
+    user_ws = context["user"]["scope"]["current_workspace"]
     return user_ws
 
 
@@ -79,20 +79,17 @@ def stringify_keys(d: dict) -> dict:
     return {str(k): v for k, v in d.items()}
 
 
-def full_collection_name_single(workspace: str, collection_name: str) -> str:
+def get_full_collection_name(name: str) -> str:
     """Create a full collection name with workspace prefix for a single collection."""
-    assert_valid_collection_name(collection_name)
+    assert_valid_collection_name(name)
 
-    workspace_formatted = format_workspace(workspace)
-    return f"{workspace_formatted}{COLLECTION_DELIMITER}{collection_name}"
+    workspace_formatted = format_workspace(SHARED_WORKSPACE)
+    return f"{workspace_formatted}{COLLECTION_DELIMITER}{name}"
 
 
-def get_full_collection_name(name: str | list[str]) -> str:
-    """Acquire a collection name from the client."""
-    workspace = SHARED_WORKSPACE
-    if isinstance(name, list):
-        return [full_collection_name_single(workspace, n) for n in name]
-    return full_collection_name_single(workspace, name)
+def get_full_collection_names(names: list[str]) -> list[str]:
+    """Get full collection names from a list of short names."""
+    return [get_full_collection_name(name) for name in names]
 
 
 def get_settings_full_name(settings: dict[str, Any]) -> dict[str, Any]:
@@ -104,7 +101,7 @@ def get_settings_full_name(settings: dict[str, Any]) -> dict[str, Any]:
 
 
 def add_app_id(
-    objects: dict[str, Any] | list[dict[str, Any]],
+    objects: list[dict[str, Any]],
     application_id: str,
 ) -> list[dict[str, Any]]:
     """Append the application ID to each object in the list or to a single object.
@@ -119,7 +116,6 @@ def add_app_id(
     Returns:
         List of objects with application_id added
     """
-    object_list = objects if isinstance(objects, list) else [objects]
-    for obj in object_list:
+    for obj in objects:
         obj["application_id"] = application_id
-    return object_list
+    return objects

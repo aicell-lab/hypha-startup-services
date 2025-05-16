@@ -12,7 +12,6 @@ from weaviate.collections.classes.internal import QueryReturn, GenerativeReturn
 from weaviate.collections.classes.batch import DeleteManyReturn
 from hypha_rpc.rpc import RemoteService
 from hypha_startup_services.utils.collection_utils import (
-    get_full_collection_name,
     acquire_collection,
     objects_part_coll_name,
     create_application_filter,
@@ -22,6 +21,8 @@ from hypha_startup_services.utils.collection_utils import (
     get_tenant_collection,
 )
 from hypha_startup_services.utils.format_utils import (
+    get_full_collection_name,
+    get_full_collection_names,
     collection_to_config_dict,
     config_with_short_name,
     ws_from_context,
@@ -105,6 +106,40 @@ async def prepare_application_creation(
     )
 
     return None
+
+
+async def get_permitted_collection(
+    client: WeaviateAsyncClient,
+    server: RemoteService,
+    collection_name: str,
+    application_id: str,
+    user_ws: str | None = None,
+    context: dict[str, Any] | None = None,
+):
+    """Get a collection with appropriate tenant permissions.
+
+    Verifies that the caller has permission to access the application.
+    Returns a collection object with the appropriate tenant configured.
+
+    Args:
+        client: WeaviateAsyncClient instance
+        server: RemoteService instance for permission checking
+        collection_name: Name of the collection to access
+        application_id: ID of the application being accessed
+        user_ws: Optional user workspace to use as tenant (if different from caller)
+        context: Context containing caller information
+
+    Returns:
+        Collection object with tenant permissions configured
+    """
+    caller_ws = ws_from_context(context)
+    if user_ws is not None:
+        await assert_has_application_permission(
+            server, collection_name, application_id, caller_ws, user_ws
+        )
+        return get_tenant_collection(client, collection_name, user_ws)
+
+    return get_tenant_collection(client, collection_name, caller_ws)
 
 
 async def collections_exists(
@@ -223,7 +258,7 @@ async def collections_delete(
     caller_ws = ws_from_context(context)
     await assert_has_collection_permission(server, caller_ws, name)
 
-    full_names = get_full_collection_name(name)
+    full_names = get_full_collection_names(name)
     await client.collections.delete(full_names)
 
     # Delete collection artifacts
@@ -316,7 +351,7 @@ async def applications_delete(
 
 
 async def applications_get(
-    server: WeaviateAsyncClient,
+    server: RemoteService,
     collection_name: str,
     application_id: str,
     context: dict[str, Any],
@@ -340,16 +375,11 @@ async def applications_get(
         full_collection_name, caller_ws, application_id
     )
 
-    artifact = await get_artifact(server, artifact_name)
-    return {
-        "name": artifact.name,
-        "description": artifact.description,
-        "metadata": artifact.metadata,
-    }
+    return await get_artifact(server, artifact_name)
 
 
 async def applications_exists(
-    server: WeaviateAsyncClient,
+    server: RemoteService,
     collection_name: str,
     application_id: str,
     context: dict[str, Any],
@@ -461,40 +491,6 @@ async def data_insert(
     app_properties = add_app_id(properties, application_id)
 
     return await tenant_collection.data.insert(app_properties, **kwargs)
-
-
-async def get_permitted_collection(
-    client: WeaviateAsyncClient,
-    server: RemoteService,
-    collection_name: str,
-    application_id: str,
-    user_ws: str | None = None,
-    context: dict[str, Any] | None = None,
-):
-    """Get a collection with appropriate tenant permissions.
-
-    Verifies that the caller has permission to access the application.
-    Returns a collection object with the appropriate tenant configured.
-
-    Args:
-        client: WeaviateAsyncClient instance
-        server: RemoteService instance for permission checking
-        collection_name: Name of the collection to access
-        application_id: ID of the application being accessed
-        user_ws: Optional user workspace to use as tenant (if different from caller)
-        context: Context containing caller information
-
-    Returns:
-        Collection object with tenant permissions configured
-    """
-    caller_ws = ws_from_context(context)
-    if user_ws is not None:
-        await assert_has_application_permission(
-            server, collection_name, application_id, caller_ws, user_ws
-        )
-        return get_tenant_collection(client, collection_name, user_ws)
-
-    return get_tenant_collection(client, collection_name, caller_ws)
 
 
 async def query_near_vector(

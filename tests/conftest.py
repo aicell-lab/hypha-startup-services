@@ -11,7 +11,7 @@ load_dotenv()
 
 async def get_server(server_url: str):
     token = os.environ.get("PERSONAL_TOKEN")
-    assert token is not None, "HYPHA_TOKEN environment variable is not set"
+    assert token is not None, "PERSONAL_TOKEN environment variable is not set"
     server = await connect_to_server(
         {
             "server_url": server_url,
@@ -19,8 +19,6 @@ async def get_server(server_url: str):
         }
     )
     await register_weaviate(server, "weaviate-test")
-    print("HEREE!!!!")
-    print(server.config["user"])
 
     return server
 

@@ -17,11 +17,13 @@ from hypha_startup_services.utils.format_utils import (
 )
 
 
-def get_collection_artifact_name(names: str | list[str]) -> str | list[str]:
+def get_collection_artifact_name(name: str) -> str:
     """Create a full collection artifact name."""
-    if isinstance(names, str):
-        return get_full_collection_name(names)
+    return get_full_collection_name(name)
 
+
+def get_collection_artifact_names(names: list[str]) -> list[str]:
+    """Create full collection artifact names."""
     return [get_full_collection_name(name) for name in names]
 
 
@@ -119,7 +121,7 @@ async def create_collection_artifact(
     )
 
 
-async def has_permission_single(
+async def is_user_in_artifact_permissions(
     server: RemoteService, user_ws: str, collection_name: str
 ) -> bool:
     """Check if the user has admin permissions for a specific collection.
@@ -144,17 +146,13 @@ async def has_permission_single(
 
 
 async def has_artifact_permission(
-    server: RemoteService, user_ws: str, artifact_names: str | list[str]
+    server: RemoteService, user_ws: str, artifact_name: str
 ) -> bool:
     if user_ws in ADMIN_WORKSPACES:
         return True
 
-    if isinstance(artifact_names, str):
-        artifact_names = [artifact_names]
-
-    for artifact_name in artifact_names:
-        if not await has_permission_single(server, user_ws, artifact_name):
-            return False
+    if not await is_user_in_artifact_permissions(server, user_ws, artifact_name):
+        return False
 
     return True
 
@@ -233,7 +231,10 @@ async def has_collection_permission(
         True if the user has admin permissions, False otherwise
     """
 
-    coll_artifact_name = get_collection_artifact_name(collection_names)
+    if isinstance(collection_names, str):
+        collection_names = [collection_names]
+
+    coll_artifact_name = get_collection_artifact_names(collection_names)
 
     return await has_artifact_permission(
         server,
