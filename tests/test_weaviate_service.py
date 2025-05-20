@@ -4,6 +4,8 @@ import pytest
 from weaviate.classes.query import Filter
 from hypha_rpc.rpc import RemoteException
 
+APP_ID = "TestApp"
+
 
 @pytest.mark.asyncio
 async def test_create_collection(weaviate_service):
@@ -91,7 +93,7 @@ async def test_create_application(weaviate_service):
     """Test creating a Weaviate application with proper schema configuration."""
     await test_create_collection(weaviate_service)
     await weaviate_service.applications.create(
-        application_id="TestApp",
+        application_id=APP_ID,
         collection_name="Movie",
         description="An application for movie data",
     )
@@ -162,14 +164,14 @@ async def test_collection_data_insert_many(weaviate_service):
 
     # Insert data using kwargs
     result = await weaviate_service.data.insert_many(
-        collection_name="Movie", application_id="TestApp", objects=test_objects
+        collection_name="Movie", application_id=APP_ID, objects=test_objects
     )
 
     assert result is not None
 
     # Verify objects were inserted by fetching them back
     query_result = await weaviate_service.query.fetch_objects(
-        collection_name="Movie", application_id="TestApp", limit=10
+        collection_name="Movie", application_id=APP_ID, limit=10
     )
 
     assert query_result is not None
@@ -184,7 +186,7 @@ async def test_collection_data_insert_many(weaviate_service):
 
     query_result = await weaviate_service.query.fetch_objects(
         collection_name="Movie",
-        application_id="TestApp",
+        application_id=APP_ID,
         limit=10,
         return_properties=["title"],
         include_vector=False,
@@ -214,7 +216,7 @@ async def test_collection_data_insert(weaviate_service):
 
     # Insert data
     uuid = await weaviate_service.data.insert(
-        collection_name="Movie", application_id="TestApp", properties=test_object
+        collection_name="Movie", application_id=APP_ID, properties=test_object
     )
 
     assert uuid is not None
@@ -222,7 +224,7 @@ async def test_collection_data_insert(weaviate_service):
     # Verify object was inserted by fetching it back
     query_result = await weaviate_service.query.fetch_objects(
         collection_name="Movie",
-        application_id="TestApp",
+        application_id=APP_ID,
         limit=1,
     )
 
@@ -250,7 +252,7 @@ async def test_collection_data_update(weaviate_service):
     }
 
     uuid = await weaviate_service.data.insert(
-        collection_name="Movie", application_id="TestApp", properties=test_object
+        collection_name="Movie", application_id=APP_ID, properties=test_object
     )
 
     # Update the object
@@ -261,14 +263,14 @@ async def test_collection_data_update(weaviate_service):
 
     await weaviate_service.data.update(
         collection_name="Movie",
-        application_id="TestApp",
+        application_id=APP_ID,
         uuid=uuid,
         properties=updated_properties,
     )
 
     # Verify the update
     query_result = await weaviate_service.query.fetch_objects(
-        collection_name="Movie", application_id="TestApp", limit=1
+        collection_name="Movie", application_id=APP_ID, limit=1
     )
 
     assert query_result is not None
@@ -295,12 +297,12 @@ async def test_collection_data_exists(weaviate_service):
     }
 
     uuid = await weaviate_service.data.insert(
-        collection_name="Movie", application_id="TestApp", properties=test_object
+        collection_name="Movie", application_id=APP_ID, properties=test_object
     )
 
     # Check if object exists
     exists = await weaviate_service.data.exists(
-        collection_name="Movie", application_id="TestApp", uuid=uuid
+        collection_name="Movie", application_id=APP_ID, uuid=uuid
     )
 
     assert exists is True
@@ -308,7 +310,7 @@ async def test_collection_data_exists(weaviate_service):
     # Check if non-existent object returns False
     fake_uuid = "00000000-0000-0000-0000-000000000000"
     exists = await weaviate_service.data.exists(
-        collection_name="Movie", application_id="TestApp", uuid=fake_uuid
+        collection_name="Movie", application_id=APP_ID, uuid=fake_uuid
     )
 
     assert exists is False
@@ -331,23 +333,23 @@ async def test_collection_data_delete_by_id(weaviate_service):
     }
 
     uuid = await weaviate_service.data.insert(
-        collection_name="Movie", application_id="TestApp", properties=test_object
+        collection_name="Movie", application_id=APP_ID, properties=test_object
     )
 
     # Verify object exists
     exists_before = await weaviate_service.data.exists(
-        collection_name="Movie", application_id="TestApp", uuid=uuid
+        collection_name="Movie", application_id=APP_ID, uuid=uuid
     )
     assert exists_before is True
 
     # Delete the object
     await weaviate_service.data.delete_by_id(
-        collection_name="Movie", application_id="TestApp", uuid=uuid
+        collection_name="Movie", application_id=APP_ID, uuid=uuid
     )
 
     # Verify object no longer exists
     exists_after = await weaviate_service.data.exists(
-        collection_name="Movie", application_id="TestApp", uuid=uuid
+        collection_name="Movie", application_id=APP_ID, uuid=uuid
     )
     assert exists_after is False
 
@@ -364,7 +366,7 @@ async def test_collection_query_near_vector(weaviate_service):
     # Query using kwargs
     result = await weaviate_service.query.near_vector(
         collection_name="Movie",
-        application_id="TestApp",
+        application_id=APP_ID,
         near_vector=test_vector,
         target_vector="title_vector",
         limit=1,
@@ -397,7 +399,7 @@ async def test_collection_query_fetch_objects(weaviate_service):
     # Fetch objects using kwargs with various parameters
     result = await weaviate_service.query.fetch_objects(
         collection_name="Movie",
-        application_id="TestApp",
+        application_id=APP_ID,
         limit=1,
         offset=0,
         after="",
@@ -423,7 +425,7 @@ async def test_collection_query_hybrid(weaviate_service):
     # Query using kwargs for hybrid search
     result = await weaviate_service.query.hybrid(
         collection_name="Movie",
-        application_id="TestApp",
+        application_id=APP_ID,
         query="Science Fiction",
         vector=test_vector,
         target_vector="description_vector",
@@ -446,7 +448,7 @@ async def test_collection_query_near_text(weaviate_service):
 
     result = await weaviate_service.generate.near_text(
         collection_name="Movie",
-        application_id="TestApp",
+        application_id=APP_ID,
         query="A sci-fi film",
         single_prompt="Translate this into French: {title}",
         target_vector="description_vector",
@@ -470,7 +472,7 @@ async def test_application_exists(weaviate_service):
     # Check if application exists
     exists = await weaviate_service.applications.exists(
         collection_name="Movie",
-        application_id="TestApp",
+        application_id=APP_ID,
     )
 
     assert exists is True
@@ -499,12 +501,12 @@ async def test_application_delete(weaviate_service):
     }
 
     await weaviate_service.data.insert(
-        collection_name="Movie", application_id="TestApp", properties=test_object
+        collection_name="Movie", application_id=APP_ID, properties=test_object
     )  # TODO: apparently this is not added. Fix this
 
     # Delete the application
     result = await weaviate_service.applications.delete(
-        collection_name="Movie", application_id="TestApp"
+        collection_name="Movie", application_id=APP_ID
     )
 
     assert result is not None
@@ -512,14 +514,14 @@ async def test_application_delete(weaviate_service):
 
     # Verify the application no longer exists
     exists = await weaviate_service.applications.exists(
-        collection_name="Movie", application_id="TestApp"
+        collection_name="Movie", application_id=APP_ID
     )
 
     assert exists is False
 
     # Verify that the data was also deleted
     query_result = await weaviate_service.query.fetch_objects(
-        collection_name="Movie", application_id="TestApp", limit=10
+        collection_name="Movie", application_id=APP_ID, limit=10
     )
 
     assert len(query_result["objects"]) == 0
@@ -533,7 +535,7 @@ async def test_application_get(weaviate_service):
 
     # Get the application details
     application = await weaviate_service.applications.get(
-        collection_name="Movie", application_id="TestApp"
+        collection_name="Movie", application_id=APP_ID
     )
 
     assert application is not None
@@ -573,19 +575,19 @@ async def test_collection_data_delete_many(weaviate_service):
 
     # Insert data
     await weaviate_service.data.insert_many(
-        collection_name="Movie", application_id="TestApp", objects=test_objects
+        collection_name="Movie", application_id=APP_ID, objects=test_objects
     )
 
     # Verify objects were inserted
     query_result = await weaviate_service.query.fetch_objects(
-        collection_name="Movie", application_id="TestApp", limit=10
+        collection_name="Movie", application_id=APP_ID, limit=10
     )
     assert len(query_result["objects"]) == 3
 
     # Delete objects with science fiction genre
     result = await weaviate_service.data.delete_many(
         collection_name="Movie",
-        application_id="TestApp",
+        application_id=APP_ID,
         where=Filter.by_property("genre").equal("Science Fiction"),
     )
 
@@ -595,7 +597,7 @@ async def test_collection_data_delete_many(weaviate_service):
 
     # Verify the remaining objects
     query_result = await weaviate_service.query.fetch_objects(
-        collection_name="Movie", application_id="TestApp", limit=10
+        collection_name="Movie", application_id=APP_ID, limit=10
     )
 
     assert len(query_result["objects"]) == 1
@@ -647,7 +649,7 @@ async def test_multi_user_application(weaviate_service):  # TODO: improve this t
 
     # Insert data as the owner (default)
     await weaviate_service.data.insert(
-        collection_name="Movie", application_id="TestApp", properties=test_object_owner
+        collection_name="Movie", application_id=APP_ID, properties=test_object_owner
     )
 
     # Insert data with an explicit user_ws parameter
@@ -656,14 +658,14 @@ async def test_multi_user_application(weaviate_service):  # TODO: improve this t
     try:
         await weaviate_service.data.insert(
             collection_name="Movie",
-            application_id="TestApp",
+            application_id=APP_ID,
             properties=test_object_user,
             user_ws="another-workspace",  # Simulating a different user
         )
 
         # Query data as the application owner (default)
         owner_results = await weaviate_service.query.fetch_objects(
-            collection_name="Movie", application_id="TestApp", limit=10
+            collection_name="Movie", application_id=APP_ID, limit=10
         )
 
         # We should see only the owner's data when querying as owner
@@ -676,7 +678,7 @@ async def test_multi_user_application(weaviate_service):  # TODO: improve this t
         # Query data as the other user
         user_results = await weaviate_service.query.fetch_objects(
             collection_name="Movie",
-            application_id="TestApp",
+            application_id=APP_ID,
             user_ws="another-workspace",
             limit=10,
         )

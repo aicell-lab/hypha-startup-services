@@ -9,6 +9,7 @@ from hypha_startup_services.service_codecs import register_weaviate_codecs
 load_dotenv()
 
 SERVER_URL = "https://hypha.aicell.io"
+APP_ID = "TestApp"
 
 
 async def get_user_server():
@@ -40,7 +41,7 @@ async def weaviate_service():
         # Try to delete test applications first
         try:
             await service.applications.delete(
-                collection_name="Movie", application_id="TestApp"
+                collection_name="Movie", application_id=APP_ID
             )
         except Exception:
             pass
