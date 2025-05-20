@@ -50,6 +50,11 @@ def and_app_filter(
     return current_filter & app_filter
 
 
+def format_tenant_name(tenant_name: str) -> str:
+    """Format tenant name to lowercase and replace spaces with underscores."""
+    return tenant_name.lower().replace("|", "_")
+
+
 async def add_tenant_if_not_exists(
     client: WeaviateAsyncClient,
     collection_name: str,
@@ -57,18 +62,20 @@ async def add_tenant_if_not_exists(
 ) -> None:
     """Add a tenant to the collection if it doesn't already exist."""
     collection = acquire_collection(client, collection_name)
-    existing_tenant = await collection.tenants.get_by_name(tenant_name)
-    if existing_tenant is None or not existing_tenant.name == tenant_name:
+    formatted_tenant_name = format_tenant_name(tenant_name)
+    existing_tenant = await collection.tenants.get_by_name(formatted_tenant_name)
+    if existing_tenant is None or not existing_tenant.name == formatted_tenant_name:
         await collection.tenants.create(
-            tenants=[Tenant(name=tenant_name)],
+            tenants=[Tenant(name=formatted_tenant_name)],
         )
 
 
 def get_tenant_collection(
     client: WeaviateAsyncClient,
     collection_name: str,
-    user_ws: str,
+    tenant_name: str,
 ) -> CollectionAsync:
     """Get the tenant collection from the client."""
     collection = acquire_collection(client, collection_name)
-    return collection.with_tenant(user_ws)
+    formatted_tenant_name = format_tenant_name(tenant_name)
+    return collection.with_tenant(formatted_tenant_name)

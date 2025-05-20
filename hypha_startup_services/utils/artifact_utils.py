@@ -153,7 +153,7 @@ async def is_user_in_artifact_permissions(
     artifact_name = get_collection_artifact_name(short_collection_name)
 
     artifact = await get_artifact(server, artifact_name)
-    permissions = artifact.config.get("permissions", {})
+    permissions = artifact.get("config", {}).get("permissions", {})
     user_permissions = permissions.get(user_ws, {})
     if user_permissions in ("*", "rw+"):
         return True

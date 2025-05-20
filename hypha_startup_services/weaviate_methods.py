@@ -5,7 +5,7 @@ This module provides functionality to interface with Weaviate vector database,
 handling collections, data operations, and query functionality with user isolation.
 """
 
-import uuid
+import uuid as uuid_class
 from typing import Any
 from weaviate import WeaviateAsyncClient
 from weaviate.collections.classes.internal import QueryReturn, GenerativeReturn
@@ -44,39 +44,6 @@ from hypha_startup_services.artifacts import (
     get_artifact,
     artifact_exists,
 )
-
-
-async def delete_application_objects(
-    client: WeaviateAsyncClient,
-    collection_name: str,
-    application_id: str,
-    user_ws: str,
-) -> dict:
-    """Delete all objects associated with an application.
-
-    Args:
-        client: WeaviateAsyncClient instance
-        collection_name: Collection name
-        application_id: Application ID
-        user_ws: User workspace
-
-    Returns:
-        Response from delete operation
-    """
-    collection = acquire_collection(client, collection_name)
-    tenant_collection = collection.with_tenant(user_ws)
-
-    # Delete all objects in the collection with the given application ID
-    response = await tenant_collection.data.delete_many(
-        where=create_application_filter(application_id)
-    )
-
-    return {
-        "failed": response.failed,
-        "matches": response.matches,
-        "objects": objects_part_coll_name(response.objects),
-        "successful": response.successful,
-    }
 
 
 async def prepare_application_creation(
@@ -319,7 +286,8 @@ async def applications_delete(
     server: RemoteService,
     collection_name: str,
     application_id: str,
-    context: dict[str, Any],
+    user_ws: str | None = None,
+    context: dict[str, Any] | None = None,
 ) -> dict:
     """Delete an application by ID from the collection.
 
@@ -335,15 +303,21 @@ async def applications_delete(
     Returns:
         Dictionary with deletion operation results
     """
-    full_collection_name = get_full_collection_name(collection_name)
-    caller_ws = ws_from_context(context)
 
-    await delete_application_artifact(
-        server, full_collection_name, application_id, caller_ws
+    result = await data_delete_many(
+        client,
+        server,
+        collection_name,
+        application_id,
+        user_ws=user_ws,
+        context=context,
+        where=create_application_filter(application_id),
     )
 
-    result = await delete_application_objects(
-        client, collection_name, application_id, caller_ws
+    full_collection_name = get_full_collection_name(collection_name)
+    caller_ws = ws_from_context(context)
+    await delete_application_artifact(
+        server, full_collection_name, application_id, caller_ws
     )
 
     return result
@@ -428,15 +402,15 @@ async def data_insert_many(
     Returns:
         Dictionary with insertion results including UUIDs and any errors
     """
-    caller_ws = ws_from_context(context)
 
-    if user_ws is not None:
-        await assert_has_application_permission(
-            server, collection_name, application_id, caller_ws, user_ws
-        )
-        tenant_collection = get_tenant_collection(client, collection_name, user_ws)
-    else:
-        tenant_collection = get_tenant_collection(client, collection_name, caller_ws)
+    tenant_collection = await get_permitted_collection(
+        client,
+        server,
+        collection_name,
+        application_id,
+        user_ws=user_ws,
+        context=context,
+    )
 
     app_objects = add_app_id(objects, application_id)
 
@@ -459,7 +433,7 @@ async def data_insert(
     user_ws: str | None = None,
     context: dict[str, Any] | None = None,
     **kwargs,
-) -> uuid.UUID:
+) -> uuid_class.UUID:
     """Insert a single object into the collection.
 
     Gets a tenant-specific collection after verifying permissions.
@@ -479,15 +453,16 @@ async def data_insert(
     Returns:
         UUID of the inserted object
     """
-    caller_ws = ws_from_context(context)
-    if user_ws is not None:
-        await assert_has_application_permission(
-            server, collection_name, application_id, caller_ws, user_ws
-        )
-        tenant_collection = get_tenant_collection(client, collection_name, user_ws)
-    else:
-        tenant_collection = get_tenant_collection(client, collection_name, caller_ws)
-    app_properties = add_app_id(properties, application_id)
+    tenant_collection = await get_permitted_collection(
+        client,
+        server,
+        collection_name,
+        application_id,
+        user_ws=user_ws,
+        context=context,
+    )
+    app_properties = properties.copy()
+    app_properties["application_id"] = application_id
 
     return await tenant_collection.data.insert(app_properties, **kwargs)
 
@@ -660,7 +635,7 @@ async def generate_near_text(
         user_ws=user_ws,
         context=context,
     )
-    kwargs["where"] = and_app_filter(application_id, kwargs.get("where"))
+    kwargs["filters"] = and_app_filter(application_id, kwargs.get("filters"))
 
     response: GenerativeReturn = await tenant_collection.generate.near_text(**kwargs)
 
@@ -712,7 +687,7 @@ async def data_delete_by_id(
     server: RemoteService,
     collection_name: str,
     application_id: str,
-    uuid_input: uuid.UUID,
+    uuid: uuid_class.UUID,
     user_ws: str | None = None,
     context: dict[str, Any] = None,
 ) -> bool:
@@ -726,7 +701,7 @@ async def data_delete_by_id(
         server: RemoteService instance for permission checking
         collection_name: Name of the collection containing the object
         application_id: ID of the application the object belongs to
-        uuid_input: UUID of the object to delete
+        uuid: UUID of the object to delete
         user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
 
@@ -741,7 +716,7 @@ async def data_delete_by_id(
         user_ws=user_ws,
         context=context,
     )
-    await tenant_collection.data.delete_by_id(uuid=uuid_input)
+    await tenant_collection.data.delete_by_id(uuid=uuid)
 
 
 async def data_delete_many(
@@ -785,7 +760,9 @@ async def data_delete_many(
     return {
         "failed": response.failed,
         "matches": response.matches,
-        "objects": objects_part_coll_name(response.objects),
+        "objects": (
+            objects_part_coll_name(response.objects) if response.objects else None
+        ),
         "successful": response.successful,
     }
 
@@ -795,7 +772,7 @@ async def data_exists(
     server: RemoteService,
     collection_name: str,
     application_id: str,
-    uuid_input: uuid.UUID,
+    uuid: uuid_class.UUID,
     context: dict[str, Any],
     user_ws: str | None = None,
 ) -> bool:
@@ -808,7 +785,7 @@ async def data_exists(
         server: RemoteService instance for permission checking
         collection_name: Name of the collection to check
         application_id: ID of the application the object belongs to
-        uuid_input: UUID of the object to check
+        uuid: UUID of the object to check
         context: Context containing caller information
         user_ws: Optional user workspace to use as tenant (if different from caller)
 
@@ -823,4 +800,4 @@ async def data_exists(
         user_ws=user_ws,
         context=context,
     )
-    return await tenant_collection.data.exists(uuid=uuid_input)
+    return await tenant_collection.data.exists(uuid=uuid)

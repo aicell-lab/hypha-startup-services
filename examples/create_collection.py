@@ -5,6 +5,7 @@ from hypha_rpc import connect_to_server
 from hypha_startup_services.register_weaviate_service import register_weaviate
 
 load_dotenv()
+SERVICE_NAME = "weaviate-test"
 
 
 async def get_server(server_url: str):
@@ -16,7 +17,7 @@ async def get_server(server_url: str):
             "token": token,
         }
     )
-    await register_weaviate(server, "weaviate-test")
+    await register_weaviate(server, SERVICE_NAME)
 
     return server
 
@@ -27,7 +28,7 @@ async def get_weaviate_service():
     Use --service-id command-line option to override the default service ID.
     """
     server = await get_server("https://hypha.aicell.io")
-    return await server.get_service("weaviate-test")
+    return await server.get_service(SERVICE_NAME)
 
 
 async def create_document_collection(
