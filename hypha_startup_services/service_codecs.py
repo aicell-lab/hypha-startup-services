@@ -5,8 +5,10 @@ allowing them to be serialized and transferred through Hypha RPC.
 """
 
 import uuid
-from weaviate.collections.classes.internal import _Object
 from dataclasses import asdict
+from weaviate.collections.classes.internal import _Object
+from weaviate.collections.classes.filters import _FilterValue
+
 
 def register_weaviate_codecs(server):
     """Register all Weaviate codecs with the Hypha server."""
@@ -16,9 +18,10 @@ def register_weaviate_codecs(server):
             "name": "uuid-uuid",
             "type": uuid.UUID,
             "encoder": lambda obj: obj.hex,
+            "decoder": uuid.UUID,
         }
     )
-    
+
     server.register_codec(
         {
             "name": "weaviate_object",
@@ -30,5 +33,24 @@ def register_weaviate_codecs(server):
                 "metadata": obj.metadata and asdict(obj.metadata),
                 "collection": obj.collection,
             },
+        }
+    )
+
+    server.register_codec(
+        {
+            "name": "filtervalue",
+            "type": _FilterValue,
+            "encoder": lambda obj: {
+                "_rintf": True,
+                "_rtype": "filtervalue",
+                "value": obj.value,
+                "operator": obj.operator,
+                "target": obj.target,
+            },
+            "decoder": lambda obj: _FilterValue(
+                value=obj["value"],
+                operator=obj["operator"],
+                target=obj["target"],
+            ),
         }
     )

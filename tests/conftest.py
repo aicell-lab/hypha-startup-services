@@ -4,21 +4,25 @@ import os
 import pytest_asyncio
 from dotenv import load_dotenv
 from hypha_rpc import connect_to_server
-from hypha_startup_services.start_weaviate_service import register_weaviate
+from hypha_startup_services.service_codecs import register_weaviate_codecs
 
 load_dotenv()
 
+SERVER_URL = "https://hypha.aicell.io"
+APP_ID = "TestApp"
 
-async def get_server(server_url: str):
-    token = os.environ.get("HYPHA_TOKEN")
-    assert token is not None, "HYPHA_TOKEN environment variable is not set"
+
+async def get_user_server():
+    token = os.environ.get("PERSONAL_TOKEN")
+    assert token is not None, "PERSONAL_TOKEN environment variable is not set"
     server = await connect_to_server(
         {
-            "server_url": server_url,
+            "server_url": SERVER_URL,
             "token": token,
         }
     )
-    await register_weaviate(server, "weaviate-test")
+
+    register_weaviate_codecs(server)
 
     return server
 
@@ -29,11 +33,20 @@ async def weaviate_service():
 
     Use --service-id command-line option to override the default service ID.
     """
-    server = await get_server("https://hypha.aicell.io")
-    service = await server.get_service("weaviate-test")
+    server = await get_user_server()
+    service = await server.get_service("aria-agents/weaviate-test")
     yield service
     # Cleanup after tests
     try:
+        # Try to delete test applications first
+        try:
+            await service.applications.delete(
+                collection_name="Movie", application_id=APP_ID
+            )
+        except Exception:
+            pass
+
+        # Then delete the collection
         await service.collections.delete("Movie")
     except ValueError:  # Collection doesn't exist
         pass
