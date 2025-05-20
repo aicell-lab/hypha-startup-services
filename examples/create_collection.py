@@ -46,6 +46,11 @@ async def create_document_collection(
         "description": "A Document class",
         "properties": [
             {
+                "name": "application_id",
+                "dataType": ["text"],
+                "description": "The ID of the application",
+            },
+            {
                 "name": "name",
                 "dataType": ["text"],
                 "description": "The name of the document",

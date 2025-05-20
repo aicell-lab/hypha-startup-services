@@ -138,7 +138,7 @@ async def create_collection_artifact(
 
 
 async def is_user_in_artifact_permissions(
-    server: RemoteService, user_ws: str, short_collection_name: str
+    server: RemoteService, user_ws: str, artifact_name: str
 ) -> bool:
     """Check if the user has admin permissions for a specific collection.
 
@@ -150,7 +150,6 @@ async def is_user_in_artifact_permissions(
     Returns:
         True if the user has admin permissions, False otherwise
     """
-    artifact_name = get_collection_artifact_name(short_collection_name)
 
     artifact = await get_artifact(server, artifact_name)
     permissions = artifact.get("config", {}).get("permissions", {})
@@ -251,13 +250,15 @@ async def has_collection_permission(
     if isinstance(short_coll_names, str):
         short_coll_names = [short_coll_names]
 
-    coll_artifact_name = get_collection_artifact_names(short_coll_names)
-
-    return await has_artifact_permission(
-        server,
-        user_ws,
-        coll_artifact_name,
-    )
+    coll_artifact_names = get_collection_artifact_names(short_coll_names)
+    for coll_artifact_name in coll_artifact_names:
+        if not await has_artifact_permission(
+            server,
+            user_ws,
+            coll_artifact_name,
+        ):
+            return False
+    return True
 
 
 def assert_is_admin_ws(user_ws: str):
