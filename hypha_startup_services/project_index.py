@@ -2,7 +2,6 @@ from typing import Any
 from functools import partial
 from weaviate import WeaviateAsyncClient
 from hypha_rpc.rpc import RemoteService
-from hypha_rpc.utils.schema import schema_function
 from hypha_startup_services.weaviate_methods import (
     applications_exists,
     applications_create,
@@ -47,7 +46,6 @@ async def ensure_application_exists(
         )
 
 
-@schema_function
 async def query_documents(
     client: WeaviateAsyncClient,
     server: RemoteService,
@@ -90,7 +88,6 @@ async def query_documents(
     return return_objects["objects"]
 
 
-@schema_function
 async def add_documents(
     client: WeaviateAsyncClient,
     server: RemoteService,

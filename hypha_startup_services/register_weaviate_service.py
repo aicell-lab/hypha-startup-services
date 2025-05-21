@@ -49,7 +49,8 @@ async def register_weaviate(server: RemoteService, service_id: str):
     )
 
     await register_weaviate_service(server, client, service_id)
-    await register_index_service(server, client, service_id)
+    service_id2 = service_id + "-index"
+    await register_index_service(server, client, service_id2)
 
     print(
         "Service registered at",
