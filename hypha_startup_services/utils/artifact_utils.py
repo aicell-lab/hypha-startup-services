@@ -39,7 +39,7 @@ def is_admin_ws(user_ws: str) -> bool:
     return user_ws in ADMIN_WORKSPACES
 
 
-def make_artifact_permissions(owners: str | list[str]) -> dict:
+def make_artifact_permissions(owners: str | list[str]) -> dict[str, str]:
     """Generate permissions dictionary for artifacts.
 
     Args:
@@ -54,10 +54,10 @@ def make_artifact_permissions(owners: str | list[str]) -> dict:
 
 
 def create_artifact_metadata(
-    short_collection_name: str = None,
-    application_id: str = None,
-    **kwargs,
-) -> dict:
+    short_collection_name: str | None = None,
+    application_id: str | None = None,
+    **kwargs: dict[str, Any],
+) -> dict[str, Any]:
     """Create standard metadata for artifacts.
 
     Args:
@@ -68,7 +68,7 @@ def create_artifact_metadata(
     Returns:
         A metadata dictionary with standard fields
     """
-    metadata = {
+    metadata: dict[str, Any] = {
         "created_at": str(uuid.uuid1()),
     }
 
@@ -124,7 +124,6 @@ async def create_collection_artifact(
     permissions = make_artifact_permissions(owners=ADMIN_WORKSPACES)
     metadata = create_artifact_metadata(
         description=settings_full_name.get("description", ""),
-        collection_type="weaviate",
         settings=settings_full_name,
     )
 

@@ -1,9 +1,12 @@
 """Utility functions for managing Weaviate collections."""
 
+from collections.abc import Sequence
 from weaviate import WeaviateAsyncClient
 from weaviate.collections import CollectionAsync
 from weaviate.classes.tenants import Tenant
 from weaviate.classes.query import Filter
+from weaviate.collections.classes.internal import Object, GenerativeObject
+from weaviate.collections.classes.filters import _Filters
 from hypha_startup_services.utils.format_utils import (
     get_full_collection_name,
     get_short_name,
@@ -18,22 +21,24 @@ def acquire_collection(
     return client.collections.get(collection_name)
 
 
-def objects_part_coll_name(objects: list[dict]) -> list[dict]:
+def objects_part_coll_name(
+    objects: Sequence[Object | GenerativeObject],
+) -> Sequence[Object | GenerativeObject]:
     """Shorten collection names in object IDs."""
     for obj in objects:
         obj.collection = get_short_name(obj.collection)
     return objects
 
 
-def create_application_filter(application_id: str) -> Filter:
+def create_application_filter(application_id: str) -> _Filters:
     """Create a filter for application_id."""
     return Filter.by_property("application_id").equal(application_id)
 
 
 def and_app_filter(
     application_id: str,
-    current_filter: Filter | None = None,
-) -> dict:
+    current_filter: _Filters | None = None,
+) -> _Filters:
     """Add application filter to existing filter.
 
     Args:

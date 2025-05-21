@@ -4,6 +4,7 @@ import os
 import pytest_asyncio
 from dotenv import load_dotenv
 from hypha_rpc import connect_to_server
+from hypha_rpc.rpc import RemoteService
 from hypha_startup_services.service_codecs import register_weaviate_codecs
 
 load_dotenv()
@@ -26,6 +27,9 @@ async def get_user_server(token_env="PERSONAL_TOKEN"):
             "token": token,
         }
     )
+
+    if not isinstance(server, RemoteService):
+        raise TypeError("connect_to_server did not return a RemoteService instance")
 
     register_weaviate_codecs(server)
 

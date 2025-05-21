@@ -4,8 +4,10 @@ Helper functions to register the Weaviate service with proper API endpoints.
 
 from functools import partial
 from hypha_rpc.rpc import RemoteService
+from weaviate import WeaviateAsyncClient
 from hypha_startup_services.service_codecs import register_weaviate_codecs
 from hypha_startup_services.weaviate_client import instantiate_and_connect
+from hypha_startup_services.project_index import register_index_service
 from hypha_startup_services.weaviate_methods import (
     collections_create,
     collections_delete,
@@ -47,6 +49,7 @@ async def register_weaviate(server: RemoteService, service_id: str):
     )
 
     await register_weaviate_service(server, client, service_id)
+    await register_index_service(server, client, service_id)
 
     print(
         "Service registered at",
@@ -54,13 +57,15 @@ async def register_weaviate(server: RemoteService, service_id: str):
     )
 
 
-async def register_weaviate_service(server, client, service_id):
+async def register_weaviate_service(
+    server: RemoteService, client: WeaviateAsyncClient, service_id: str
+) -> None:
     """Register the Weaviate service with the Hypha server.
 
     Sets up all service endpoints for collections, data operations, and queries.
     """
 
-    return await server.register_service(
+    await server.register_service(
         {
             "name": "Hypha Weaviate Service",
             "id": service_id,

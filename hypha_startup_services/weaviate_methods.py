@@ -99,7 +99,7 @@ async def get_permitted_collection(
     Returns:
         Collection object with tenant permissions configured
     """
-    caller_ws = ws_from_context(context)
+    caller_ws = ws_from_context(context) if context else ""
     if user_ws is not None:
         await assert_has_application_permission(
             server, collection_name, application_id, caller_ws, user_ws
@@ -303,6 +303,7 @@ async def applications_delete(
     Returns:
         Dictionary with deletion operation results
     """
+    context = context or {}
 
     result = await data_delete_many(
         client,
@@ -473,7 +474,7 @@ async def query_near_vector(
     collection_name: str,
     application_id: str,
     user_ws: str | None = None,
-    context: dict[str, Any] = None,
+    context: dict[str, Any] | None = None,
     **kwargs,
 ) -> dict[str, Any]:
     """Query the collection using vector similarity search.
@@ -516,9 +517,9 @@ async def query_fetch_objects(
     client: WeaviateAsyncClient,
     server: RemoteService,
     collection_name: str,
-    application_id: str = None,
+    application_id: str,
     user_ws: str | None = None,
-    context: dict[str, Any] = None,
+    context: dict[str, Any] | None = None,
     **kwargs,
 ) -> dict[str, Any]:
     """Query the collection to fetch objects based on filters.
@@ -560,9 +561,9 @@ async def query_hybrid(
     client: WeaviateAsyncClient,
     server: RemoteService,
     collection_name: str,
-    application_id: str = None,
+    application_id: str,
     user_ws: str | None = None,
-    context: dict[str, Any] = None,
+    context: dict[str, Any] | None = None,
     **kwargs,
 ) -> dict[str, Any]:
     """Query the collection using hybrid search (combination of vector and keyword search).
@@ -606,7 +607,7 @@ async def generate_near_text(
     collection_name: str,
     application_id: str,
     user_ws: str | None = None,
-    context: dict[str, Any] = None,
+    context: dict[str, Any] | None = None,
     **kwargs,
 ) -> dict[str, Any]:
     """Generate content based on query text and similar objects in the collection.
@@ -651,7 +652,7 @@ async def data_update(
     collection_name: str,
     application_id: str,
     user_ws: str | None = None,
-    context: dict[str, Any] = None,
+    context: dict[str, Any] | None = None,
     **kwargs,
 ) -> None:
     """Update an object in the collection.
@@ -689,8 +690,8 @@ async def data_delete_by_id(
     application_id: str,
     uuid: uuid_class.UUID,
     user_ws: str | None = None,
-    context: dict[str, Any] = None,
-) -> bool:
+    context: dict[str, Any] | None = None,
+) -> None:
     """Delete an object by ID from the collection.
 
     Gets a tenant-specific collection after verifying permissions.
@@ -725,7 +726,7 @@ async def data_delete_many(
     collection_name: str,
     application_id: str,
     user_ws: str | None = None,
-    context: dict[str, Any] = None,
+    context: dict[str, Any] | None = None,
     **kwargs,
 ) -> dict[str, Any]:
     """Delete many objects from the collection based on filter criteria.
