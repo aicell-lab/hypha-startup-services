@@ -1,6 +1,7 @@
 import asyncio
 import os
 from hypha_rpc import connect_to_server
+from hypha_rpc.rpc import RemoteService
 from hypha_startup_services.register_weaviate_service import register_weaviate
 
 SERVER_URL = "https://hypha.aicell.io"
@@ -15,6 +16,10 @@ async def register_service():
             "token": token,
         }
     )
+
+    if not isinstance(server, RemoteService):
+        raise TypeError("connect_to_server did not return a RemoteService instance")
+
     await register_weaviate(server, "weaviate-test")
     await server.serve()
 
