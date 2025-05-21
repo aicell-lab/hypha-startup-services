@@ -63,7 +63,7 @@ async def query_documents(
         collection_name="Document",
         application_id=application_id,
         context=context,
-    )
+    ), "Application does not exist. Please call init(<application-id>) first."
 
     return_objects = await generate_near_text(
         client=client,
@@ -94,7 +94,7 @@ async def add_documents(
         collection_name="Document",
         application_id=application_id,
         context=context,
-    )
+    ), "Application does not exist. Please call init(<application-id>) first."
 
     await data_insert_many(
         client=client,
