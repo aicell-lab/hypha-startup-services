@@ -1,6 +1,6 @@
 import uuid
 from typing import Any
-from hypha_rpc.rpc import RemoteService
+from hypha_rpc.rpc import RemoteService, RemoteException
 from hypha_startup_services.artifacts import (
     create_artifact,
     delete_artifact,
@@ -151,7 +151,12 @@ async def is_user_in_artifact_permissions(
         True if the user has admin permissions, False otherwise
     """
 
-    artifact = await get_artifact(server, artifact_name)
+    try:
+        artifact = await get_artifact(server, artifact_name)
+    except RemoteException as e:
+        print(f"Error getting artifact. Error: {e}")
+        return False
+
     permissions = artifact.get("config", {}).get("permissions", {})
     user_permissions = permissions.get(user_ws, {})
     if user_permissions in ("*", "rw+"):
