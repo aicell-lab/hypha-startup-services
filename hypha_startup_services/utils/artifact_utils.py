@@ -304,7 +304,7 @@ async def create_application_artifact(
     application_id: str,
     description: str,
     user_ws: str,
-) -> dict:
+) -> dict[str, Any]:
     """Create an application artifact.
 
     Args:

@@ -8,7 +8,7 @@ from hypha_startup_services.utils.constants import (
 )
 
 
-def ws_from_context(context: dict) -> str:
+def ws_from_context(context: dict[str, Any]) -> str:
     """Get workspace ID from context."""
     user_ws = context["user"]["scope"]["current_workspace"]
     return user_ws
@@ -36,14 +36,14 @@ def get_short_name(collection_name: str) -> str:
 
 def config_with_short_name(
     collection_config: CollectionConfig,
-) -> dict:
+) -> dict[str, Any]:
     """Remove workspace from collection config."""
     config_dict = collection_config.to_dict()
     config_dict["class"] = get_short_name(config_dict["class"])
     return config_dict
 
 
-async def collection_to_config_dict(collection: CollectionAsync) -> dict:
+async def collection_to_config_dict(collection: CollectionAsync) -> dict[str, Any]:
     """Convert collection to a dictionary with shortened collection name.
 
     Gets the collection's configuration and converts the full collection name

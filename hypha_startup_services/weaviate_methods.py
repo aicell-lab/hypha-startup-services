@@ -50,7 +50,7 @@ async def prepare_application_creation(
     client: WeaviateAsyncClient,
     collection_name: str,
     user_ws: str,
-) -> dict | None:
+) -> dict[str, str] | None:
     """Prepare for application creation by checking collection existence and adding tenant.
 
     Args:
@@ -122,7 +122,7 @@ async def collections_exists(
 async def collections_create(
     client: WeaviateAsyncClient,
     server: RemoteService,
-    settings: dict,
+    settings: dict[str, Any],
     context: dict[str, Any],
 ) -> dict[str, Any]:
     """Create a new collection.
@@ -157,7 +157,7 @@ async def collections_create(
 
 async def collections_list_all(
     client: WeaviateAsyncClient, context: dict[str, Any]
-) -> dict[str, dict]:
+) -> dict[str, dict[str, Any]]:
     """List all collections in the database.
 
     Verifies that the caller has admin permissions.

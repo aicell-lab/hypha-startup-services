@@ -8,7 +8,7 @@ import uuid
 from dataclasses import asdict
 from weaviate.collections.classes.internal import Object
 from weaviate.collections.classes.filters import _FilterValue
-from hypha_rpc.rpc import RemoteService
+from hypha_rpc.rpc import RemoteService  # type: ignore
 
 
 def register_weaviate_codecs(server: RemoteService) -> None:

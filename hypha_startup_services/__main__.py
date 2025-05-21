@@ -1,19 +1,27 @@
 import os
 import argparse
+from argparse import Namespace
 import asyncio
-from hypha_rpc import connect_to_server
+from hypha_rpc import connect_to_server  # type: ignore
+from hypha_rpc.rpc import RemoteService  # type: ignore
 from hypha_startup_services.register_weaviate_service import register_weaviate
 
 
-async def register_to_existing_server(provided_url, service_id, port=None):
+async def register_to_existing_server(
+    provided_url: str, service_id: str, port: int | None = None
+):
     server_url = provided_url if port is None else f"{provided_url}:{port}"
     token = os.environ.get("HYPHA_TOKEN")
     assert token is not None, "HYPHA_TOKEN environment variable is not set"
     server = await connect_to_server({"server_url": server_url, "token": token})
+
+    if not isinstance(server, RemoteService):
+        raise ValueError("Server is not a RemoteService instance.")
+
     await register_weaviate(server, service_id)
 
 
-def connect_to_remote(args):
+def connect_to_remote(args: Namespace):
     server_url = args.server_url
     service_id = args.service_id
     port = args.port

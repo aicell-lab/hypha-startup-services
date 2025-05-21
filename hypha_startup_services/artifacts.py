@@ -1,13 +1,13 @@
 from typing import Any
-from hypha_rpc.rpc import RemoteException, RemoteService
+from hypha_rpc.rpc import RemoteException, RemoteService  # type: ignore
 
 
 async def create_artifact(
     server: RemoteService,
     artifact_name: str,
     description: str,
-    permissions: dict | None = None,
-    metadata: dict | None = None,
+    permissions: dict[str, str] | None = None,
+    metadata: dict[str, Any] | None = None,
     parent_id: str | None = None,
 ) -> None:
     """Create a new artifact."""
