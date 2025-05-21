@@ -10,40 +10,30 @@ from hypha_startup_services.weaviate_methods import (
 )
 
 
-async def ensure_application_exists(
+async def initialize(
     client: WeaviateAsyncClient,
     server: RemoteService,
-    collection_name: str,
     application_id: str,
     context: dict[str, Any],
-) -> None:
-    """Ensure the application exists in the Weaviate instance.
+) -> str:
+    """Initialize the Project index service.
 
-    This function checks if the application exists, and if not, creates it.
+    This function sets up the Project index service with the necessary
+    configurations and endpoints.
     Args:
         client (WeaviateAsyncClient): The Weaviate client instance.
         server (RemoteService): The remote service instance.
-        collection_name (str): The name of the collection.
-        application_id (str): The ID of the application to check/create.
-        context (dict[str, Any]): Contextual information for the application.
-
-    Raises:
-        Exception: If the application creation fails.
     """
-    if not await applications_exists(
+    await applications_create(
+        client=client,
         server=server,
-        collection_name=collection_name,
+        collection_name="Document",
         application_id=application_id,
+        description=f"Document collection for application {application_id}",
         context=context,
-    ):
-        await applications_create(
-            client=client,
-            server=server,
-            collection_name=collection_name,
-            application_id=application_id,
-            description=f"Document collection for application {application_id}",
-            context=context,
-        )
+    )
+
+    return f"Project index service initialized for application {application_id}"
 
 
 async def query_documents(
@@ -68,8 +58,7 @@ async def query_documents(
     Returns:
         list[dict[str, Any]]: A list of documents matching the search query.
     """
-    await ensure_application_exists(
-        client=client,
+    assert await applications_exists(
         server=server,
         collection_name="Document",
         application_id=application_id,
@@ -94,14 +83,13 @@ async def add_documents(
     application_id: str,
     documents: list[dict[str, Any]],
     context: dict[str, Any],
-):
+) -> None:
     """Add documents to the Project index.
 
     This function is a placeholder and should be implemented with the actual
     logic to add documents.
     """
-    await ensure_application_exists(
-        client=client,
+    assert await applications_exists(
         server=server,
         collection_name="Document",
         application_id=application_id,
@@ -135,6 +123,7 @@ async def register_index_service(
                 "require_context": True,
             },
             "query": partial(query_documents, client, server),
+            "init": partial(initialize, client, server),
             "add_documents": partial(add_documents, client, server),
         }
     )
