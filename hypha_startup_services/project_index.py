@@ -82,6 +82,7 @@ async def add_documents(
     server: RemoteService,
     application_id: str,
     documents: list[dict[str, Any]],
+    # TODO: add chunking config
     context: dict[str, Any],
 ) -> None:
     """Add documents to the Project index.
@@ -95,7 +96,7 @@ async def add_documents(
         application_id=application_id,
         context=context,
     ), "Application does not exist. Please call init(<application-id>) first."
-
+    # TODO: call semantic splitting
     await data_insert_many(
         client=client,
         server=server,

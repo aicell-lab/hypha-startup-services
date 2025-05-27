@@ -377,6 +377,9 @@ async def applications_exists(
     return await artifact_exists(server, artifact_name)
 
 
+# TODO: implement semantic splitting
+
+
 async def data_insert_many(
     client: WeaviateAsyncClient,
     server: RemoteService,
