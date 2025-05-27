@@ -42,7 +42,7 @@ def main():
     parser.add_argument(
         "--service-id",
         type=str,
-        default="weaviate",
+        default="mem0",
     )
 
     args = parser.parse_args()

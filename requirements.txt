@@ -1,4 +1,4 @@
-weaviate-client==4.11.2
-setuptools==70.0.0
-hypha-rpc==0.20.48
-python-dotenv==1.1.0
+mem0ai
+hypha_rpc
+python-dotenv
+weaviate-client>=4.0.0
