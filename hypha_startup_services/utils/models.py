@@ -263,11 +263,13 @@ class CreateArtifactParams(BaseModel):
         # Generate new artifact_id with run_id
         base_artifact_id = f"{self.agent_id}{ARTIFACT_DELIMITER}{self.workspace}"
         new_artifact_id = f"{base_artifact_id}{ARTIFACT_DELIMITER}{run_id}"
+        parent_id = base_artifact_id
 
         return self.model_copy(
             update={
                 "artifact_id": new_artifact_id,
                 "run_id": run_id,
                 "permissions": {self.workspace: permissions},
+                "parent_id": parent_id,
             }
         )

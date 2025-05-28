@@ -1,5 +1,5 @@
 from typing import Any
-from mem0 import Memory
+from mem0 import AsyncMemory
 from hypha_rpc.rpc import RemoteService
 from hypha_startup_services.artifact import create_artifact
 from hypha_startup_services.permissions import require_permission
@@ -28,14 +28,14 @@ async def init_run(
         description: Optional description for the artifacts
         metadata: Optional metadata for the artifacts
         server: The Hypha server instance
-        memory: The Memory instance (currently unused)
+        memory: The AsyncMemory instance (currently unused)
         context: Context from Hypha-rpc for permissions
     """
     # Create base artifact for agent
     base_artifact_params = CreateArtifactParams.from_mem0_params(
         context=context,
         agent_id=agent_id,
-        description=description or f"Memory artifact for agent {agent_id}",
+        description=description or f"AsyncMemory artifact for agent {agent_id}",
         permissions="r",
         metadata=metadata,
     )
@@ -48,7 +48,7 @@ async def init_run(
     # Create run-specific artifact
     run_artifact_params = base_artifact_params.with_run_id(run_id, permissions="*")
     run_artifact_params.description = (
-        description or f"Memory artifact for agent {agent_id}, run {run_id}"
+        description or f"AsyncMemory artifact for agent {agent_id}, run {run_id}"
     )
 
     await create_artifact(
@@ -63,7 +63,7 @@ async def mem0_add(
     workspace: str,
     *,
     server: RemoteService,
-    memory: Memory,
+    memory: AsyncMemory,
     context: dict[str, Any],
     run_id: str | None = None,
     **kwargs,
@@ -76,7 +76,7 @@ async def mem0_add(
         agent_id: ID of the agent adding the item.
         workspace: Workspace of the user adding the item.
         server: The Hypha server instance.
-        memory: The Memory instance to add the item to.
+        memory: The AsyncMemory instance to add the item to.
         context: Context from Hypha-rpc for permissions.
         run_id: ID of the run to associate with the item. Defaults to None.
         **kwargs: Additional keyword arguments for the memory service.
@@ -95,7 +95,9 @@ async def mem0_add(
 
     await require_permission(server, permission_params)
 
-    memory.add(messages, user_id=workspace, agent_id=agent_id, run_id=run_id, **kwargs)
+    await memory.add(
+        messages, user_id=workspace, agent_id=agent_id, run_id=run_id, **kwargs
+    )
 
 
 async def mem0_search(
@@ -104,7 +106,7 @@ async def mem0_search(
     workspace: str,
     *,
     server: RemoteService,
-    memory: Memory,
+    memory: AsyncMemory,
     context: dict[str, Any],
     run_id: str | None = None,
     **kwargs,
@@ -117,7 +119,7 @@ async def mem0_search(
         agent_id: ID of the agent to search for.
         workspace: Workspace of the user to search for.
         server: The Hypha server instance.
-        memory: The Memory instance to perform the search on.
+        memory: The AsyncMemory instance to perform the search on.
         context: Context from Hypha-rpc for permissions.
         run_id: ID of the run to search for. Defaults to None.
         **kwargs: Additional keyword arguments for the memory service.
@@ -141,7 +143,7 @@ async def mem0_search(
 
     await require_permission(server, permission_params)
 
-    return memory.search(
+    return await memory.search(
         query,
         user_id=workspace,
         agent_id=agent_id,

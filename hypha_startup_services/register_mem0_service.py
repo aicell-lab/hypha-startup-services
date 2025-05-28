@@ -4,7 +4,7 @@ Helper functions to register the Weaviate service with proper API endpoints.
 
 from functools import partial
 from hypha_rpc.rpc import RemoteService
-from mem0 import Memory
+from mem0 import AsyncMemory
 from hypha_startup_services.mem0 import get_mem0
 from hypha_startup_services.mem0_methods import mem0_add, mem0_search, init_run
 
@@ -14,7 +14,7 @@ async def register_mem0(server: RemoteService, service_id: str) -> None:
 
     Sets up all service endpoints for collections, data operations, and queries.
     """
-    mem0 = get_mem0(server.config.public_base_url)
+    mem0 = await get_mem0()
     await register_mem0_service(server, mem0, service_id)
 
     print(
@@ -24,7 +24,7 @@ async def register_mem0(server: RemoteService, service_id: str) -> None:
 
 
 async def register_mem0_service(
-    server: RemoteService, mem0: Memory, service_id: str
+    server: RemoteService, mem0: AsyncMemory, service_id: str
 ) -> None:
     """Register the Weaviate service with the Hypha server.
 

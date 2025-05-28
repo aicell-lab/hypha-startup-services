@@ -1,4 +1,5 @@
-from mem0 import Memory
+import os
+from mem0 import AsyncMemory
 from dotenv import load_dotenv
 
 # client = WeaviateAsyncClient(
@@ -11,26 +12,25 @@ from dotenv import load_dotenv
 # )
 
 
-def get_mem0(http_url: str) -> Memory:
+async def get_mem0() -> AsyncMemory:
     """
     Register the memory service with the Hypha server.
     Sets up all service endpoints for collections, data operations, and queries.
     """
     load_dotenv()
 
-    http_url = "https://hypha-weaviate.scilifelab-2-dev.sys.kth.se:443"
-    # grpc_url = "https://hypha-weaviate-grpc.scilifelab-2-dev.sys.kth.se:443"
+    grpc_url = "hypha-weaviate-grpc.scilifelab-2-dev.sys.kth.se"
+    http_url = "hypha-weaviate.scilifelab-2-dev.sys.kth.se"
 
     config = {
         "vector_store": {
             "provider": "weaviate",
             "config": {
-                "collection_name": "hypha-agents",
+                "collection_name": "Document",
                 "cluster_url": http_url,
-                # Don't include auth_client_secret at all when not needed
-                # This avoids the TypeError when concatenating None with a string
+                # "auth_client_secret": os.environ["WEAVIATE_ADMIN_KEY"],
             },
         }
     }
 
-    return Memory.from_config(config)
+    return await AsyncMemory.from_config(config)
