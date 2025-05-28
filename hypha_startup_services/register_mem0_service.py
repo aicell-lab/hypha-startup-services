@@ -6,16 +6,16 @@ from functools import partial
 from hypha_rpc.rpc import RemoteService
 from mem0 import Memory
 from hypha_startup_services.mem0 import get_mem0
-from hypha_startup_services.mem0_methods import mem0_add
+from hypha_startup_services.mem0_methods import mem0_add, mem0_search, init_run
 
 
-async def register_weaviate(server: RemoteService, service_id: str) -> None:
+async def register_mem0(server: RemoteService, service_id: str) -> None:
     """Register the Weaviate service with the Hypha server.
 
     Sets up all service endpoints for collections, data operations, and queries.
     """
     mem0 = get_mem0(server.config.public_base_url)
-    await register_weaviate_service(server, mem0, service_id)
+    await register_mem0_service(server, mem0, service_id)
 
     print(
         "Service registered at",
@@ -23,7 +23,7 @@ async def register_weaviate(server: RemoteService, service_id: str) -> None:
     )
 
 
-async def register_weaviate_service(
+async def register_mem0_service(
     server: RemoteService, mem0: Memory, service_id: str
 ) -> None:
     """Register the Weaviate service with the Hypha server.
@@ -39,8 +39,8 @@ async def register_weaviate_service(
                 "visibility": "public",
                 "require_context": True,
             },
-            "mem0": {
-                "add": partial(mem0_add, memory=mem0),
-            },
+            "init": partial(init_run, server=server),
+            "add": partial(mem0_add, server=server, memory=mem0),
+            "search": partial(mem0_search, server=server, memory=mem0),
         }
     )

@@ -2,9 +2,9 @@ import os
 import argparse
 from argparse import Namespace
 import asyncio
-from hypha_rpc import connect_to_server  # type: ignore
-from hypha_rpc.rpc import RemoteService  # type: ignore
-from hypha_startup_services.register_weaviate_service import register_weaviate
+from hypha_rpc import connect_to_server
+from hypha_rpc.rpc import RemoteService
+from hypha_startup_services.register_mem0_service import register_mem0
 
 
 async def register_to_existing_server(
@@ -18,7 +18,7 @@ async def register_to_existing_server(
     if not isinstance(server, RemoteService):
         raise ValueError("Server is not a RemoteService instance.")
 
-    await register_weaviate(server, service_id)
+    await register_mem0(server, service_id)
 
 
 def connect_to_remote(args: Namespace):

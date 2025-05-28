@@ -1,4 +1,6 @@
 mem0ai
 hypha_rpc
 python-dotenv
+weaviate
 weaviate-client>=4.0.0
+pydantic
