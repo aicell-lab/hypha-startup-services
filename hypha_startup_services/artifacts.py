@@ -41,7 +41,6 @@ async def delete_artifact(
 ) -> None:
     """Delete an artifact."""
     artifact_manager = await server.get_service("public/artifact-manager")
-    # TODO: Fix "User does not have permission to perform the operation 'delete' on the artifact."
     try:
         await artifact_manager.delete(artifact_id=artifact_name, delete_files=True)
     except RemoteException as e:
