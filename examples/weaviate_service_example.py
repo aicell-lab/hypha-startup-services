@@ -11,28 +11,32 @@ import asyncio
 import os
 from dotenv import load_dotenv
 from hypha_rpc import connect_to_server
+from hypha_rpc.rpc import RemoteService
+
 
 async def main():
     # Load environment variables
     load_dotenv()
-    
+
     # Connect to Hypha server
     token = os.environ.get("HYPHA_TOKEN")
     assert token is not None, "HYPHA_TOKEN environment variable is not set"
-    
-    server = await connect_to_server({
-        "server_url": "https://hypha.aicell.io",
-        "token": token,
-    })
-    
+
+    server: RemoteService = await connect_to_server(
+        {
+            "server_url": "https://hypha.aicell.io",
+            "token": token,
+        }
+    )  # type: ignore
+
     # Get the Weaviate service
-    weaviate_service = await server.get_service("weaviate")
-    
+    weaviate_service: RemoteService = await server.get_service("weaviate")  # type: ignore
+
     try:
         # 1. Create a Movie Collection
         # ---------------------------
         print("\n1. Creating Movie Collection...")
-        
+
         # Define collection schema
         class_obj = {
             "class": "Movie",
@@ -69,9 +73,7 @@ async def main():
                     },
                     "sourceProperties": ["title"],
                     "vectorIndexType": "hnsw",
-                    "vectorIndexConfig": {
-                        "distance": "cosine"
-                    },
+                    "vectorIndexConfig": {"distance": "cosine"},
                 },
                 "description_vector": {
                     "vectorizer": {
@@ -82,9 +84,7 @@ async def main():
                     },
                     "sourceProperties": ["description"],
                     "vectorIndexType": "hnsw",
-                    "vectorIndexConfig": {
-                        "distance": "cosine"
-                    },
+                    "vectorIndexConfig": {"distance": "cosine"},
                 },
             },
             "moduleConfig": {
@@ -94,18 +94,18 @@ async def main():
                 }
             },
         }
-        
+
         if not await weaviate_service.collections.exists("Movie"):
             # Create collection
             collection = await weaviate_service.collections.create(class_obj)
             print("Collection created:", collection["class"])
         else:
             print("Collection already exists")
-        
+
         # 2. Insert Data
         # --------------
         print("\n2. Inserting movie data...")
-        
+
         # Insert a single movie
         movie = {
             "title": "The Matrix",
@@ -113,13 +113,12 @@ async def main():
             "genre": "Science Fiction",
             "year": 1999,
         }
-        
+
         uuid = await weaviate_service.data.insert(
-            collection_name="Movie",
-            properties=movie
+            collection_name="Movie", properties=movie
         )
         print("Inserted movie with UUID:", uuid)
-        
+
         # Insert multiple movies
         movies = [
             {
@@ -133,70 +132,69 @@ async def main():
                 "description": "Batman faces his greatest challenge against the Joker",
                 "genre": "Action",
                 "year": 2008,
-            }
+            },
         ]
-        
+
         result = await weaviate_service.data.insert_many(
-            collection_name="Movie",
-            objects=movies
+            collection_name="Movie", objects=movies
         )
         print("Inserted multiple movies:", result["uuids"])
-        
+
         # 3. Query Data
         # ------------
         print("\n3. Querying data...")
-        
+
         # Fetch all movies
         query_result = await weaviate_service.query.fetch_objects(
-            collection_name="Movie",
-            limit=10
+            collection_name="Movie", limit=10
         )
         print("\nAll movies:")
         for obj in query_result["objects"]:
             print(f"- {obj['properties']['title']} ({obj['properties']['year']})")
-        
+
         # 4. Vector Search
         # ---------------
         print("\n4. Performing vector search...")
-        
+
         # Example vector (in practice, this would come from your embedding model)
         example_vector = [0.1] * 3072  # Using 3072 dimensions as an example
-        
+
         vector_results = await weaviate_service.query.near_vector(
             collection_name="Movie",
             near_vector=example_vector,
             target_vector="title_vector",
-            limit=2
+            limit=2,
         )
         print("\nVector search results:")
         for obj in vector_results["objects"]:
             print(f"- {obj['properties']['title']}")
-        
+
         # 5. Hybrid Search
         # ---------------
         print("\n5. Performing hybrid search...")
-        
+
         hybrid_results = await weaviate_service.query.hybrid(
             collection_name="Movie",
             query="Science Fiction",
             vector=example_vector,
             target_vector="description_vector",
             alpha=0.5,
-            limit=2
+            limit=2,
         )
         print("\nHybrid search results:")
         for obj in hybrid_results["objects"]:
             print(f"- {obj['properties']['title']} ({obj['properties']['genre']})")
-        
+
         # 6. Cleanup
         # ----------
         print("\n6. Cleaning up...")
         await weaviate_service.collections.delete("Movie")
         print("Collection deleted")
-        
+
     finally:
         # Disconnect from server
         await server.disconnect()
 
+
 if __name__ == "__main__":
-    asyncio.run(main()) 
+    asyncio.run(main())

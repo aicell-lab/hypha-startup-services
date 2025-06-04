@@ -119,12 +119,15 @@ async def test_admin_only_collection_deletion(weaviate_service, weaviate_service
             "admin" in str(e).lower() or "permission" in str(e).lower()
         ), f"Error should mention admin permissions, but got: {str(e)}"
 
+    collections = await weaviate_service.collections.list_all()
+    assert any(coll_name == "Movie" for coll_name in collections.keys())
+
     # Admin should be able to delete collections
     await weaviate_service.collections.delete("Movie")
 
     # Verify collection was deleted
     collections = await weaviate_service.collections.list_all()
-    assert not any("Movie" in coll_name for coll_name in collections.keys())
+    assert not any(coll_name == "Movie" for coll_name in collections.keys())
 
 
 @pytest.mark.asyncio

@@ -231,8 +231,10 @@ async def test_uuid_collision_between_tenants(weaviate_service, weaviate_service
         limit=10,
     )
 
+    expected_uuid = custom_uuid.replace("-", "")
+
     assert len(user1_results["objects"]) == 1
-    assert user1_results["objects"][0]["uuid"] == custom_uuid
+    assert user1_results["objects"][0]["uuid"] == expected_uuid
     assert (
         user1_results["objects"][0]["properties"]["title"] == "User 1's UUID Test Movie"
     )
@@ -245,7 +247,7 @@ async def test_uuid_collision_between_tenants(weaviate_service, weaviate_service
     )
 
     assert len(user2_results["objects"]) == 1
-    assert user2_results["objects"][0]["uuid"] == custom_uuid
+    assert user2_results["objects"][0]["uuid"] == expected_uuid
     assert (
         user2_results["objects"][0]["properties"]["title"] == "User 2's UUID Test Movie"
     )

@@ -29,33 +29,22 @@ from hypha_startup_services.weaviate_methods import (
     query_hybrid,
     generate_near_text,
 )
+from hypha_startup_services.utils.constants import DEFAULT_SERVICE_ID
 
 
-async def register_weaviate(server: RemoteService, service_id: str):
+async def register_weaviate(
+    server: RemoteService, service_id: str = DEFAULT_SERVICE_ID
+) -> None:
     """Register the Weaviate service with the Hypha server.
 
     Sets up all service endpoints for collections, data operations, and queries.
     """
     register_weaviate_codecs(server)
-    weaviate_url = "https://hypha-weaviate.scilifelab-2-dev.sys.kth.se"
-    weaviate_grpc_url = "https://hypha-weaviate-grpc.scilifelab-2-dev.sys.kth.se"
-
-    http_host = weaviate_url.replace("https://", "").replace("http://", "")
-    grpc_host = weaviate_grpc_url.replace("https://", "").replace("http://", "")
-    is_secure = weaviate_url.startswith("https://")
-    is_grpc_secure = weaviate_grpc_url.startswith("https://")
-    client = await instantiate_and_connect(
-        http_host, is_secure, grpc_host, is_grpc_secure
-    )
+    client = await instantiate_and_connect()
 
     await register_weaviate_service(server, client, service_id)
-    service_id2 = service_id + "-index"
+    service_id2 = service_id + "-project"
     await register_index_service(server, client, service_id2)
-
-    print(
-        "Service registered at",
-        f"{server.config.public_base_url}/{server.config.workspace}/services/{service_id}",
-    )
 
 
 async def register_weaviate_service(
@@ -104,4 +93,9 @@ async def register_weaviate_service(
                 "near_text": partial(generate_near_text, client, server),
             },
         }
+    )
+
+    print(
+        f"Service {service_id} registered at",
+        f"{server.config.public_base_url}/{server.config.workspace}/services/{service_id}",
     )

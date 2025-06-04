@@ -74,8 +74,8 @@ async def test_collection_data_insert_many(weaviate_service):
 
     # Verify the result contains successful operations and UUIDs
     assert result is not None
-    assert "successful" in result
-    assert result["successful"] == len(test_objects)
+    assert "has_errors" in result
+    assert not result["has_errors"]
     assert "uuids" in result
     assert len(result["uuids"]) == len(test_objects)
     assert all(isinstance(uuid, str) for uuid in result["uuids"])

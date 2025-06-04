@@ -6,20 +6,18 @@ from weaviate import WeaviateAsyncClient
 load_dotenv()
 
 
-async def instantiate_and_connect(
-    http_host: str, is_secure: bool, grpc_host: str, is_grpc_secure: bool
-) -> WeaviateAsyncClient:
+async def instantiate_and_connect() -> WeaviateAsyncClient:
     """
     Instantiate and connect to Weaviate client.
     """
     client = WeaviateAsyncClient(
         connection_params=ConnectionParams.from_params(
-            http_host=http_host,
-            http_port=443 if is_secure else 80,
-            http_secure=is_secure,
-            grpc_host=grpc_host,
-            grpc_port=443 if is_grpc_secure else 50051,
-            grpc_secure=is_grpc_secure,
+            http_host="hypha-weaviate.scilifelab-2-dev.sys.kth.se",
+            http_port=443,
+            http_secure=True,
+            grpc_host="hypha-weaviate-grpc.scilifelab-2-dev.sys.kth.se",
+            grpc_port=443,
+            grpc_secure=True,
         ),
         additional_config=AdditionalConfig(
             timeout_config=(5, 60),  # (connection_timeout_sec, request_timeout_sec)

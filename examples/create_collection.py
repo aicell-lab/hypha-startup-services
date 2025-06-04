@@ -2,6 +2,7 @@ import os
 import asyncio
 from dotenv import load_dotenv
 from hypha_rpc import connect_to_server
+from hypha_rpc.rpc import RemoteService
 from hypha_startup_services.register_weaviate_service import register_weaviate
 
 load_dotenv()
@@ -11,12 +12,12 @@ SERVICE_NAME = "weaviate-test"
 async def get_server(server_url: str):
     token = os.environ.get("HYPHA_TOKEN")
     assert token is not None, "HYPHA_TOKEN environment variable is not set"
-    server = await connect_to_server(
+    server: RemoteService = await connect_to_server(
         {
             "server_url": server_url,
             "token": token,
         }
-    )
+    )  # type: ignore
     await register_weaviate(server, SERVICE_NAME)
 
     return server

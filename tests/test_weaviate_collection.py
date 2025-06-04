@@ -46,10 +46,13 @@ async def test_delete_collection(weaviate_service):
     """Test deleting a collection and verifying it no longer exists."""
     await create_test_collection(weaviate_service)
 
+    collections = await weaviate_service.collections.list_all()
+    assert any(coll_name == "Movie" for coll_name in collections.keys())
+
     await weaviate_service.collections.delete("Movie")
 
     collections = await weaviate_service.collections.list_all()
-    assert not any("Movie" in coll_name for coll_name in collections.keys())
+    assert not any(coll_name == "Movie" for coll_name in collections.keys())
 
 
 @pytest.mark.asyncio

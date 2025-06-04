@@ -308,7 +308,7 @@ async def test_cross_application_data_isolation(
     user1_results = await weaviate_service.query.fetch_objects(
         collection_name="Movie",
         application_id=USER1_APP_ID,
-        where=filter_condition,
+        filters=filter_condition,
         limit=10,
     )
 
@@ -316,7 +316,7 @@ async def test_cross_application_data_isolation(
     user2_results = await weaviate_service2.query.fetch_objects(
         collection_name="Movie",
         application_id=USER2_APP_ID,
-        where=filter_condition,
+        filters=filter_condition,
         limit=10,
     )
 
@@ -324,7 +324,7 @@ async def test_cross_application_data_isolation(
     user3_results = await weaviate_service3.query.fetch_objects(
         collection_name="Movie",
         application_id=USER3_APP_ID,
-        where=filter_condition,
+        filters=filter_condition,
         limit=10,
     )
 
@@ -342,7 +342,7 @@ async def test_cross_application_data_isolation(
     admin_user1_results = await weaviate_service.query.fetch_objects(
         collection_name="Movie",
         application_id=USER1_APP_ID,
-        where=filter_condition,
+        filters=filter_condition,
         limit=10,
     )
 
@@ -350,7 +350,7 @@ async def test_cross_application_data_isolation(
         collection_name="Movie",
         application_id=USER2_APP_ID,
         user_ws=USER2_WS,
-        where=filter_condition,
+        filters=filter_condition,
         limit=10,
     )
 
@@ -358,7 +358,7 @@ async def test_cross_application_data_isolation(
         collection_name="Movie",
         application_id=USER3_APP_ID,
         user_ws=USER3_WS,
-        where=filter_condition,
+        filters=filter_condition,
         limit=10,
     )
 

@@ -140,7 +140,7 @@ async def test_collection_query_near_text(weaviate_service):
     )
 
     # Perform a near_text search
-    result = await weaviate_service.query.near_text(
+    result = await weaviate_service.generate.near_text(
         collection_name="Movie",
         application_id=APP_ID,
         query="space exploration",

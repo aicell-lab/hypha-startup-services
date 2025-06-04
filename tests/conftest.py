@@ -4,7 +4,7 @@ import os
 import pytest_asyncio
 from dotenv import load_dotenv
 from hypha_rpc import connect_to_server
-from hypha_rpc.rpc import RemoteService
+from hypha_rpc.rpc import RemoteService, RemoteException
 from hypha_startup_services.service_codecs import register_weaviate_codecs
 
 load_dotenv()
@@ -36,6 +36,23 @@ async def get_user_server(token_env="PERSONAL_TOKEN"):
     return server
 
 
+async def cleanup_weaviate_service(service: RemoteService):
+    # Cleanup after tests
+    try:
+        # Try to delete test applications first
+        try:
+            await service.applications.delete(
+                collection_name="Movie", application_id=APP_ID
+            )
+        except RemoteException as e:
+            print("Error deleting test application:", e)
+
+        # Then delete the collection
+        await service.collections.delete("Movie")
+    except ValueError:  # Collection doesn't exist
+        pass
+
+
 @pytest_asyncio.fixture
 async def weaviate_service():
     """Fixture for connecting to the weaviate service.
@@ -45,20 +62,6 @@ async def weaviate_service():
     server = await get_user_server()
     service = await server.get_service("aria-agents/weaviate-test")
     yield service
-    # Cleanup after tests
-    try:
-        # Try to delete test applications first
-        try:
-            await service.applications.delete(
-                collection_name="Movie", application_id=APP_ID
-            )
-        except Exception:
-            pass
-
-        # Then delete the collection
-        await service.collections.delete("Movie")
-    except ValueError:  # Collection doesn't exist
-        pass
     await server.disconnect()
 
 
