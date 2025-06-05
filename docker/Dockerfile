@@ -14,6 +14,9 @@ RUN groupadd -r hypha_startup_services && useradd -r -g hypha_startup_services -
 # Upgrade pip
 RUN pip install --upgrade pip
 
+# Switch to the non-root user
+USER hypha_startup_services
+
 # Set the working directory
 WORKDIR /app/
 
@@ -43,9 +46,6 @@ RUN chmod +x /app/start-services.sh
 # Set environment variables for mem0 and other services
 ENV HOME=/home/hypha_startup_services
 ENV MEM0_DIR=/home/hypha_startup_services/.mem0
-
-# Switch to the non-root user
-USER hypha_startup_services
 
 # Default entry point - can be overridden in Kubernetes deployment
 # For running both services: command: ["/app/start-services.sh"]
