@@ -1,10 +1,10 @@
 import os
 import sys
 import subprocess
-from subprocess import CalledProcessError
 import argparse
 from argparse import Namespace
 import asyncio
+from websockets.exceptions import InvalidURI
 from hypha_rpc import connect_to_server
 from hypha_rpc.rpc import RemoteService, RemoteException
 from hypha_startup_services.weaviate_service.register_service import (
@@ -12,6 +12,7 @@ from hypha_startup_services.weaviate_service.register_service import (
 )
 from hypha_startup_services.weaviate_service.utils.constants import (
     DEFAULT_LOCAL_HOST,
+    DEFAULT_LOCAL_EXISTING_HOST,
     DEFAULT_LOCAL_PORT,
     DEFAULT_REMOTE_URL,
     DEFAULT_SERVICE_ID,
@@ -44,9 +45,13 @@ async def run_local_server(
     """
     try:
         await register_to_existing_server(
-            server_url, port=port, service_id=service_id_existing_server
+            DEFAULT_LOCAL_EXISTING_HOST,
+            port=port,
+            service_id=service_id_existing_server,
         )
-    except OSError:
+    except (ConnectionRefusedError, InvalidURI, RemoteException) as e:
+        print("HEREE")
+        print(f"Failed to connect to the server at {server_url}:{port}. Error: {e}")
         command = [
             sys.executable,
             "-m",

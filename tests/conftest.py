@@ -11,7 +11,7 @@ from hypha_startup_services.weaviate_service.service_codecs import (
 
 load_dotenv()
 
-SERVER_URL = "https://hypha.aicell.io"
+SERVER_URL = "localhost:9527"
 APP_ID = "TestApp"
 
 # User workspace IDs
@@ -62,7 +62,7 @@ async def weaviate_service():
     Use --service-id command-line option to override the default service ID.
     """
     server = await get_user_server()
-    service = await server.get_service("aria-agents/weaviate-test")
+    service = await server.get_service("weaviate-test")
     yield service
     await server.disconnect()
 
