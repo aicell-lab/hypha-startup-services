@@ -11,7 +11,6 @@ from hypha_startup_services.weaviate_service.service_codecs import (
 from hypha_startup_services.weaviate_service.client import (
     instantiate_and_connect,
 )
-from hypha_startup_services.weaviate_service.project_index import register_index_service
 from hypha_startup_services.weaviate_service.methods import (
     collections_create,
     collections_delete,
@@ -47,8 +46,6 @@ async def register_weaviate(
     client = await instantiate_and_connect()
 
     await register_weaviate_service(server, client, service_id)
-    service_id2 = service_id + "-project"
-    await register_index_service(server, client, service_id2)
 
 
 async def register_weaviate_service(
