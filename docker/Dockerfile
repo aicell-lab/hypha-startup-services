@@ -39,4 +39,4 @@ RUN pip install .
 USER hypha_startup_services
 
 # Entry point for the application
-ENTRYPOINT ["python", "-m", "hypha_startup_services", "remote"]
+ENTRYPOINT ["hss_weaviate", "remote"]
