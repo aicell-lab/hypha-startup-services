@@ -1,4 +1,4 @@
-"""Common test fixtures for mem0 tests."""
+"""Common test fixtures for weaviate tests."""
 
 import os
 import pytest_asyncio
@@ -14,6 +14,11 @@ load_dotenv()
 SERVER_URL = "localhost:9527"
 APP_ID = "TestApp"
 
+# User workspace IDs
+USER1_WS = "ws-user-google-oauth2|104255278140940970953"  # Admin user
+USER2_WS = "ws-user-google-oauth2|101844867326318340275"  # Regular user
+USER3_WS = "ws-user-google-oauth2|101564907182096510974"  # Regular user
+
 
 async def get_user_server(token_env="PERSONAL_TOKEN"):
     token = os.environ.get(token_env)
@@ -27,6 +32,8 @@ async def get_user_server(token_env="PERSONAL_TOKEN"):
 
     if not isinstance(server, RemoteService):
         raise TypeError("connect_to_server did not return a RemoteService instance")
+
+    register_weaviate_codecs(server)
 
     return server
 
@@ -61,24 +68,24 @@ async def weaviate_service():
 
 
 @pytest_asyncio.fixture
-async def mem0_service2():
-    """Fixture for connecting to the mem0 service with a second personal token.
+async def weaviate_service2():
+    """Fixture for connecting to the weaviate service with a second personal token.
 
     This represents a different user accessing the same service.
     """
     server = await get_user_server("PERSONAL_TOKEN2")
-    service = await server.get_service("aria-agents/mem0-test")
+    service = await server.get_service("aria-agents/weaviate-test")
     yield service
     await server.disconnect()
 
 
 @pytest_asyncio.fixture
-async def mem0_service3():
-    """Fixture for connecting to the mem0 service with a third personal token.
+async def weaviate_service3():
+    """Fixture for connecting to the weaviate service with a third personal token.
 
     This represents a third user accessing the same service.
     """
     server = await get_user_server("PERSONAL_TOKEN3")
-    service = await server.get_service("aria-agents/mem0-test")
+    service = await server.get_service("aria-agents/weaviate-test")
     yield service
     await server.disconnect()

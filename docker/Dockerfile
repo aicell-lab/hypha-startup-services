@@ -35,8 +35,15 @@ RUN git clean -fdX && rm -rf .git
 RUN pip install -r requirements.txt
 RUN pip install .
 
+# Copy startup scripts and make them executable
+COPY scripts/start-services.sh /app/start-services.sh
+RUN chmod +x /app/start-services.sh
+
 # Switch to the non-root user
 USER hypha_startup_services
 
-# Entry point for the application
-ENTRYPOINT ["hypha-startup-services", "weaviate", "remote"]
+# Default entry point - can be overridden in Kubernetes deployment
+# For running both services: command: ["/app/start-services.sh"]
+# For single service: command: ["hypha-startup-services", "weaviate", "remote", ...]
+ENTRYPOINT ["hypha-startup-services"]
+CMD ["weaviate", "remote", "--server-url=https://hypha.aicell.io"]
