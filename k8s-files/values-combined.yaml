@@ -1,0 +1,285 @@
+# Combined Helm values for Weaviate server + hypha startup services
+# This file configures both the Weaviate database server and the hypha startup services
+
+# Weaviate Server Configuration
+weaviate:
+  image:
+    # registry where weaviate image is stored
+    registry: cr.weaviate.io
+    # Tag of weaviate image to deploy
+    tag: 1.29.0
+    repo: semitechnologies/weaviate
+    pullPolicy: IfNotPresent
+    pullSecrets: []
+
+  # Disable sysctl init container due to non-root issue with Rancher cluster
+  initContainers:
+    sysctlInitContainer:
+      enabled: false
+    ensureFileOwnershipContainer:
+      enabled: false
+
+  # security Context for the Weaviate Pods
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    runAsNonRoot: true
+    runAsUser: 1001
+    seccompProfile:
+      type: RuntimeDefault
+
+  # Security context for the Weaviate container
+  containerSecurityContext:
+    runAsUser: 1001
+    runAsGroup: 1001
+    capabilities:
+      drop:
+        - ALL
+    runAsNonRoot: true
+    allowPrivilegeEscalation: false
+    privileged: false
+    readOnlyRootFilesystem: true
+
+  # AWS credentials
+  aws:
+    secretName: hypha-secrets
+    accessKeyIdKey: ACCESS_KEY_ID
+    secretAccessKeyKey: SECRET_ACCESS_KEY
+
+  # Configure offload providers
+  offload:
+    s3:
+      enabled: true
+      envconfig:
+        # Configure bucket where data should be saved
+        OFFLOAD_S3_BUCKET: hypha-weaviate-offload
+        # Optional setting if you're using a custom S3 endpoint (like MinIO)
+        OFFLOAD_S3_ENDPOINT: s3.cloud.kth.se
+        # Set to false if your endpoint doesn't use SSL
+        OFFLOAD_S3_USE_SSL: true
+
+  # Configure backup providers
+  backups:
+    # The backup-filesystem module enables creation of the DB backups in
+    # the local filesystem
+    filesystem:
+      enabled: false
+      envconfig:
+        # Configure folder where backups should be saved
+        BACKUP_FILESYSTEM_PATH: /tmp/backups
+
+    s3:
+      enabled: true
+      envconfig:
+        # Configure bucket where backups should be saved
+        BACKUP_S3_BUCKET: hypha-weaviate-backups
+        # Optional setting if you want to save backups to a specific path
+        # BACKUP_S3_PATH: backups
+        # Optional setting if you're using a custom S3 endpoint (like MinIO)
+        BACKUP_S3_ENDPOINT: s3.cloud.kth.se
+        BACKUP_S3_USE_SSL: true
+
+    gcs:
+      enabled: false
+      envconfig:
+        # Configure bucket where backups should be saved, this setting is mandatory
+        BACKUP_GCS_BUCKET: hypha-weaviate-backups
+
+    azure:
+      enabled: false
+      envconfig:
+        # Configure container where backups should be saved, this setting is mandatory
+        BACKUP_AZURE_CONTAINER: hypha-weaviate-backups
+
+  # modules are extensions to Weaviate
+  modules:
+    # Enable Ollama module for embeddings
+    text2vec-ollama:
+      enabled: true
+
+    generative-ollama:
+      enabled: true
+
+    # Other modules are disabled
+    text2vec-contextionary:
+      enabled: false
+
+    text2vec-transformers:
+      enabled: false
+
+    text2vec-openai:
+      enabled: false
+
+    text2vec-cohere:
+      enabled: false
+
+    text2vec-huggingface:
+      enabled: false
+
+    text2vec-palm:
+      enabled: false
+
+    text2vec-gpt4all:
+      enabled: false
+
+    text-spellcheck:
+      enabled: false
+
+  # Disable the default ingress as we'll create a separate one
+  ingress:
+    enabled: false
+
+  # Enable and configure gRPC service
+  grpcService:
+    enabled: true
+    name: weaviate-grpc
+    ports:
+      - name: grpc
+        protocol: TCP
+        port: 50051
+    type: ClusterIP # Use ClusterIP since we're using Ingress for external access
+
+# Hypha Startup Services Configuration
+services:
+  # Weaviate service configuration
+  weaviate:
+    enabled: true
+    replicaCount: 1
+
+    image:
+      repository: ghcr.io/aicell-lab/hypha-startup-services
+      pullPolicy: Always
+      # Update this tag to the latest version
+      tag: "latest"
+
+    imagePullSecrets:
+      - name: ghcr-secret
+
+    serviceAccount:
+      create: true
+      automount: true
+      annotations: {}
+      name: "weaviate-service"
+
+    podSecurityContext:
+      seccompProfile:
+        type: RuntimeDefault
+
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+      runAsNonRoot: true
+      runAsUser: 1000
+      runAsGroup: 1000
+
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+
+    env:
+      - name: HYPHA_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: aria-agents-secrets
+            key: ARIA_AGENTS_TOKEN
+
+    # Weaviate service specific startup command
+    startupCommand:
+      service: "weaviate"
+      mode: "remote"
+      args:
+        - "--server-url=https://hypha.aicell.io"
+        - "--service-id=weaviate-production"
+
+  # Mem0 service configuration
+  mem0:
+    enabled: true
+    replicaCount: 1
+
+    image:
+      repository: ghcr.io/aicell-lab/hypha-startup-services
+      pullPolicy: Always
+      # Update this tag to the latest version
+      tag: "latest"
+
+    imagePullSecrets:
+      - name: ghcr-secret
+
+    serviceAccount:
+      create: true
+      automount: true
+      annotations: {}
+      name: "mem0-service"
+
+    podSecurityContext:
+      seccompProfile:
+        type: RuntimeDefault
+
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+      runAsNonRoot: true
+      runAsUser: 1000
+      runAsGroup: 1000
+
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+
+    env:
+      - name: HYPHA_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: aria-agents-secrets
+            key: ARIA_AGENTS_TOKEN
+      # Add any mem0-specific environment variables here
+      - name: MEM0_API_KEY
+        valueFrom:
+          secretKeyRef:
+            name: aria-agents-secrets
+            key: MEM0_API_KEY
+            optional: true
+
+    # Mem0 service specific startup command
+    startupCommand:
+      service: "mem0"
+      mode: "remote"
+      args:
+        - "--server-url=https://hypha.aicell.io"
+        - "--service-id=mem0-production"
+
+# Global settings
+global:
+  nameOverride: ""
+  fullnameOverride: ""
+
+  # Node selector for all services
+  nodeSelector: {}
+
+  # Tolerations for all services
+  tolerations: []
+
+  # Affinity for all services
+  affinity: {}
+
+# Testing configuration
+testing:
+  enabled: true
+  weaviate:
+    testUrl: "https://hypha.aicell.io/aria-agents/services/weaviate-production"
+  mem0:
+    testUrl: "https://hypha.aicell.io/aria-agents/services/mem0-production"

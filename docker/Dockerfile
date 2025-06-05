@@ -8,8 +8,8 @@ RUN apt-get update && apt-get install -y \
     jq \
     && rm -rf /var/lib/apt/lists/*
 
-# Create a non-root user
-RUN groupadd -r hypha_startup_services && useradd -r -g hypha_startup_services hypha_startup_services
+# Create a non-root user with home directory
+RUN groupadd -r hypha_startup_services && useradd -r -g hypha_startup_services -m -d /home/hypha_startup_services hypha_startup_services
 
 # Upgrade pip
 RUN pip install --upgrade pip
@@ -20,10 +20,11 @@ WORKDIR /app/
 # Copy the repository to the image
 COPY . .
 
-# Create logs directory and set permissions for /app and /app/logs
+# Create logs directory and set permissions for /app, /app/logs, and home directory
 RUN mkdir -p /app/logs && \
+    mkdir -p /home/hypha_startup_services/.mem0 && \
     chmod 777 -R /app /app/logs && \
-    chown -R hypha_startup_services:hypha_startup_services /app /app/logs
+    chown -R hypha_startup_services:hypha_startup_services /app /app/logs /home/hypha_startup_services
 
 # Add /app to the list of safe directories for Git
 RUN git config --global --add safe.directory /app
@@ -38,6 +39,10 @@ RUN pip install .
 # Copy startup scripts and make them executable
 COPY scripts/start-services.sh /app/start-services.sh
 RUN chmod +x /app/start-services.sh
+
+# Set environment variables for mem0 and other services
+ENV HOME=/home/hypha_startup_services
+ENV MEM0_DIR=/home/hypha_startup_services/.mem0
 
 # Switch to the non-root user
 USER hypha_startup_services

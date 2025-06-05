@@ -1,0 +1,211 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: hypha-weaviate-stack
+  annotations: {}
+automountServiceAccountToken: true
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: weaviate-data-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hypha-weaviate-stack
+  labels:
+    app: hypha-weaviate-stack
+    component: combined-stack
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hypha-weaviate-stack
+  template:
+    metadata:
+      labels:
+        app: hypha-weaviate-stack
+        component: combined-stack
+    spec:
+      serviceAccountName: hypha-weaviate-stack
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      imagePullSecrets:
+        - name: ghcr-secret
+      volumes:
+        - name: weaviate-data
+          persistentVolumeClaim:
+            claimName: weaviate-data-pvc
+        - name: tmp
+          emptyDir: {}
+      containers:
+        # Weaviate Database Server
+        - name: weaviate
+          image: cr.weaviate.io/semitechnologies/weaviate:1.29.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: grpc
+              containerPort: 50051
+              protocol: TCP
+          env:
+            - name: QUERY_DEFAULTS_LIMIT
+              value: "25"
+            - name: AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED
+              value: "true"
+            - name: PERSISTENCE_DATA_PATH
+              value: "/var/lib/weaviate"
+            - name: DEFAULT_VECTORIZER_MODULE
+              value: "text2vec-ollama"
+            - name: ENABLE_MODULES
+              value: "text2vec-ollama,generative-ollama,backup-s3,offload-s3"
+            - name: BACKUP_S3_BUCKET
+              value: "hypha-weaviate-backups"
+            - name: BACKUP_S3_ENDPOINT
+              value: "s3.cloud.kth.se"
+            - name: BACKUP_S3_USE_SSL
+              value: "true"
+            - name: OFFLOAD_S3_BUCKET
+              value: "hypha-weaviate-offload"
+            - name: OFFLOAD_S3_ENDPOINT
+              value: "s3.cloud.kth.se"
+            - name: OFFLOAD_S3_USE_SSL
+              value: "true"
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: hypha-secrets
+                  key: ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: hypha-secrets
+                  key: SECRET_ACCESS_KEY
+          securityContext:
+            runAsUser: 1001
+            runAsGroup: 1001
+            capabilities:
+              drop:
+                - ALL
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            privileged: false
+            readOnlyRootFilesystem: true
+          resources:
+            limits:
+              cpu: 2000m
+              memory: 4Gi
+            requests:
+              cpu: 500m
+              memory: 1Gi
+          volumeMounts:
+            - name: weaviate-data
+              mountPath: /var/lib/weaviate
+            - name: tmp
+              mountPath: /tmp
+          livenessProbe:
+            httpGet:
+              path: /v1/.well-known/live
+              port: 8080
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            timeoutSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /v1/.well-known/ready
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+
+        # Hypha Startup Services (both weaviate and mem0)
+        - name: startup-services
+          image: ghcr.io/aicell-lab/hypha-startup-services:latest
+          imagePullPolicy: Always
+          command: ["/app/start-services.sh"]
+          env:
+            - name: HYPHA_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: aria-agents-secrets
+                  key: ARIA_AGENTS_TOKEN
+            - name: SERVER_URL
+              value: "https://hypha.aicell.io"
+            - name: WEAVIATE_SERVICE_ID
+              value: "weaviate-production"
+            - name: MEM0_SERVICE_ID
+              value: "mem0-production"
+            - name: HOME
+              value: "/home/hypha_startup_services"
+            - name: MEM0_DIR
+              value: "/home/hypha_startup_services/.mem0"
+            - name: MEM0_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aria-agents-secrets
+                  key: MEM0_API_KEY
+                  optional: true
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+          resources:
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+            requests:
+              cpu: 200m
+              memory: 256Mi
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - "pgrep -f 'hypha-startup-services'"
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - "pgrep -f 'hypha-startup-services'"
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hypha-weaviate-stack
+  labels:
+    app: hypha-weaviate-stack
+    component: combined-stack
+spec:
+  type: ClusterIP
+  ports:
+    - name: weaviate-http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+    - name: weaviate-grpc
+      port: 50051
+      targetPort: 50051
+      protocol: TCP
+  selector:
+    app: hypha-weaviate-stack
