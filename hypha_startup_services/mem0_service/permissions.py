@@ -1,9 +1,12 @@
 from typing import Any
 import logging
 from hypha_rpc.rpc import RemoteService
-from hypha_startup_services.utils.constants import ADMIN_WORKSPACES
-from hypha_startup_services.utils.models import PermissionParams, HyphaPermissionError
-from hypha_startup_services.artifact import get_artifact
+from hypha_startup_services.mem0_service.utils.constants import ADMIN_WORKSPACES
+from hypha_startup_services.mem0_service.utils.models import (
+    PermissionParams,
+    HyphaPermissionError,
+)
+from hypha_startup_services.mem0_service.artifact import get_artifact
 
 logger = logging.getLogger(__name__)
 

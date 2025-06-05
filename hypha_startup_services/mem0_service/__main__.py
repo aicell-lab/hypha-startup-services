@@ -6,8 +6,8 @@ from argparse import Namespace
 import asyncio
 from hypha_rpc import connect_to_server
 from hypha_rpc.rpc import RemoteService, RemoteException
-from hypha_startup_services.register_mem0_service import register_mem0
-from hypha_startup_services.utils.constants import (
+from hypha_startup_services.mem0_service.register_service import register_mem0
+from hypha_startup_services.mem0_service.utils.constants import (
     DEFAULT_LOCAL_HOST,
     DEFAULT_LOCAL_PORT,
     DEFAULT_REMOTE_URL,
@@ -17,7 +17,7 @@ from hypha_startup_services.utils.constants import (
 
 async def register_to_existing_server(
     provided_url: str, port: int | None, service_id: str
-) -> RemoteService:
+) -> None:
     server_url = provided_url if port is None else f"{provided_url}:{port}"
     token = os.environ.get("HYPHA_TOKEN")
     assert token is not None, "HYPHA_TOKEN environment variable is not set"

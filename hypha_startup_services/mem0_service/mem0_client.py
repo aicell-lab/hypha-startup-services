@@ -1,4 +1,3 @@
-import os
 from mem0 import AsyncMemory
 from dotenv import load_dotenv
 

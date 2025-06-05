@@ -1,9 +1,12 @@
 from typing import Any
 from mem0 import AsyncMemory
 from hypha_rpc.rpc import RemoteService
-from hypha_startup_services.artifact import create_artifact
-from hypha_startup_services.permissions import require_permission
-from hypha_startup_services.utils.models import PermissionParams, CreateArtifactParams
+from hypha_startup_services.mem0_service.artifact import create_artifact
+from hypha_startup_services.mem0_service.permissions import require_permission
+from hypha_startup_services.mem0_service.utils.models import (
+    PermissionParams,
+    CreateArtifactParams,
+)
 
 
 async def init_run(

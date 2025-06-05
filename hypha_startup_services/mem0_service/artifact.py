@@ -1,7 +1,7 @@
 from typing import Any
 import logging
 from hypha_rpc.rpc import RemoteException, RemoteService
-from hypha_startup_services.utils.models import CreateArtifactParams
+from hypha_startup_services.mem0_service.utils.models import CreateArtifactParams
 
 logger = logging.getLogger(__name__)
 
