@@ -10,22 +10,12 @@ from hypha_startup_services.mem0_service.methods import (
     mem0_search,
     init_run,
 )
+from hypha_startup_services.mem0_service.utils.constants import DEFAULT_SERVICE_ID
 
 
-async def register_mem0(server: RemoteService, service_id: str) -> None:
-    """Register the Weaviate service with the Hypha server.
-
-    Sets up all service endpoints for collections, data operations, and queries.
-    """
-    await register_mem0_service(server, service_id)
-
-    print(
-        "Service registered at",
-        f"{server.config.public_base_url}/{server.config.workspace}/services/{service_id}",
-    )
-
-
-async def register_mem0_service(server: RemoteService, service_id: str) -> None:
+async def register_mem0_service(
+    server: RemoteService, service_id: str = DEFAULT_SERVICE_ID
+) -> None:
     """Register the Weaviate service with the Hypha server.
 
     Sets up all service endpoints for collections, data operations, and queries.
@@ -45,4 +35,9 @@ async def register_mem0_service(server: RemoteService, service_id: str) -> None:
             "add": partial(mem0_add, server=server, memory=mem0),
             "search": partial(mem0_search, server=server, memory=mem0),
         }
+    )
+
+    print(
+        "Service registered at",
+        f"{server.config.public_base_url}/{server.config.workspace}/services/{service_id}",
     )

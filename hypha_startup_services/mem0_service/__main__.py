@@ -6,12 +6,13 @@ from argparse import Namespace
 import asyncio
 from hypha_rpc import connect_to_server
 from hypha_rpc.rpc import RemoteService, RemoteException
-from hypha_startup_services.mem0_service.register_service import register_mem0
+from hypha_startup_services.mem0_service.register_service import register_mem0_service
 from hypha_startup_services.mem0_service.utils.constants import (
     DEFAULT_LOCAL_HOST,
     DEFAULT_LOCAL_PORT,
     DEFAULT_REMOTE_URL,
     DEFAULT_SERVICE_ID,
+    DEFAULT_LOCAL_EXISTING_HOST,
 )
 
 
@@ -26,7 +27,7 @@ async def register_to_existing_server(
     if not isinstance(server, RemoteService):
         raise ValueError("Server is not a RemoteService instance.")
 
-    await register_mem0(server, service_id)
+    await register_mem0_service(server, service_id)
 
 
 async def run_local_server(
@@ -41,7 +42,9 @@ async def run_local_server(
     """
     try:
         await register_to_existing_server(
-            server_url, port=port, service_id=service_id_existing_server
+            DEFAULT_LOCAL_EXISTING_HOST,
+            port=port,
+            service_id=service_id_existing_server,
         )
     except (ConnectionRefusedError, RemoteException):
         command = [
@@ -50,7 +53,7 @@ async def run_local_server(
             "hypha.server",
             f"--host={server_url}",
             f"--port={port}",
-            "--startup-functions=hypha_startup_services.register_tools:register_tools",
+            "--startup-functions=hypha_startup_services.mem0_service.register_service:register_mem0_service",
         ]
         subprocess.run(command, check=True)
 

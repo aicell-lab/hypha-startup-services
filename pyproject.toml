@@ -25,3 +25,4 @@ include = ["hypha_startup_services*"]
 
 [project.scripts]
 hss_weaviate = "hypha_startup_services.weaviate_service.__main__:main"
+hss_mem0 = "hypha_startup_services.mem0_service.__main__:main"
