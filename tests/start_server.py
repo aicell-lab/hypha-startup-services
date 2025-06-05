@@ -2,7 +2,9 @@ import asyncio
 import os
 from hypha_rpc import connect_to_server
 from hypha_rpc.rpc import RemoteService
-from hypha_startup_services.register_weaviate_service import register_weaviate
+from hypha_startup_services.weaviate_service.register_service import (
+    register_weaviate,
+)
 
 SERVER_URL = "https://hypha.aicell.io"
 

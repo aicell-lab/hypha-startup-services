@@ -11,7 +11,7 @@ from weaviate import WeaviateAsyncClient
 from weaviate.collections.classes.internal import QueryReturn, GenerativeReturn
 from weaviate.collections.classes.batch import DeleteManyReturn
 from hypha_rpc.rpc import RemoteService
-from hypha_startup_services.utils.collection_utils import (
+from hypha_startup_services.weaviate_service.utils.collection_utils import (
     acquire_collection,
     objects_part_coll_name,
     create_application_filter,
@@ -20,7 +20,7 @@ from hypha_startup_services.utils.collection_utils import (
     add_tenant_if_not_exists,
     get_tenant_collection,
 )
-from hypha_startup_services.utils.format_utils import (
+from hypha_startup_services.weaviate_service.utils.format_utils import (
     get_full_collection_name,
     get_full_collection_names,
     collection_to_config_dict,
@@ -30,7 +30,7 @@ from hypha_startup_services.utils.format_utils import (
     get_settings_full_name,
     add_app_id,
 )
-from hypha_startup_services.utils.artifact_utils import (
+from hypha_startup_services.weaviate_service.utils.artifact_utils import (
     get_application_artifact_name,
     assert_has_collection_permission,
     assert_has_application_permission,
@@ -40,7 +40,7 @@ from hypha_startup_services.utils.artifact_utils import (
     create_application_artifact,
     delete_application_artifact,
 )
-from hypha_startup_services.artifacts import (
+from hypha_startup_services.weaviate_service.artifacts import (
     get_artifact,
     artifact_exists,
 )

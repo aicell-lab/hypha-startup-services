@@ -1,4 +1,5 @@
-weaviate-client==4.11.2
+weaviate-client>=4.14.0
 setuptools==70.0.0
+hypha
 hypha-rpc==0.20.55
 python-dotenv==1.1.0

@@ -2,7 +2,7 @@ from typing import Any
 from functools import partial
 from weaviate import WeaviateAsyncClient
 from hypha_rpc.rpc import RemoteService
-from hypha_startup_services.weaviate_methods import (
+from hypha_startup_services.weaviate_service.methods import (
     applications_exists,
     applications_create,
     generate_near_text,

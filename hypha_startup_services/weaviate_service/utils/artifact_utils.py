@@ -1,16 +1,16 @@
 import uuid
 from typing import Any
 from hypha_rpc.rpc import RemoteService, RemoteException
-from hypha_startup_services.artifacts import (
+from hypha_startup_services.weaviate_service.artifacts import (
     create_artifact,
     delete_artifact,
     get_artifact,
 )
-from hypha_startup_services.utils.constants import (
+from hypha_startup_services.weaviate_service.utils.constants import (
     ADMIN_WORKSPACES,
     ARTIFACT_DELIMITER,
 )
-from hypha_startup_services.utils.format_utils import (
+from hypha_startup_services.weaviate_service.utils.format_utils import (
     get_full_collection_name,
     assert_valid_application_name,
 )

@@ -5,7 +5,9 @@ import pytest_asyncio
 from dotenv import load_dotenv
 from hypha_rpc import connect_to_server
 from hypha_rpc.rpc import RemoteService, RemoteException
-from hypha_startup_services.service_codecs import register_weaviate_codecs
+from hypha_startup_services.weaviate_service.service_codecs import (
+    register_weaviate_codecs,
+)
 
 load_dotenv()
 

@@ -1,7 +1,7 @@
 from typing import Any
 from weaviate.collections import CollectionAsync
 from weaviate.collections.classes.config import CollectionConfig
-from hypha_startup_services.utils.constants import (
+from hypha_startup_services.weaviate_service.utils.constants import (
     COLLECTION_DELIMITER,
     ARTIFACT_DELIMITER,
     SHARED_WORKSPACE,

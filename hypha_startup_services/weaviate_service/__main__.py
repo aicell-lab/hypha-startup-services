@@ -1,13 +1,16 @@
 import os
 import sys
 import subprocess
+from subprocess import CalledProcessError
 import argparse
 from argparse import Namespace
 import asyncio
 from hypha_rpc import connect_to_server
 from hypha_rpc.rpc import RemoteService, RemoteException
-from hypha_startup_services.register_weaviate_service import register_weaviate
-from hypha_startup_services.utils.constants import (
+from hypha_startup_services.weaviate_service.register_service import (
+    register_weaviate,
+)
+from hypha_startup_services.weaviate_service.utils.constants import (
     DEFAULT_LOCAL_HOST,
     DEFAULT_LOCAL_PORT,
     DEFAULT_REMOTE_URL,
@@ -43,14 +46,14 @@ async def run_local_server(
         await register_to_existing_server(
             server_url, port=port, service_id=service_id_existing_server
         )
-    except (ConnectionRefusedError, RemoteException):
+    except OSError:
         command = [
             sys.executable,
             "-m",
             "hypha.server",
             f"--host={server_url}",
             f"--port={port}",
-            "--startup-functions=hypha_startup_services.register_tools:register_tools",
+            "--startup-functions=hypha_startup_services.weaviate_service.register_service:register_weaviate",
         ]
         subprocess.run(command, check=True)
 
