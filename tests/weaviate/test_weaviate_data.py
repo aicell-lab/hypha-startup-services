@@ -3,7 +3,7 @@
 import uuid as uuid_module
 import pytest
 from weaviate.classes.query import Filter
-from tests.weaviate_test_utils import create_test_application, APP_ID
+from tests.weaviate.utils import create_test_application, APP_ID
 
 
 @pytest.mark.asyncio

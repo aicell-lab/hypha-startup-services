@@ -1,2 +1,2 @@
 # hypha-startup-services
-Hypha services run on startup, including weaviate collections.
+Hypha services run on startup, including Mem0 collections.

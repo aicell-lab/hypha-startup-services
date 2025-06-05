@@ -1,7 +1,7 @@
 """Tests for Weaviate application functionality."""
 
 import pytest
-from tests.weaviate_test_utils import (
+from tests.weaviate.utils import (
     create_test_collection,
     create_test_application,
     APP_ID,

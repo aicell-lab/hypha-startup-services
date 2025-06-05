@@ -1,3 +1,5 @@
+mem0ai
+pydantic
 weaviate-client>=4.14.0
 setuptools==70.0.0
 hypha==0.20.54.post8

@@ -2,12 +2,12 @@
 
 import pytest
 from hypha_rpc.rpc import RemoteException
-from tests.weaviate_test_utils import (
+from tests.weaviate.utils import (
     create_test_collection,
     USER1_APP_ID,
     USER2_APP_ID,
 )
-from tests.conftest import USER2_WS
+from tests.weaviate.conftest import USER2_WS
 
 
 @pytest.mark.asyncio

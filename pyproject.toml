@@ -8,6 +8,7 @@ readme = "README.md"
 description = "Hypha Startup Services for use by Hypha Agents."
 requires-python = ">=3.11"
 dependencies = [
+  "mem0ai",
   "weaviate-client>=4.11.2",
   "setuptools>=70.0.0",
   "hypha-rpc>=0.20.55",
@@ -23,4 +24,4 @@ include-package-data = true
 include = ["hypha_startup_services*"]
 
 [project.scripts]
-hss_weaviate = "hypha_startup_services.weaviate_service.__main__:main"
+hypha-startup-services = "hypha_startup_services.__main__:main"
