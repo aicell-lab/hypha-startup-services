@@ -1,41 +1,11 @@
 """Common test fixtures for weaviate tests."""
 
-import os
 import pytest_asyncio
-from dotenv import load_dotenv
-from hypha_rpc import connect_to_server
 from hypha_rpc.rpc import RemoteService, RemoteException
 from hypha_startup_services.weaviate_service.service_codecs import (
     register_weaviate_codecs,
 )
-
-load_dotenv()
-
-SERVER_URL = "localhost:9527"
-APP_ID = "TestApp"
-
-# User workspace IDs
-USER1_WS = "ws-user-google-oauth2|104255278140940970953"  # Admin user
-USER2_WS = "ws-user-google-oauth2|101844867326318340275"  # Regular user
-USER3_WS = "ws-user-google-oauth2|101564907182096510974"  # Regular user
-
-
-async def get_user_server(token_env="PERSONAL_TOKEN"):
-    token = os.environ.get(token_env)
-    assert token is not None, f"{token_env} environment variable is not set"
-    server = await connect_to_server(
-        {
-            "server_url": SERVER_URL,
-            "token": token,
-        }
-    )
-
-    if not isinstance(server, RemoteService):
-        raise TypeError("connect_to_server did not return a RemoteService instance")
-
-    register_weaviate_codecs(server)
-
-    return server
+from tests.conftest import get_user_server, APP_ID
 
 
 async def cleanup_weaviate_service(service: RemoteService):
@@ -61,8 +31,9 @@ async def weaviate_service():
 
     Use --service-id command-line option to override the default service ID.
     """
-    server = await get_user_server()
-    service = await server.get_service("weaviate-test")
+    server = await get_user_server("PERSONAL_TOKEN")
+    register_weaviate_codecs(server)
+    service = await server.get_service("aria-agents/weaviate-test")
     yield service
     await server.disconnect()
 
@@ -74,6 +45,7 @@ async def weaviate_service2():
     This represents a different user accessing the same service.
     """
     server = await get_user_server("PERSONAL_TOKEN2")
+    register_weaviate_codecs(server)
     service = await server.get_service("aria-agents/weaviate-test")
     yield service
     await server.disconnect()
@@ -86,6 +58,7 @@ async def weaviate_service3():
     This represents a third user accessing the same service.
     """
     server = await get_user_server("PERSONAL_TOKEN3")
+    register_weaviate_codecs(server)
     service = await server.get_service("aria-agents/weaviate-test")
     yield service
     await server.disconnect()

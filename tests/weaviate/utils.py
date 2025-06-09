@@ -1,7 +1,8 @@
 """Common utilities for Weaviate tests."""
 
-# Constants used across tests
-APP_ID = "TestApp"
+from tests.conftest import APP_ID
+
+# Export all app IDs for backward compatibility
 USER1_APP_ID = "User1App"
 USER2_APP_ID = "User2App"
 USER3_APP_ID = "User3App"

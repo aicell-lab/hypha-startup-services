@@ -1,31 +1,7 @@
 """Common test fixtures for mem0 tests."""
 
-import os
 import pytest_asyncio
-from dotenv import load_dotenv
-from hypha_rpc import connect_to_server
-from hypha_rpc.rpc import RemoteService
-
-load_dotenv()
-
-SERVER_URL = "localhost:9527"
-APP_ID = "TestApp"
-
-
-async def get_user_server(token_env="PERSONAL_TOKEN"):
-    token = os.environ.get(token_env)
-    assert token is not None, f"{token_env} environment variable is not set"
-    server = await connect_to_server(
-        {
-            "server_url": SERVER_URL,
-            "token": token,
-        }
-    )
-
-    if not isinstance(server, RemoteService):
-        raise TypeError("connect_to_server did not return a RemoteService instance")
-
-    return server
+from tests.conftest import get_user_server
 
 
 @pytest_asyncio.fixture

@@ -25,7 +25,7 @@ async def register_mem0_service(
 
     await server.register_service(
         {
-            "name": "Hypha Weaviate Service",
+            "name": "Hypha Mem0 Service",
             "id": service_id,
             "config": {
                 "visibility": "public",

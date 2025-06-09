@@ -7,7 +7,7 @@ from tests.weaviate.utils import (
     USER1_APP_ID,
     USER2_APP_ID,
 )
-from tests.weaviate.conftest import USER2_WS
+from tests.conftest import USER2_WS
 
 
 @pytest.mark.asyncio
