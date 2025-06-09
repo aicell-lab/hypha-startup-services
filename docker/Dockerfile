@@ -24,8 +24,8 @@ COPY . .
 RUN mkdir -p /app/logs && \
     mkdir -p /home/hypha_startup_services/.mem0 && \
     chmod 777 -R /app /app/logs && \
-    chmod 755 /home/hypha_startup_services && \
-    chmod 755 /home/hypha_startup_services/.mem0 && \
+    chmod 777 /home/hypha_startup_services && \
+    chmod 777 /home/hypha_startup_services/.mem0 && \
     chown -R hypha_startup_services:hypha_startup_services /app /app/logs /home/hypha_startup_services
 
 # Add /app to the list of safe directories for Git
