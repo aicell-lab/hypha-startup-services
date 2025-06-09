@@ -2,7 +2,7 @@
 
 import pytest
 from hypha_rpc.rpc import RemoteException
-from tests.mem0.utils import (
+from tests.mem0_service.utils import (
     TEST_AGENT_ID,
     TEST_AGENT_ID2,
     TEST_RUN_ID,
@@ -16,6 +16,25 @@ from tests.conftest import USER1_WS, USER2_WS, USER3_WS
 @pytest.mark.asyncio
 async def test_multi_user_memory_isolation(mem0_service, mem0_service2, mem0_service3):
     """Test that memories are properly isolated between different users."""
+    # Initialize agents for each user to create proper artifacts
+    await mem0_service.init(
+        agent_id=TEST_AGENT_ID,
+        run_id=f"{TEST_RUN_ID}-user1",
+        description="User 1's agent",
+    )
+
+    await mem0_service2.init(
+        agent_id=TEST_AGENT_ID,
+        run_id=f"{TEST_RUN_ID}-user2",
+        description="User 2's agent",
+    )
+
+    await mem0_service3.init(
+        agent_id=TEST_AGENT_ID,
+        run_id=f"{TEST_RUN_ID}-user3",
+        description="User 3's agent",
+    )
+
     # Each user adds memories to the same agent ID but in their own workspace
     await mem0_service.add(
         messages=TEST_MESSAGES,
@@ -110,6 +129,19 @@ async def test_multi_user_same_agent_different_runs(mem0_service, mem0_service2)
     run_id_1 = f"{TEST_RUN_ID}-user1"
     run_id_2 = f"{TEST_RUN_ID}-user2"
 
+    # Initialize agents for each user
+    await mem0_service.init(
+        agent_id=TEST_AGENT_ID,
+        run_id=run_id_1,
+        description="User 1's run",
+    )
+
+    await mem0_service2.init(
+        agent_id=TEST_AGENT_ID,
+        run_id=run_id_2,
+        description="User 2's run",
+    )
+
     # User 1 adds memories with their run ID
     await mem0_service.add(
         messages=TEST_MESSAGES,
@@ -149,6 +181,19 @@ async def test_multi_user_same_agent_different_runs(mem0_service, mem0_service2)
 async def test_concurrent_memory_operations(mem0_service, mem0_service2):
     """Test concurrent memory operations from different users."""
     import asyncio
+
+    # Initialize agents for each user first
+    await mem0_service.init(
+        agent_id=f"{TEST_AGENT_ID}-travel",
+        run_id=f"{TEST_RUN_ID}-travel",
+        description="Travel agent for user 1",
+    )
+
+    await mem0_service2.init(
+        agent_id=f"{TEST_AGENT_ID}-cooking",
+        run_id=f"{TEST_RUN_ID}-cooking",
+        description="Cooking agent for user 2",
+    )
 
     # Define different message sets for each user
     user1_messages = [

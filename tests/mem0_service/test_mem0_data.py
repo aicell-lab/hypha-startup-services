@@ -1,7 +1,7 @@
 """Tests for mem0 data operations and edge cases."""
 
 import pytest
-from tests.mem0.utils import (
+from tests.mem0_service.utils import (
     TEST_AGENT_ID,
     TEST_AGENT_ID2,
     TEST_RUN_ID,

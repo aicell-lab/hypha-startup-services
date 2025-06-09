@@ -1,7 +1,7 @@
 """Tests for the Weaviate collection functionality."""
 
 import pytest
-from tests.weaviate.utils import create_test_collection
+from tests.weaviate_service.utils import create_test_collection
 
 
 @pytest.mark.asyncio

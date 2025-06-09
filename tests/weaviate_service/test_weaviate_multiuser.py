@@ -2,7 +2,7 @@
 
 import pytest
 from hypha_rpc.rpc import RemoteException
-from tests.weaviate.utils import (
+from tests.weaviate_service.utils import (
     create_test_collection,
     APP_ID,
     USER2_APP_ID,
