@@ -7,8 +7,8 @@ set -e
 
 # Default values
 SERVER_URL="${SERVER_URL:-https://hypha.aicell.io}"
-WEAVIATE_SERVICE_ID="${WEAVIATE_SERVICE_ID:-weaviate-production}"
-MEM0_SERVICE_ID="${MEM0_SERVICE_ID:-mem0-production}"
+WEAVIATE_SERVICE_ID="${WEAVIATE_SERVICE_ID:-weaviate}"
+MEM0_SERVICE_ID="${MEM0_SERVICE_ID:-mem0}"
 
 echo "Starting Hypha startup services..."
 echo "Server URL: $SERVER_URL"
