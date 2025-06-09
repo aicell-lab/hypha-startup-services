@@ -14,9 +14,6 @@ RUN groupadd -r hypha_startup_services && useradd -r -g hypha_startup_services -
 # Upgrade pip
 RUN pip install --upgrade pip
 
-# Switch to the non-root user
-USER hypha_startup_services
-
 # Set the working directory
 WORKDIR /app/
 
@@ -27,6 +24,8 @@ COPY . .
 RUN mkdir -p /app/logs && \
     mkdir -p /home/hypha_startup_services/.mem0 && \
     chmod 777 -R /app /app/logs && \
+    chmod 755 /home/hypha_startup_services && \
+    chmod 755 /home/hypha_startup_services/.mem0 && \
     chown -R hypha_startup_services:hypha_startup_services /app /app/logs /home/hypha_startup_services
 
 # Add /app to the list of safe directories for Git
@@ -46,6 +45,9 @@ RUN chmod +x /app/start-services.sh
 # Set environment variables for mem0 and other services
 ENV HOME=/home/hypha_startup_services
 ENV MEM0_DIR=/home/hypha_startup_services/.mem0
+
+# Switch to the non-root user
+USER hypha_startup_services
 
 # Default entry point - can be overridden in Kubernetes deployment
 # For running both services: command: ["/app/start-services.sh"]
