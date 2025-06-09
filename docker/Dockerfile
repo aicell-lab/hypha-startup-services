@@ -50,7 +50,6 @@ ENV MEM0_DIR=/home/hypha_startup_services/.mem0
 USER hypha_startup_services
 
 # Default entry point - can be overridden in Kubernetes deployment
-# For running both services: command: ["/app/start-services.sh"]
+# For running both services: use default CMD
 # For single service: command: ["hypha-startup-services", "weaviate", "remote", ...]
-ENTRYPOINT ["hypha-startup-services"]
-CMD ["weaviate", "remote", "--server-url=https://hypha.aicell.io"]
+CMD ["/app/start-services.sh"]
