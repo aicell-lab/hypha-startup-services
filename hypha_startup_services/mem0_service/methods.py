@@ -5,13 +5,52 @@ from hypha_startup_services.mem0_service.artifact import create_artifact
 from hypha_startup_services.mem0_service.permissions import require_permission
 from hypha_startup_services.mem0_service.utils.models import (
     PermissionParams,
-    CreateArtifactParams,
+    AgentArtifactParams,
 )
+from hypha_startup_services.common.workspace_utils import ws_from_context
+
+
+async def init_agent(
+    agent_id: str,
+    *,
+    description: str | None = None,
+    metadata: dict[str, Any] | None = None,
+    server: RemoteService,
+    context: dict[str, Any],
+) -> None:
+    """
+    Initialize an agent by creating an artifact for the agent in the workspace.
+
+    This creates a base artifact for the agent in the workspace.
+
+    Args:
+        agent_id: ID of the agent
+        description: Optional description for the artifact
+        metadata: Optional metadata for the artifact
+        server: The Hypha server instance
+        context: Context from Hypha-rpc for permissions
+    """
+    accessor_ws = ws_from_context(context)
+
+    agent_artifact_params = AgentArtifactParams(
+        agent_id=agent_id,
+        creator_id=accessor_ws,
+        general_permission="r",
+        desc=description,
+        metadata=metadata,
+        artifact_type="collection",
+    )
+
+    await create_artifact(
+        server=server,
+        artifact_params=agent_artifact_params,
+    )
 
 
 async def init_run(
     agent_id: str,
-    run_id: str,
+    workspace: str,
+    run_id: str | None = None,
     *,
     description: str | None = None,
     metadata: dict[str, Any] | None = None,
@@ -34,30 +73,28 @@ async def init_run(
         memory: The AsyncMemory instance (currently unused)
         context: Context from Hypha-rpc for permissions
     """
-    # Create base artifact for agent
-    base_artifact_params = CreateArtifactParams.from_mem0_params(
-        context=context,
+    accessor_ws = ws_from_context(context)
+
+    agent_artifact_params = AgentArtifactParams(
         agent_id=agent_id,
-        description=description or f"AsyncMemory artifact for agent {agent_id}",
-        permissions="r",
+        creator_id=accessor_ws,
+        desc=description,
         metadata=metadata,
+        artifact_type="collection",
     )
 
+    workspace_artifact_params = agent_artifact_params.for_workspace(workspace)
     await create_artifact(
         server=server,
-        artifact_params=base_artifact_params,
+        artifact_params=workspace_artifact_params,
     )
 
-    # Create run-specific artifact
-    run_artifact_params = base_artifact_params.with_run_id(run_id, permissions="*")
-    run_artifact_params.description = (
-        description or f"AsyncMemory artifact for agent {agent_id}, run {run_id}"
-    )
-
-    await create_artifact(
-        server=server,
-        artifact_params=run_artifact_params,
-    )
+    if run_id is not None:
+        run_artifact_params = workspace_artifact_params.for_run(run_id)
+        await create_artifact(
+            server=server,
+            artifact_params=run_artifact_params,
+        )
 
 
 async def mem0_add(
@@ -88,10 +125,13 @@ async def mem0_add(
         HyphaPermissionError: If the user does not have permission to add items to the memory.
         ValueError: If the permission parameters are invalid.
     """
-    permission_params = PermissionParams.from_mem0_params(
+
+    accessor_ws = ws_from_context(context)
+
+    permission_params = PermissionParams(
         agent_id=agent_id,
-        workspace=workspace,
-        context=context,
+        accessed_workspace=workspace,
+        accessor_workspace=accessor_ws,
         run_id=run_id,
         operation="rw",
     )
@@ -136,10 +176,12 @@ async def mem0_search(
         and potentially "relations" if graph store is enabled.
         Example for v1.1+: `{"results": [{"id": "...", "memory": "...", "score": 0.8, ...}]}`
     """
-    permission_params = PermissionParams.from_mem0_params(
+    accessor_ws = ws_from_context(context)
+
+    permission_params = PermissionParams(
         agent_id=agent_id,
-        workspace=workspace,
-        context=context,
+        accessed_workspace=workspace,
+        accessor_workspace=accessor_ws,
         run_id=run_id,
         operation="r",
     )

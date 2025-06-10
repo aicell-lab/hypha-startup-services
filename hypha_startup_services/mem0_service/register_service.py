@@ -9,6 +9,7 @@ from hypha_startup_services.mem0_service.methods import (
     mem0_add,
     mem0_search,
     init_run,
+    init_agent,
 )
 from hypha_startup_services.mem0_service.utils.constants import DEFAULT_SERVICE_ID
 
@@ -31,6 +32,7 @@ async def register_mem0_service(
                 "visibility": "public",
                 "require_context": True,
             },
+            "init_agent": partial(init_agent, server=server),
             "init": partial(init_run, server=server),
             "add": partial(mem0_add, server=server, memory=mem0),
             "search": partial(mem0_search, server=server, memory=mem0),

@@ -1,5 +1,6 @@
 """Tests for multi-user mem0 functionality."""
 
+import asyncio
 import pytest
 from hypha_rpc.rpc import RemoteException
 from tests.mem0_service.utils import (
@@ -180,20 +181,6 @@ async def test_multi_user_same_agent_different_runs(mem0_service, mem0_service2)
 @pytest.mark.asyncio
 async def test_concurrent_memory_operations(mem0_service, mem0_service2):
     """Test concurrent memory operations from different users."""
-    import asyncio
-
-    # Initialize agents for each user first
-    await mem0_service.init(
-        agent_id=f"{TEST_AGENT_ID}-travel",
-        run_id=f"{TEST_RUN_ID}-travel",
-        description="Travel agent for user 1",
-    )
-
-    await mem0_service2.init(
-        agent_id=f"{TEST_AGENT_ID}-cooking",
-        run_id=f"{TEST_RUN_ID}-cooking",
-        description="Cooking agent for user 2",
-    )
 
     # Define different message sets for each user
     user1_messages = [
@@ -214,12 +201,12 @@ async def test_concurrent_memory_operations(mem0_service, mem0_service2):
     tasks = [
         mem0_service.add(
             messages=user1_messages,
-            agent_id=f"{TEST_AGENT_ID}-travel",
+            agent_id=TEST_AGENT_ID,
             workspace=USER1_WS,
         ),
         mem0_service2.add(
             messages=user2_messages,
-            agent_id=f"{TEST_AGENT_ID}-cooking",
+            agent_id=TEST_AGENT_ID,
             workspace=USER2_WS,
         ),
     ]
@@ -231,12 +218,12 @@ async def test_concurrent_memory_operations(mem0_service, mem0_service2):
     search_tasks = [
         mem0_service.search(
             query="travel to Japan",
-            agent_id=f"{TEST_AGENT_ID}-travel",
+            agent_id=TEST_AGENT_ID,
             workspace=USER1_WS,
         ),
         mem0_service2.search(
             query="cooking Italian food",
-            agent_id=f"{TEST_AGENT_ID}-cooking",
+            agent_id=TEST_AGENT_ID,
             workspace=USER2_WS,
         ),
     ]

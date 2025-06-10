@@ -68,10 +68,11 @@ async def artifact_exists(
 ) -> bool:
     """Check if an artifact exists."""
 
-    artifact_response = await get_artifact(
-        server=server,
-        artifact_name=artifact_name,
-    )
-    if "error" in artifact_response:
+    try:
+        await get_artifact(
+            server=server,
+            artifact_name=artifact_name,
+        )
+        return True
+    except RemoteException:
         return False
-    return True

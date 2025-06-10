@@ -1,7 +1,7 @@
 from typing import Any
 import logging
 from hypha_rpc.rpc import RemoteException, RemoteService
-from hypha_startup_services.mem0_service.utils.models import CreateArtifactParams
+from hypha_startup_services.mem0_service.utils.models import AgentArtifactParams
 
 logger = logging.getLogger(__name__)
 
@@ -25,17 +25,14 @@ async def get_artifact(
     """
     artifact_manager = await server.get_service("public/artifact-manager")
 
-    try:
-        artifact = await artifact_manager.read(artifact_id=artifact_id)
-        return artifact
-    except RemoteException as e:
-        logger.error("Error getting artifact %s: %s", artifact_id, e)
-        return {"error": str(e)}
+    artifact = await artifact_manager.read(artifact_id=artifact_id)
+
+    return artifact
 
 
 async def create_artifact(
     server: RemoteService,
-    artifact_params: CreateArtifactParams,
+    artifact_params: AgentArtifactParams,
 ) -> None:
     """Create a new artifact."""
 
@@ -51,12 +48,12 @@ async def create_artifact(
         )
         return
 
-    try:
-        await artifact_manager.create(**artifact_params.creation_dict)
-    except RemoteException as e:
-        logger.error(
-            "Artifact couldn't be created. It likely already exists. Error: %s", e
-        )
+    await artifact_manager.create(**artifact_params.creation_dict)
+    logger.info(
+        "Artifact created: %s with params: %s",
+        artifact_params.artifact_id,
+        artifact_params.creation_dict,
+    )
 
 
 async def delete_artifact(
@@ -68,7 +65,7 @@ async def delete_artifact(
     try:
         await artifact_manager.delete(artifact_id=artifact_id, delete_files=True)
     except RemoteException as e:
-        logger.error("Error deleting artifact. Error: %s", e)
+        logger.warning("Error deleting artifact. Error: %s", e)
 
 
 async def artifact_exists(
@@ -77,10 +74,27 @@ async def artifact_exists(
 ) -> bool:
     """Check if an artifact exists."""
 
-    artifact_response = await get_artifact(
-        server=server,
-        artifact_id=artifact_id,
-    )
-    if "error" in artifact_response:
+    # artifact_manager = await server.get_service("public/artifact-manager")
+    # try:
+    #     await artifact_manager.delete(
+    #         artifact_id=artifact_id, delete_files=True
+    #     )
+    #     return True
+    # except RemoteException:
+    #     return True
+    # raise NotImplementedError(
+    #     "The artifact_exists function is not implemented yet. "
+    #     "Please implement it to check if an artifact exists."
+    # )
+
+    try:
+        await get_artifact(
+            server=server,
+            artifact_id=artifact_id,
+        )
+        # artifact_manager = await server.get_service("public/artifact-manager")
+        # await artifact_manager.delete(artifact_id=artifact_id, delete_files=True)
+        return True
+    except RemoteException:
+        logger.warning("Artifact %s does not exist.", artifact_id)
         return False
-    return True

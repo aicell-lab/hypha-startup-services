@@ -8,12 +8,6 @@ from hypha_startup_services.weaviate_service.utils.constants import (
 )
 
 
-def ws_from_context(context: dict[str, Any]) -> str:
-    """Get workspace ID from context."""
-    user_ws = context["user"]["scope"]["current_workspace"]
-    return user_ws
-
-
 def format_workspace(workspace: str) -> str:
     """Format workspace name to use in collection names.
 

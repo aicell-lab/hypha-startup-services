@@ -142,7 +142,7 @@ async def test_mem0_empty_search_results(mem0_service):
     """Test searching with a query that should return no results."""
     result = await mem0_service.search(
         query="extremely specific query that should not match anything xyzabc123",
-        agent_id=f"{TEST_AGENT_ID}-nonexistent",
+        agent_id=TEST_AGENT_ID,
         workspace=USER1_WS,
     )
 

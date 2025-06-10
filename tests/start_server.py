@@ -36,7 +36,7 @@ async def start_services():
     print("Registering mem0-test service...")
     await register_mem0_service(server, "mem0-test")
 
-    print("Both services registered. Starting server...")
+    print("Both services successfully registered!")
     await server.serve()
 
 

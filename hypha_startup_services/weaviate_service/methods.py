@@ -11,6 +11,7 @@ from weaviate import WeaviateAsyncClient
 from weaviate.collections.classes.internal import QueryReturn, GenerativeReturn
 from weaviate.collections.classes.batch import DeleteManyReturn
 from hypha_rpc.rpc import RemoteService
+from hypha_startup_services.common.workspace_utils import ws_from_context
 from hypha_startup_services.weaviate_service.utils.collection_utils import (
     acquire_collection,
     objects_part_coll_name,
@@ -25,7 +26,6 @@ from hypha_startup_services.weaviate_service.utils.format_utils import (
     get_full_collection_names,
     collection_to_config_dict,
     config_with_short_name,
-    ws_from_context,
     stringify_keys,
     get_settings_full_name,
     add_app_id,

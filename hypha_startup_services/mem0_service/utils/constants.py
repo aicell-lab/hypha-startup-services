@@ -1,6 +1,6 @@
 from hypha_startup_services.common.constants import (
     COLLECTION_DELIMITER,
-    ARTIFACT_DELIMITER,
+    ARTIFACT_DELIMITER_MEM0,
     SHARED_WORKSPACE,
     ADMIN_WORKSPACES,
     DEFAULT_LOCAL_HOST,
@@ -13,7 +13,7 @@ from hypha_startup_services.common.constants import (
 # Re-export for backward compatibility
 __all__ = [
     "COLLECTION_DELIMITER",
-    "ARTIFACT_DELIMITER",
+    "ARTIFACT_DELIMITER_MEM0",
     "SHARED_WORKSPACE",
     "ADMIN_WORKSPACES",
     "DEFAULT_LOCAL_HOST",

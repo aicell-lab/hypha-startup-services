@@ -11,12 +11,23 @@ from tests.mem0_service.utils import (
     SEARCH_QUERY_MOVIES,
 )
 from tests.conftest import USER1_WS, USER2_WS
+from tests.mem0_service.utils import init_run
 
 
 @pytest.mark.asyncio
 async def test_admin_access_to_other_users_memories(mem0_service, mem0_service2):
     """Test admin access to memories owned by other users."""
     # User 2 (non-admin) adds private memories
+    await init_run(mem0_service2, TEST_AGENT_ID2, TEST_RUN_ID, USER2_WS)
+
+    await mem0_service2.init(
+        agent_id=TEST_AGENT_ID2,
+        workspace=USER2_WS,
+        run_id=TEST_RUN_ID,
+        description="User 2's run for testing admin access",
+        metadata={"test": True, "environment": "pytest"},
+    )
+
     await mem0_service2.add(
         messages=TEST_MESSAGES2,
         agent_id=TEST_AGENT_ID2,

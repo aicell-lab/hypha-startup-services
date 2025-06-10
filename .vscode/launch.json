@@ -1,0 +1,22 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Run locally",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "hypha_startup_services",
+            "justMyCode": false,
+        },
+        {
+            "name": "Run test",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "tests/mem0_service/test_mem0_admin.py::test_admin_access_to_other_users_memories"
+            ],
+            "justMyCode": false
+        },
+    ]
+}

@@ -1,8 +1,6 @@
 """Common utilities for Weaviate tests."""
 
-from tests.conftest import APP_ID
-
-# Export all app IDs for backward compatibility
+APP_ID = "TestApp"
 USER1_APP_ID = "User1App"
 USER2_APP_ID = "User2App"
 USER3_APP_ID = "User3App"

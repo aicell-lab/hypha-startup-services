@@ -194,7 +194,7 @@ async def test_concurrent_permission_checks(mem0_service, mem0_service2):
     tasks.append(
         mem0_service.add(
             messages=TEST_MESSAGES,
-            agent_id=f"{TEST_AGENT_ID}-user1",
+            agent_id=TEST_AGENT_ID,
             workspace=USER1_WS,
         )
     )
@@ -202,7 +202,7 @@ async def test_concurrent_permission_checks(mem0_service, mem0_service2):
     tasks.append(
         mem0_service2.add(
             messages=TEST_MESSAGES,
-            agent_id=f"{TEST_AGENT_ID}-user2",
+            agent_id=TEST_AGENT_ID,
             workspace=USER2_WS,
         )
     )
@@ -211,7 +211,7 @@ async def test_concurrent_permission_checks(mem0_service, mem0_service2):
     tasks.append(
         mem0_service2.add(
             messages=TEST_MESSAGES,
-            agent_id=f"{TEST_AGENT_ID}-invalid",
+            agent_id=TEST_AGENT_ID,
             workspace=USER1_WS,  # User 2 trying to access User 1's workspace
         )
     )

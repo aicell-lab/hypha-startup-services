@@ -1,10 +1,12 @@
 """Common test fixtures for weaviate tests."""
 
+import pytest_asyncio
 from hypha_rpc.rpc import RemoteService, RemoteException
 from hypha_startup_services.weaviate_service.service_codecs import (
     register_weaviate_codecs,
 )
-from tests.conftest import create_service_fixtures, APP_ID
+from tests.weaviate_service.utils import APP_ID
+from tests.conftest import get_user_server
 
 
 async def cleanup_weaviate_service(service: RemoteService):
@@ -29,14 +31,31 @@ def setup_weaviate_server(server: RemoteService):
     register_weaviate_codecs(server)
 
 
-# Create weaviate service fixtures using the shared utility
-_fixtures = create_service_fixtures(
-    service_name="weaviate_service",
-    service_id="aria-agents/weaviate-test",
-    setup_func=setup_weaviate_server,
-)
+@pytest_asyncio.fixture
+async def weaviate_service1():
+    """Weaviate service fixture for user 1."""
+    server = await get_user_server("PERSONAL_TOKEN")
+    register_weaviate_codecs(server)
+    service = await server.get_service("aria-agents/weaviate-test")
+    yield service
+    await server.disconnect()
 
-# Register the fixtures globally
-weaviate_service = _fixtures["weaviate_service"]
-weaviate_service2 = _fixtures["weaviate_service2"]
-weaviate_service3 = _fixtures["weaviate_service3"]
+
+@pytest_asyncio.fixture
+async def weaviate_service2():
+    """Weaviate service fixture for user 2."""
+    server = await get_user_server("PERSONAL_TOKEN2")
+    register_weaviate_codecs(server)
+    service = await server.get_service("aria-agents/weaviate-test")
+    yield service
+    await server.disconnect()
+
+
+@pytest_asyncio.fixture
+async def weaviate_service3():
+    """Weaviate service fixture for user 3."""
+    server = await get_user_server("PERSONAL_TOKEN3")
+    register_weaviate_codecs(server)
+    service = await server.get_service("aria-agents/weaviate-test")
+    yield service
+    await server.disconnect()

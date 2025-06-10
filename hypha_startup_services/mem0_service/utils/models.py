@@ -1,6 +1,6 @@
 from typing import Any, Literal
 from pydantic import BaseModel, Field
-from hypha_startup_services.mem0_service.utils.constants import ARTIFACT_DELIMITER
+from hypha_startup_services.mem0_service.utils.constants import ARTIFACT_DELIMITER_MEM0
 
 
 # Type alias for permission operations
@@ -24,11 +24,11 @@ class PermissionParams(BaseModel):
     Model for permission parameters with validation and computed properties.
     """
 
-    accessor_ws: str = Field(
+    accessor_workspace: str = Field(
         description="The workspace of the user accessing the artifact",
     )
     agent_id: str = Field(description="The ID of the agent")
-    accessed_ws: str = Field(description="The workspace of the user")
+    accessed_workspace: str = Field(description="The workspace of the user")
     run_id: str | None = Field(default=None, description="The ID of the run")
     operation: PermissionOperation = Field(
         default="r",
@@ -58,105 +58,88 @@ class PermissionParams(BaseModel):
 
         Format: {agent_id}:{workspace} or {agent_id}:{workspace}:{run_id}
         """
-        artifact_id = f"{self.agent_id}{ARTIFACT_DELIMITER}{self.accessed_ws}"
+        artifact_id = (
+            f"{self.agent_id}{ARTIFACT_DELIMITER_MEM0}{self.accessed_workspace}"
+        )
         if self.run_id:
-            artifact_id += f"{ARTIFACT_DELIMITER}{self.run_id}"
+            artifact_id += f"{ARTIFACT_DELIMITER_MEM0}{self.run_id}"
         return artifact_id
 
-    @classmethod
-    def from_mem0_params(
-        cls,
-        agent_id: str,
-        workspace: str,
-        context: dict[str, Any],
-        run_id: str | None = None,
-        operation: PermissionOperation = "r",
-    ) -> "PermissionParams":
-        """
-        Create PermissionParams from mem0 function parameters.
 
-        This is a convenience method for creating PermissionParams instances
-        from the common parameter pattern used in mem0 functions.
-
-        Args:
-            agent_id: The ID of the agent
-            workspace: The workspace of the user
-            context: Context from Hypha-rpc containing user information
-            run_id: Optional ID of the run
-            operation: The requested operation (see operation field description for valid values)
-
-        Returns:
-            A new PermissionParams instance
-
-        Raises:
-            ValueError: If context is invalid or missing required fields
-        """
-        # Validate context structure before creating the instance
-        if not context:
-            raise ValueError("Context cannot be empty")
-
-        user_info = context.get("user", {})
-        if not user_info:
-            raise ValueError("Context must contain 'user' information")
-
-        scope = user_info.get("scope", {})
-        if not scope or "current_workspace" not in scope:
-            raise ValueError("Context must contain user scope with current_workspace")
-
-        try:
-            accessor_ws = context["user"]["scope"]["current_workspace"]
-        except KeyError as e:
-            raise KeyError(f"Invalid context structure: missing {e}") from e
-
-        return cls(
-            accessor_ws=accessor_ws,
-            agent_id=agent_id,
-            accessed_ws=workspace,
-            run_id=run_id,
-            operation=operation,
-        )
-
-
-class CreateArtifactParams(BaseModel):
+class AgentArtifactParams(BaseModel):
     """
     Model for artifact parameters with validation and computed properties.
     """
 
-    artifact_id: str = Field(
-        description="The ID of the artifact",
+    agent_id: str = Field(
+        description="The agent ID associated with this artifact",
     )
-    description: str | None = Field(
+    creator_id: str = Field(
+        description="The workspace of the artifact creator, used for permission checks",
+    )
+    _workspace: str | None = None
+    _run_id: str | None = None
+    desc: str | None = Field(
         default=None,
         description="A description of the artifact",
     )
-    permissions: dict[str, PermissionOperation] | None = Field(
+    general_permission: PermissionOperation | None = Field(
         default=None,
         description="Permissions for the artifact, mapping user IDs to permission levels",
+    )
+    workspace_permission: PermissionOperation | None = Field(
+        default=None,
+        description="Permissions for the workspace, mapping user IDs to permission levels",
     )
     metadata: dict[str, Any] | None = Field(
         default=None,
         description="Metadata associated with the artifact",
     )
-    parent_id: str | None = Field(
-        default=None,
-        description="The ID of the parent artifact, if any",
-    )
     artifact_type: str = Field(
         default="collection",
         description="The type of the artifact, e.g., 'collection', 'file', etc.",
     )
-    workspace: str | None = Field(
-        default=None,
-        description="The workspace associated with this artifact",
-    )
-    agent_id: str | None = Field(
-        default=None,
-        description="The agent ID associated with this artifact",
-    )
-    run_id: str | None = Field(
-        default=None,
-        description="The run ID associated with this artifact",
-    )
+
+    @property
+    def artifact_id(self) -> str:
+        """
+        Returns the artifact ID based on agent_id, workspace, and run_id.
+
+        Format: {agent_id}:{workspace} or {agent_id}:{workspace}:{run_id}
+        """
+        artifact_id = self.agent_id
+        if self._workspace:
+            artifact_id += f"{ARTIFACT_DELIMITER_MEM0}{self._workspace}"
+            if self._run_id:
+                artifact_id += f"{ARTIFACT_DELIMITER_MEM0}{self._run_id}"
+        return artifact_id
+
+    @property
+    def parent_id(self) -> str | None:
+        """
+        Returns the parent artifact ID if it exists, otherwise None.
+        """
+        parent_id = None
+        if self._workspace:
+            parent_id = self.agent_id
+            if self._run_id:
+                parent_id += f"{ARTIFACT_DELIMITER_MEM0}{self._workspace}"
+        return parent_id
+
+    @property
+    def description(self) -> str:
+        """
+        Returns the description of the artifact.
+        """
+        if self.desc:
+            return self.desc
+
+        description = f"Artifact for agent {self.agent_id}"
+        if self._workspace:
+            description += f" in workspace {self._workspace}"
+        if self._run_id:
+            description += f" with run ID {self._run_id}"
+        return description
 
     @property
     def manifest(self) -> dict[str, Any]:
@@ -164,7 +147,7 @@ class CreateArtifactParams(BaseModel):
         Returns the artifact manifest as a dictionary.
         """
         return {
-            "name": self.artifact_id,
+            "name": f"Artifact for agent {self.agent_id}",
             "description": self.description or "",
             "collection": [],
             "metadata": self.metadata or {},
@@ -178,77 +161,48 @@ class CreateArtifactParams(BaseModel):
         Returns:
             A dictionary representation of the ArtifactParams instance.
         """
+        permission_dict = {self.creator_id: "*", "*": self.general_permission or "r"}
+        if self._workspace:
+            permission_dict[self._workspace] = self.workspace_permission or "*"
+
         return {
             "parent_id": self.parent_id,
             "alias": self.artifact_id,
             "type": self.artifact_type,
             "config": {
-                "permissions": self.permissions,
+                "permissions": permission_dict,
             },
             "manifest": self.manifest,
         }
 
-    @classmethod
-    def from_mem0_params(
-        cls,
-        agent_id: str,
-        context: dict[str, Any],
-        run_id: str | None = None,
-        description: str | None = None,
-        permissions: PermissionOperation = "r",
-        metadata: dict[str, Any] | None = None,
-        parent_id: str | None = None,
-        artifact_type: str = "collection",
-    ) -> "CreateArtifactParams":
+    def for_workspace(
+        self, workspace: str, operation: PermissionOperation = "*"
+    ) -> "AgentArtifactParams":
         """
-        Create ArtifactParams from mem0 function parameters.
+        Create a new ArtifactParams instance with a workspace added.
 
-        This is a convenience method for creating ArtifactParams instances
-        from the common parameter pattern used in mem0 functions.
+        This updates the artifact_id to include the workspace and creates a new instance.
 
         Args:
-            agent_id: The ID of the agent
-            context: Context from Hypha-rpc containing user information
-            run_id: Optional ID of the run
-            description: A description of the artifact
-            permissions: Either a dict mapping users to permissions, or a single permission level
-            metadata: Metadata associated with the artifact
-            parent_id: The ID of the parent artifact, if any
-            artifact_type: The type of the artifact
+            workspace: The workspace to add
+            operation: The operation permission for the new artifact
 
         Returns:
-            A new ArtifactParams instance
-
-        Raises:
-            ValueError: If context is invalid or missing required fields
+            A new ArtifactParams instance with the workspace included
         """
-        try:
-            workspace = context["user"]["scope"]["current_workspace"]
-        except KeyError as e:
-            raise KeyError(f"Invalid context structure: missing {e}") from e
-
-        # Generate artifact_id
-        artifact_id = f"{agent_id}{ARTIFACT_DELIMITER}{workspace}"
-        if run_id:
-            artifact_id += f"{ARTIFACT_DELIMITER}{run_id}"
-
-        processed_permissions: dict[str, PermissionOperation] = {workspace: permissions}
-
-        return cls(
-            artifact_id=artifact_id,
-            description=description,
-            permissions=processed_permissions,
-            metadata=metadata,
-            parent_id=parent_id,
-            artifact_type=artifact_type,
-            workspace=workspace,
-            agent_id=agent_id,
-            run_id=run_id,
+        return self.model_copy(
+            update={
+                "_workspace": workspace,
+                "workspace_permission": operation,
+            }
         )
 
-    def with_run_id(
-        self, run_id: str, permissions: PermissionOperation
-    ) -> "CreateArtifactParams":
+    def for_run(
+        self,
+        run_id: str,
+        workspace: str | None = None,
+        operation: PermissionOperation = "*",
+    ) -> "AgentArtifactParams":
         """
         Create a new ArtifactParams instance with a run_id added.
 
@@ -256,20 +210,17 @@ class CreateArtifactParams(BaseModel):
 
         Args:
             run_id: The run ID to add
+            workspace: The workspace for the new artifact
+            operation: The operation permission for the new artifact
 
         Returns:
             A new ArtifactParams instance with the run_id included
         """
-        # Generate new artifact_id with run_id
-        base_artifact_id = f"{self.agent_id}{ARTIFACT_DELIMITER}{self.workspace}"
-        new_artifact_id = f"{base_artifact_id}{ARTIFACT_DELIMITER}{run_id}"
-        parent_id = base_artifact_id
 
         return self.model_copy(
             update={
-                "artifact_id": new_artifact_id,
-                "run_id": run_id,
-                "permissions": {self.workspace: permissions},
-                "parent_id": parent_id,
+                "_workspace": workspace or self._workspace,
+                "_run_id": run_id,
+                "workspace_permission": operation,
             }
         )

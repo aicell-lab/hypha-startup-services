@@ -1,6 +1,6 @@
 from typing import Any
 import logging
-from hypha_rpc.rpc import RemoteService
+from hypha_rpc.rpc import RemoteService, RemoteException
 from hypha_startup_services.mem0_service.utils.constants import ADMIN_WORKSPACES
 from hypha_startup_services.mem0_service.utils.models import (
     PermissionParams,
@@ -27,21 +27,19 @@ async def get_user_permissions(
     Raises:
         RemoteException: If there's a server communication error
     """
-    artifact = await get_artifact(server, permission_params.artifact_id)
-
-    # If artifact retrieval failed, return empty permissions
-    if "error" in artifact:
-        logger.warning(
-            "Failed to retrieve artifact %s for permission check",
-            permission_params.artifact_id,
+    try:
+        artifact = await get_artifact(server, permission_params.artifact_id)
+    except RemoteException as e:
+        logger.error(
+            "Failed to retrieve artifact %s: %s", permission_params.artifact_id, e
         )
         return {}
 
     permissions = artifact.get("config", {}).get("permissions", {})
-    return permissions.get(permission_params.accessor_ws, {})
+    return permissions.get(permission_params.accessor_workspace, {})
 
 
-async def is_user_in_artifact_permissions(
+async def user_has_operation_permission(
     server: RemoteService, permission_params: PermissionParams
 ) -> bool:
     """
@@ -62,6 +60,19 @@ async def is_user_in_artifact_permissions(
     return permission_params.operation in user_permissions
 
 
+def is_admin_workspace(workspace: str) -> bool:
+    """
+    Check if the given workspace is an admin workspace.
+
+    Args:
+        workspace: The workspace to check
+
+    Returns:
+        True if the workspace is an admin workspace, False otherwise
+    """
+    return workspace in ADMIN_WORKSPACES
+
+
 async def has_permission(
     server: RemoteService,
     permission_params: PermissionParams,
@@ -79,17 +90,18 @@ async def has_permission(
         True if the user has permission, False otherwise
     """
     # Admin workspaces have full access
-    if permission_params.accessor_ws in ADMIN_WORKSPACES:
+    if is_admin_workspace(permission_params.accessor_workspace):
         logger.debug(
-            "Granting permission to admin workspace: %s", permission_params.accessor_ws
+            "Granting permission to admin workspace: %s",
+            permission_params.accessor_workspace,
         )
         return True
 
     # Check artifact-specific permissions
-    if await is_user_in_artifact_permissions(server, permission_params):
+    if await user_has_operation_permission(server, permission_params):
         logger.debug(
             "Granting permission to workspace %s for operation %s on artifact %s",
-            permission_params.accessor_ws,
+            permission_params.accessor_workspace,
             permission_params.operation,
             permission_params.artifact_id,
         )
@@ -97,7 +109,7 @@ async def has_permission(
 
     logger.info(
         "Permission denied for workspace %s, operation %s on artifact %s",
-        permission_params.accessor_ws,
+        permission_params.accessor_workspace,
         permission_params.operation,
         permission_params.artifact_id,
     )
@@ -118,7 +130,7 @@ async def require_permission(
     if not await has_permission(server, permission_params):
         raise HyphaPermissionError(
             f"Permission denied for {permission_params.operation} operation "
-            f"on agent '{permission_params.agent_id}' in ws '{permission_params.accessed_ws}'",
+            f"on agent '{permission_params.agent_id}' in ws '{permission_params.accessed_workspace}'",
             permission_params,
         )
 
