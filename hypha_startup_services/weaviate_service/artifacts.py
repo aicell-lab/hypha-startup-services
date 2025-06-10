@@ -1,5 +1,8 @@
 from typing import Any
+import logging
 from hypha_rpc.rpc import RemoteException, RemoteService  # type: ignore
+
+logger = logging.getLogger(__name__)
 
 
 async def create_artifact(
@@ -32,7 +35,9 @@ async def create_artifact(
             config={"permissions": permissions},
         )
     except RemoteException as e:
-        print(f"Artifact couldn't be created. It likely already exists. Error: {e}")
+        logger.warning(
+            "Artifact couldn't be created. It likely already exists. Error: %s", e
+        )
 
 
 async def delete_artifact(
@@ -44,7 +49,7 @@ async def delete_artifact(
     try:
         await artifact_manager.delete(artifact_id=artifact_name, delete_files=True)
     except RemoteException as e:
-        print(f"Error deleting artifact. Error: {e}")
+        logger.error("Error deleting artifact. Error: %s", e)
 
 
 async def get_artifact(
@@ -58,7 +63,7 @@ async def get_artifact(
         artifact = await artifact_manager.read(artifact_id=artifact_name)
         return artifact
     except RemoteException as e:
-        print(f"Error getting artifact. Error: {e}")
+        logger.error("Error getting artifact. Error: %s", e)
         return {"error": str(e)}
 
 

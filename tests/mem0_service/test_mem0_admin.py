@@ -57,6 +57,19 @@ async def test_admin_access_to_other_users_memories(mem0_service, mem0_service2)
 @pytest.mark.asyncio
 async def test_admin_workspace_isolation(mem0_service, mem0_service2):
     """Test that memories are properly isolated between workspaces."""
+    # Initialize agents for each user
+    await mem0_service.init(
+        agent_id=TEST_AGENT_ID,
+        workspace=USER1_WS,
+        description="User 1's agent for workspace isolation test",
+    )
+
+    await mem0_service2.init(
+        agent_id=TEST_AGENT_ID,
+        workspace=USER2_WS,
+        description="User 2's agent for workspace isolation test",
+    )
+
     # User 1 (admin) adds memories in their workspace
     await mem0_service.add(
         messages=TEST_MESSAGES,
@@ -98,6 +111,7 @@ async def test_admin_run_initialization_for_other_users(mem0_service):
     # Admin can initialize runs for any agent
     await mem0_service.init(
         agent_id=TEST_AGENT_ID2,
+        workspace=USER2_WS,
         run_id=TEST_RUN_ID,
         description="Admin-initialized run for another agent",
         metadata={"initialized_by": "admin", "target_agent": TEST_AGENT_ID2},
@@ -107,7 +121,7 @@ async def test_admin_run_initialization_for_other_users(mem0_service):
     await mem0_service.add(
         messages=TEST_MESSAGES,
         agent_id=TEST_AGENT_ID2,
-        workspace=USER1_WS,  # Admin's workspace
+        workspace=USER2_WS,
         run_id=TEST_RUN_ID,
     )
 
@@ -115,6 +129,19 @@ async def test_admin_run_initialization_for_other_users(mem0_service):
 @pytest.mark.asyncio
 async def test_cross_agent_memory_isolation(mem0_service):
     """Test that memories are isolated between different agents."""
+    # Initialize agents
+    await mem0_service.init(
+        agent_id=TEST_AGENT_ID,
+        workspace=USER1_WS,
+        description="Agent 1 for cross-agent isolation test",
+    )
+
+    await mem0_service.init(
+        agent_id=TEST_AGENT_ID2,
+        workspace=USER1_WS,
+        description="Agent 2 for cross-agent isolation test",
+    )
+
     # Add memories for agent 1
     await mem0_service.add(
         messages=TEST_MESSAGES,
@@ -153,6 +180,21 @@ async def test_run_id_isolation(mem0_service):
     """Test that memories are properly isolated by run ID."""
     run_id_1 = f"{TEST_RUN_ID}-1"
     run_id_2 = f"{TEST_RUN_ID}-2"
+
+    # Initialize runs
+    await mem0_service.init(
+        agent_id=TEST_AGENT_ID,
+        workspace=USER1_WS,
+        run_id=run_id_1,
+        description="Run 1 for run ID isolation test",
+    )
+
+    await mem0_service.init(
+        agent_id=TEST_AGENT_ID,
+        workspace=USER1_WS,
+        run_id=run_id_2,
+        description="Run 2 for run ID isolation test",
+    )
 
     # Add memories to first run
     await mem0_service.add(

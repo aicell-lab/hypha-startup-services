@@ -15,6 +15,14 @@ from tests.conftest import USER1_WS
 @pytest.mark.asyncio
 async def test_memory_persistence_across_operations(mem0_service):
     """Test that memories persist across multiple operations."""
+    # Initialize agent and run
+    await mem0_service.init(
+        agent_id=TEST_AGENT_ID,
+        workspace=USER1_WS,
+        run_id=TEST_RUN_ID,
+        description="Test agent for memory persistence",
+    )
+
     # Add initial memories
     await mem0_service.add(
         messages=TEST_MESSAGES,
@@ -57,6 +65,13 @@ async def test_memory_persistence_across_operations(mem0_service):
 @pytest.mark.asyncio
 async def test_large_message_content(mem0_service):
     """Test handling of large message content."""
+    # Initialize agent
+    await mem0_service.init(
+        agent_id=TEST_AGENT_ID,
+        workspace=USER1_WS,
+        description="Test agent for large message content",
+    )
+
     large_content = "This is a very long message. " * 1000  # ~30KB message
 
     large_messages = [
@@ -87,6 +102,13 @@ async def test_large_message_content(mem0_service):
 @pytest.mark.asyncio
 async def test_special_characters_in_content(mem0_service):
     """Test handling of special characters and Unicode in message content."""
+    # Initialize agent
+    await mem0_service.init(
+        agent_id=TEST_AGENT_ID,
+        workspace=USER1_WS,
+        description="Test agent for special characters",
+    )
+
     special_messages = [
         {
             "role": "user",
@@ -118,6 +140,21 @@ async def test_special_characters_in_content(mem0_service):
 async def test_multiple_agents_same_run(mem0_service):
     """Test multiple agents sharing the same run ID."""
     shared_run_id = f"{TEST_RUN_ID}-shared"
+
+    # Initialize both agents with the same run ID
+    await mem0_service.init(
+        agent_id=TEST_AGENT_ID,
+        workspace=USER1_WS,
+        run_id=shared_run_id,
+        description="Agent 1 for shared run test",
+    )
+
+    await mem0_service.init(
+        agent_id=TEST_AGENT_ID2,
+        workspace=USER1_WS,
+        run_id=shared_run_id,
+        description="Agent 2 for shared run test",
+    )
 
     # Agent 1 adds memories
     await mem0_service.add(
@@ -161,6 +198,7 @@ async def test_search_with_metadata_context(mem0_service):
     await mem0_service.init(
         agent_id=TEST_AGENT_ID,
         run_id=TEST_RUN_ID,
+        workspace=USER1_WS,
         description="Test run with metadata",
         metadata={
             "user_preferences": "sci-fi movies",
@@ -191,10 +229,23 @@ async def test_search_with_metadata_context(mem0_service):
 @pytest.mark.asyncio
 async def test_rapid_sequential_operations(mem0_service):
     """Test rapid sequential add and search operations."""
-    agent_id = f"{TEST_AGENT_ID}-rapid"
+    # Initialize the agent
+    await mem0_service.init(
+        agent_id=TEST_AGENT_ID,
+        workspace=USER1_WS,
+        description="Test agent for rapid sequential operations",
+    )
 
     # Rapidly add multiple memory sets
     for i in range(5):
+        # Initialize each run
+        await mem0_service.init(
+            agent_id=TEST_AGENT_ID,
+            workspace=USER1_WS,
+            run_id=f"{TEST_RUN_ID}-{i}",
+            description=f"Rapid test run {i}",
+        )
+
         messages = [
             {
                 "role": "user",
@@ -204,7 +255,7 @@ async def test_rapid_sequential_operations(mem0_service):
 
         await mem0_service.add(
             messages=messages,
-            agent_id=agent_id,
+            agent_id=TEST_AGENT_ID,
             workspace=USER1_WS,
             run_id=f"{TEST_RUN_ID}-{i}",
         )
@@ -213,7 +264,7 @@ async def test_rapid_sequential_operations(mem0_service):
     for i in range(3):
         result = await mem0_service.search(
             query="rapid test movies",
-            agent_id=agent_id,
+            agent_id=TEST_AGENT_ID,
             workspace=USER1_WS,
         )
 
@@ -226,6 +277,21 @@ async def test_cross_run_search_isolation(mem0_service):
     """Test that searches are properly isolated by run ID when specified."""
     run_1 = f"{TEST_RUN_ID}-isolation-1"
     run_2 = f"{TEST_RUN_ID}-isolation-2"
+
+    # Initialize both runs
+    await mem0_service.init(
+        agent_id=TEST_AGENT_ID,
+        workspace=USER1_WS,
+        run_id=run_1,
+        description="Run 1 for search isolation test",
+    )
+
+    await mem0_service.init(
+        agent_id=TEST_AGENT_ID,
+        workspace=USER1_WS,
+        run_id=run_2,
+        description="Run 2 for search isolation test",
+    )
 
     # Add distinct memories to each run
     run1_messages = [
@@ -276,6 +342,13 @@ async def test_cross_run_search_isolation(mem0_service):
 @pytest.mark.asyncio
 async def test_memory_search_ranking(mem0_service):
     """Test that search results are properly ranked by relevance."""
+    # Initialize agent
+    await mem0_service.init(
+        agent_id=TEST_AGENT_ID,
+        workspace=USER1_WS,
+        description="Test agent for search ranking",
+    )
+
     # Add memories with varying relevance to a search query
     highly_relevant = [
         {

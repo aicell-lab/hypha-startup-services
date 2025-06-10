@@ -134,12 +134,14 @@ async def test_multi_user_same_agent_different_runs(mem0_service, mem0_service2)
     await mem0_service.init(
         agent_id=TEST_AGENT_ID,
         run_id=run_id_1,
+        workspace=USER1_WS,
         description="User 1's run",
     )
 
     await mem0_service2.init(
         agent_id=TEST_AGENT_ID,
         run_id=run_id_2,
+        workspace=USER2_WS,
         description="User 2's run",
     )
 
@@ -181,6 +183,18 @@ async def test_multi_user_same_agent_different_runs(mem0_service, mem0_service2)
 @pytest.mark.asyncio
 async def test_concurrent_memory_operations(mem0_service, mem0_service2):
     """Test concurrent memory operations from different users."""
+    # Initialize agents for both users
+    await mem0_service.init(
+        agent_id=TEST_AGENT_ID,
+        workspace=USER1_WS,
+        description="User 1's agent for concurrent operations test",
+    )
+
+    await mem0_service2.init(
+        agent_id=TEST_AGENT_ID,
+        workspace=USER2_WS,
+        description="User 2's agent for concurrent operations test",
+    )
 
     # Define different message sets for each user
     user1_messages = [
@@ -243,6 +257,7 @@ async def test_user_initialization_permissions(mem0_service2):
     await mem0_service2.init(
         agent_id=TEST_AGENT_ID2,
         run_id=TEST_RUN_ID,
+        workspace=USER2_WS,
         description="User 2's initialized run",
         metadata={"user": "user2", "permission_test": True},
     )
@@ -259,6 +274,13 @@ async def test_user_initialization_permissions(mem0_service2):
 @pytest.mark.asyncio
 async def test_workspace_validation(mem0_service):
     """Test that workspace parameter validation works correctly."""
+    # Initialize agent for valid operations first
+    await mem0_service.init(
+        agent_id=TEST_AGENT_ID,
+        workspace=USER1_WS,
+        description="Test agent for workspace validation",
+    )
+
     # Test with invalid workspace format
     with pytest.raises((RemoteException, PermissionError, ValueError)):
         await mem0_service.add(

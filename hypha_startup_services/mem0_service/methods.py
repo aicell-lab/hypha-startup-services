@@ -1,7 +1,10 @@
 from typing import Any
 from mem0 import AsyncMemory
 from hypha_rpc.rpc import RemoteService
-from hypha_startup_services.mem0_service.artifact import create_artifact
+from hypha_startup_services.mem0_service.artifact import (
+    create_artifact,
+    artifact_exists,
+)
 from hypha_startup_services.mem0_service.permissions import require_permission
 from hypha_startup_services.mem0_service.utils.models import (
     PermissionParams,
@@ -49,7 +52,7 @@ async def init_agent(
 
 async def init_run(
     agent_id: str,
-    workspace: str,
+    workspace: str | None = None,
     run_id: str | None = None,
     *,
     description: str | None = None,
@@ -83,7 +86,17 @@ async def init_run(
         artifact_type="collection",
     )
 
+    if workspace is None:
+        workspace = accessor_ws
+
     workspace_artifact_params = agent_artifact_params.for_workspace(workspace)
+
+    parent_id = agent_artifact_params.artifact_id
+    assert parent_id is not None and await artifact_exists(
+        server=server,
+        artifact_id=parent_id,
+    ), "Please call init_agent() before initializing workspace agent."
+
     await create_artifact(
         server=server,
         artifact_params=workspace_artifact_params,
@@ -100,7 +113,7 @@ async def init_run(
 async def mem0_add(
     messages: Any,
     agent_id: str,
-    workspace: str,
+    workspace: str | None = None,
     *,
     server: RemoteService,
     memory: AsyncMemory,
@@ -128,6 +141,9 @@ async def mem0_add(
 
     accessor_ws = ws_from_context(context)
 
+    if workspace is None:
+        workspace = accessor_ws
+
     permission_params = PermissionParams(
         agent_id=agent_id,
         accessed_workspace=workspace,
@@ -135,6 +151,11 @@ async def mem0_add(
         run_id=run_id,
         operation="rw",
     )
+
+    assert await artifact_exists(
+        server=server,
+        artifact_id=permission_params.artifact_id,
+    ), "Please call init() before adding memories."
 
     await require_permission(server, permission_params)
 
@@ -146,7 +167,7 @@ async def mem0_add(
 async def mem0_search(
     query: str,
     agent_id: str,
-    workspace: str,
+    workspace: str | None = None,
     *,
     server: RemoteService,
     memory: AsyncMemory,
@@ -178,6 +199,9 @@ async def mem0_search(
     """
     accessor_ws = ws_from_context(context)
 
+    if workspace is None:
+        workspace = accessor_ws
+
     permission_params = PermissionParams(
         agent_id=agent_id,
         accessed_workspace=workspace,
@@ -185,6 +209,11 @@ async def mem0_search(
         run_id=run_id,
         operation="r",
     )
+
+    assert await artifact_exists(
+        server=server,
+        artifact_id=permission_params.artifact_id,
+    ), "Please call init() before adding memories."
 
     await require_permission(server, permission_params)
 

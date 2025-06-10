@@ -43,7 +43,7 @@ class TestInitAgent:
             artifact_params = call_args[1]["artifact_params"]
             assert artifact_params.agent_id == TEST_AGENT_ID
             assert artifact_params.creator_id == USER1_WS
-            assert artifact_params.operation == "r"
+            assert artifact_params.general_permission == "r"
             assert artifact_params.desc == "Test agent"
             assert artifact_params.metadata == {"test": True}
             assert artifact_params.artifact_type == "collection"
@@ -143,8 +143,11 @@ class TestInitRun:
                 context=context,
             )
 
-            # Should not be called when run_id is None
-            mock_create.assert_not_called()
+            # Should be called once only for workspace artifact when run_id is None
+            mock_create.assert_called_once()
+            workspace_params = mock_create.call_args[1]["artifact_params"]
+            assert TEST_AGENT_ID in workspace_params.artifact_id
+            assert USER2_WS in workspace_params.artifact_id
 
     @pytest.mark.asyncio
     async def test_init_run_minimal_params(self):
@@ -346,9 +349,7 @@ class TestMem0Search:
         mock_memory.search.return_value = {"results": []}
         context = {"user": {"scope": {"current_workspace": USER1_WS}}}
 
-        with patch(
-            "hypha_startup_services.mem0_service.methods.require_permission"
-        ) as mock_require:
+        with patch("hypha_startup_services.mem0_service.methods.require_permission"):
             result = await mem0_search(
                 query="nonexistent query",
                 agent_id=TEST_AGENT_ID,

@@ -14,6 +14,13 @@ from tests.conftest import USER1_WS
 @pytest.mark.asyncio
 async def test_mem0_add_basic(mem0_service):
     """Test basic memory addition functionality."""
+    # Initialize agent and workspace
+    await mem0_service.init(
+        agent_id=TEST_AGENT_ID,
+        workspace=USER1_WS,
+        description="Test agent for basic memory addition",
+    )
+
     # Add a memory
     await mem0_service.add(
         messages=TEST_MESSAGES,
@@ -37,6 +44,14 @@ async def test_mem0_add_basic(mem0_service):
 @pytest.mark.asyncio
 async def test_mem0_add_with_run_id(mem0_service):
     """Test memory addition with a specific run ID."""
+    # Initialize agent, workspace, and run
+    await mem0_service.init(
+        agent_id=TEST_AGENT_ID,
+        workspace=USER1_WS,
+        run_id=TEST_RUN_ID,
+        description="Test run for memory addition with run ID",
+    )
+
     # Add a memory with run ID
     await mem0_service.add(
         messages=TEST_MESSAGES,
@@ -60,6 +75,13 @@ async def test_mem0_add_with_run_id(mem0_service):
 @pytest.mark.asyncio
 async def test_mem0_search_basic(mem0_service):
     """Test basic memory search functionality."""
+    # Initialize agent and workspace
+    await mem0_service.init(
+        agent_id=TEST_AGENT_ID,
+        workspace=USER1_WS,
+        description="Test agent for basic memory search",
+    )
+
     # First add some memories
     await mem0_service.add(
         messages=TEST_MESSAGES,
@@ -87,6 +109,7 @@ async def test_mem0_init_run(mem0_service):
     await mem0_service.init(
         agent_id=TEST_AGENT_ID,
         run_id=TEST_RUN_ID,
+        workspace=USER1_WS,
         description="Test run for mem0 service",
         metadata={"test": True, "environment": "pytest"},
     )
@@ -140,9 +163,21 @@ async def test_mem0_search_permission_error(mem0_service2):
 @pytest.mark.asyncio
 async def test_mem0_empty_search_results(mem0_service):
     """Test searching with a query that should return no results."""
+    # Initialize agent and workspace
+    await mem0_service.init_agent(
+        agent_id=f"{TEST_AGENT_ID}-empty-search",
+        description="Test agent for empty search results",
+    )
+
+    await mem0_service.init(
+        agent_id=f"{TEST_AGENT_ID}-empty-search",
+        workspace=USER1_WS,
+        description="Test agent for empty search results",
+    )
+
     result = await mem0_service.search(
         query="extremely specific query that should not match anything xyzabc123",
-        agent_id=TEST_AGENT_ID,
+        agent_id=f"{TEST_AGENT_ID}-empty-search",
         workspace=USER1_WS,
     )
 

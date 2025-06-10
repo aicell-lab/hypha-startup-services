@@ -8,6 +8,7 @@ from tests.mem0_service.utils import (
     TEST_MESSAGES,
 )
 from tests.conftest import USER1_WS, USER2_WS
+import asyncio
 
 
 @pytest.mark.asyncio
@@ -125,6 +126,7 @@ async def test_artifact_permission_validation(mem0_service):
     await mem0_service.init(
         agent_id=TEST_AGENT_ID,
         run_id=TEST_RUN_ID,
+        workspace=USER1_WS,
         description="Test artifact permissions",
     )
 
@@ -150,6 +152,13 @@ async def test_artifact_permission_validation(mem0_service):
 @pytest.mark.asyncio
 async def test_malformed_search_query(mem0_service):
     """Test handling of malformed search queries."""
+    # Initialize agent first
+    await mem0_service.init(
+        agent_id=TEST_AGENT_ID,
+        workspace=USER1_WS,
+        description="Test agent for malformed search queries",
+    )
+
     # First add some valid memories
     await mem0_service.add(
         messages=TEST_MESSAGES,
@@ -185,7 +194,19 @@ async def test_malformed_search_query(mem0_service):
 @pytest.mark.asyncio
 async def test_concurrent_permission_checks(mem0_service, mem0_service2):
     """Test that permission checks work correctly under concurrent access."""
-    import asyncio
+
+    # Initialize agents for both users first
+    await mem0_service.init(
+        agent_id=TEST_AGENT_ID,
+        workspace=USER1_WS,
+        description="User 1's agent for concurrent permission test",
+    )
+
+    await mem0_service2.init(
+        agent_id=TEST_AGENT_ID,
+        workspace=USER2_WS,
+        description="User 2's agent for concurrent permission test",
+    )
 
     # Create multiple concurrent operations with different permission contexts
     tasks = []
@@ -228,6 +249,13 @@ async def test_concurrent_permission_checks(mem0_service, mem0_service2):
 @pytest.mark.asyncio
 async def test_service_error_recovery(mem0_service):
     """Test that the service can recover from errors."""
+    # Initialize agent for valid operations
+    await mem0_service.init(
+        agent_id=TEST_AGENT_ID,
+        workspace=USER1_WS,
+        description="Test agent for error recovery",
+    )
+
     # Try an operation that might fail
     try:
         await mem0_service.add(

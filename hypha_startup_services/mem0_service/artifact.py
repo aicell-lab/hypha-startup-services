@@ -50,7 +50,7 @@ async def create_artifact(
 
     await artifact_manager.create(**artifact_params.creation_dict)
     logger.info(
-        "Artifact created: %s with params: %s",
+        "Artifact created: '%s' with params: %s",
         artifact_params.artifact_id,
         artifact_params.creation_dict,
     )
@@ -65,7 +65,7 @@ async def delete_artifact(
     try:
         await artifact_manager.delete(artifact_id=artifact_id, delete_files=True)
     except RemoteException as e:
-        logger.warning("Error deleting artifact. Error: %s", e)
+        logger.warning("Error deleting artifact '%s'. Error: %s", artifact_id, e)
 
 
 async def artifact_exists(
@@ -74,27 +74,12 @@ async def artifact_exists(
 ) -> bool:
     """Check if an artifact exists."""
 
-    # artifact_manager = await server.get_service("public/artifact-manager")
-    # try:
-    #     await artifact_manager.delete(
-    #         artifact_id=artifact_id, delete_files=True
-    #     )
-    #     return True
-    # except RemoteException:
-    #     return True
-    # raise NotImplementedError(
-    #     "The artifact_exists function is not implemented yet. "
-    #     "Please implement it to check if an artifact exists."
-    # )
-
     try:
         await get_artifact(
             server=server,
             artifact_id=artifact_id,
         )
-        # artifact_manager = await server.get_service("public/artifact-manager")
-        # await artifact_manager.delete(artifact_id=artifact_id, delete_files=True)
         return True
     except RemoteException:
-        logger.warning("Artifact %s does not exist.", artifact_id)
+        logger.warning("Artifact '%s' does not exist.", artifact_id)
         return False

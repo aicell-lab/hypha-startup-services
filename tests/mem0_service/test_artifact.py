@@ -50,17 +50,12 @@ class TestGetArtifact:
         error_message = "Artifact not found"
         mock_artifact_manager.read.side_effect = RemoteException(error_message)
 
-        with patch(
-            "hypha_startup_services.mem0_service.artifact.logger"
-        ) as mock_logger:
-            result = await get_artifact(mock_server, "nonexistent-artifact")
-
-            assert result == {"error": error_message}
-            mock_logger.error.assert_called_once_with(
-                "Error getting artifact %s: %s",
-                "nonexistent-artifact",
-                mock_artifact_manager.read.side_effect,
-            )
+        with patch("hypha_startup_services.mem0_service.artifact.logger"):
+            try:
+                await get_artifact(mock_server, "nonexistent-artifact")
+                assert False, "Expected RemoteException to be raised"
+            except RemoteException:
+                pass
 
     @pytest.mark.asyncio
     async def test_get_artifact_server_error(self):
@@ -147,15 +142,12 @@ class TestCreateArtifact:
         ) as mock_exists:
             mock_exists.return_value = False
 
-            with patch(
-                "hypha_startup_services.mem0_service.artifact.logger"
-            ) as mock_logger:
-                await create_artifact(mock_server, sample_artifact_params)
-
-                mock_logger.error.assert_called_once_with(
-                    "Artifact couldn't be created. It likely already exists. Error: %s",
-                    mock_artifact_manager.create.side_effect,
-                )
+            with patch("hypha_startup_services.mem0_service.artifact.logger"):
+                try:
+                    await create_artifact(mock_server, sample_artifact_params)
+                    assert False, "Expected RemoteException to be raised"
+                except RemoteException:
+                    pass
 
 
 class TestDeleteArtifact:
@@ -190,7 +182,7 @@ class TestDeleteArtifact:
         ) as mock_logger:
             await delete_artifact(mock_server, "test-artifact-123")
 
-            mock_logger.error.assert_called_once_with(
+            mock_logger.warning.assert_called_once_with(
                 "Error deleting artifact. Error: %s",
                 mock_artifact_manager.delete.side_effect,
             )
@@ -233,7 +225,7 @@ class TestArtifactExists:
         with patch(
             "hypha_startup_services.mem0_service.artifact.get_artifact"
         ) as mock_get:
-            mock_get.return_value = {"error": "Artifact not found"}
+            mock_get.side_effect = RemoteException("Artifact not found")
 
             result = await artifact_exists(mock_server, "nonexistent-artifact")
 
@@ -278,7 +270,7 @@ class TestIntegration:
             "hypha_startup_services.mem0_service.artifact.get_artifact"
         ) as mock_get:
             mock_get.side_effect = [
-                {"error": "Not found"},  # First call - doesn't exist
+                RemoteException("Artifact not found"),  # First call - throws exception
                 {
                     "id": artifact_params.artifact_id,
                     "name": "Test",
@@ -308,7 +300,9 @@ class TestIntegration:
         ) as mock_get:
             mock_get.side_effect = [
                 {"id": artifact_id, "name": "Test"},  # First call - exists
-                {"error": "Not found"},  # Second call - doesn't exist after deletion
+                RemoteException(
+                    "Artifact not found"
+                ),  # Second call - doesn't exist after deletion
             ]
 
             # Check it exists first
