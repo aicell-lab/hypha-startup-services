@@ -1,5 +1,6 @@
 """Data structures and indexing for EBI nodes and technologies."""
 
+import os
 from typing import Dict, List, Any, Set
 import json
 import logging
@@ -86,14 +87,10 @@ class BioimageIndex:
 
     def load_data(
         self,
-        nodes_data: List[Dict[str, Any]] | None = None,
-        technologies_data: List[Dict[str, Any]] | None = None,
+        nodes_data: List[Dict[str, Any]],
+        technologies_data: List[Dict[str, Any]],
     ):
         """Load and index the EBI data."""
-        if nodes_data is None:
-            nodes_data = EBI_NODES_DATA
-        if technologies_data is None:
-            technologies_data = EBI_TECHNOLOGIES_DATA
 
         # Index technologies
         for tech in technologies_data:
@@ -232,8 +229,6 @@ def load_external_data(
     nodes_file: str | None = None, technologies_file: str | None = None
 ) -> BioimageIndex:
     """Load data from external JSON files."""
-    import os
-
     # Default to assets directory if no files specified
     if nodes_file is None:
         nodes_file = os.path.join(os.path.dirname(__file__), "assets", "ebi-nodes.json")
