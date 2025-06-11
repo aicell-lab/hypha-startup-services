@@ -24,12 +24,16 @@ async def test_memory_persistence_across_operations(mem0_service):
     )
 
     # Add initial memories
-    await mem0_service.add(
+    add_result1 = await mem0_service.add(
         messages=TEST_MESSAGES,
         agent_id=TEST_AGENT_ID,
         workspace=USER1_WS,
         run_id=TEST_RUN_ID,
     )
+
+    # Check that memories were actually added
+    assert add_result1 is not None and "results" in add_result1
+    assert len(add_result1["results"]) > 0, "No initial memories were added"
 
     # Add more memories to the same agent/run
     additional_messages = [
@@ -43,12 +47,16 @@ async def test_memory_persistence_across_operations(mem0_service):
         },
     ]
 
-    await mem0_service.add(
+    add_result2 = await mem0_service.add(
         messages=additional_messages,
         agent_id=TEST_AGENT_ID,
         workspace=USER1_WS,
         run_id=TEST_RUN_ID,
     )
+
+    # Check that additional memories were actually added
+    assert add_result2 is not None and "results" in add_result2
+    assert len(add_result2["results"]) > 0, "No additional memories were added"
 
     # Search should find content from both additions
     result = await mem0_service.search(
@@ -83,12 +91,15 @@ async def test_large_message_content(mem0_service):
     ]
 
     # Should handle large content gracefully
-    await mem0_service.add(
+    add_result = await mem0_service.add(
         messages=large_messages,
         agent_id=TEST_AGENT_ID,
         workspace=USER1_WS,
     )
 
+    # Check that memories were actually added
+    assert add_result is not None and "results" in add_result
+    assert len(add_result["results"]) > 0, "No memories were added to the service"
     # Should be able to search in large content
     result = await mem0_service.search(
         query="long message",
@@ -120,12 +131,15 @@ async def test_special_characters_in_content(mem0_service):
         },
     ]
 
-    await mem0_service.add(
+    add_result = await mem0_service.add(
         messages=special_messages,
         agent_id=TEST_AGENT_ID,
         workspace=USER1_WS,
     )
 
+    # Check that memories were actually added
+    assert add_result is not None and "results" in add_result
+    assert len(add_result["results"]) > 0, "No memories were added to the service"
     # Search with Unicode characters
     result = await mem0_service.search(
         query="émojis and special characters",
@@ -157,21 +171,27 @@ async def test_multiple_agents_same_run(mem0_service):
     )
 
     # Agent 1 adds memories
-    await mem0_service.add(
+    add_result = await mem0_service.add(
         messages=TEST_MESSAGES,
         agent_id=TEST_AGENT_ID,
         workspace=USER1_WS,
         run_id=shared_run_id,
     )
 
+    # Check that memories were actually added
+    assert add_result is not None and "results" in add_result
+    assert len(add_result["results"]) > 0, "No memories were added to the service"
     # Agent 2 adds different memories with same run ID
-    await mem0_service.add(
+    add_result = await mem0_service.add(
         messages=TEST_MESSAGES2,
         agent_id=TEST_AGENT_ID2,
         workspace=USER1_WS,
         run_id=shared_run_id,
     )
 
+    # Check that memories were actually added
+    assert add_result is not None and "results" in add_result
+    assert len(add_result["results"]) > 0, "No memories were added to the service"
     # Search for each agent should return their specific memories
     agent1_results = await mem0_service.search(
         query=SEARCH_QUERY_MOVIES,
@@ -208,13 +228,16 @@ async def test_search_with_metadata_context(mem0_service):
     )
 
     # Add memories with the initialized context
-    await mem0_service.add(
+    add_result = await mem0_service.add(
         messages=TEST_MESSAGES,
         agent_id=TEST_AGENT_ID,
         workspace=USER1_WS,
         run_id=TEST_RUN_ID,
     )
 
+    # Check that memories were actually added
+    assert add_result is not None and "results" in add_result
+    assert len(add_result["results"]) > 0, "No memories were added to the service"
     # Search should work with the metadata context
     result = await mem0_service.search(
         query=SEARCH_QUERY_MOVIES,
@@ -253,13 +276,16 @@ async def test_rapid_sequential_operations(mem0_service):
             }
         ]
 
-        await mem0_service.add(
+        add_result = await mem0_service.add(
             messages=messages,
             agent_id=TEST_AGENT_ID,
             workspace=USER1_WS,
             run_id=f"{TEST_RUN_ID}-{i}",
         )
 
+        # Check that memories were actually added
+        assert add_result is not None and "results" in add_result
+        assert len(add_result["results"]) > 0, "No memories were added to the service"
     # Rapidly search multiple times
     for i in range(3):
         result = await mem0_service.search(
@@ -305,20 +331,23 @@ async def test_cross_run_search_isolation(mem0_service):
         }
     ]
 
-    await mem0_service.add(
+    add_result = await mem0_service.add(
         messages=run1_messages,
         agent_id=TEST_AGENT_ID,
         workspace=USER1_WS,
         run_id=run_1,
     )
 
-    await mem0_service.add(
+    add_result = await mem0_service.add(
         messages=run2_messages,
         agent_id=TEST_AGENT_ID,
         workspace=USER1_WS,
         run_id=run_2,
     )
 
+    # Check that memories were actually added
+    assert add_result is not None and "results" in add_result
+    assert len(add_result["results"]) > 0, "No memories were added to the service"
     # Search within run 1 should only find run 1 content
     run1_results = await mem0_service.search(
         query="action movies",
@@ -367,12 +396,15 @@ async def test_memory_search_ranking(mem0_service):
 
     # Add all memories
     for messages in [highly_relevant, somewhat_relevant, barely_relevant]:
-        await mem0_service.add(
+        add_result = await mem0_service.add(
             messages=messages,
             agent_id=TEST_AGENT_ID,
             workspace=USER1_WS,
         )
 
+        # Check that memories were actually added
+        assert add_result is not None and "results" in add_result
+        assert len(add_result["results"]) > 0, "No memories were added to the service"
     # Search with a specific query
     result = await mem0_service.search(
         query="favorite science fiction movie",

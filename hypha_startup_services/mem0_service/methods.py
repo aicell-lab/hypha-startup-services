@@ -1,5 +1,6 @@
 from typing import Any
 from mem0 import AsyncMemory
+import logging
 from hypha_rpc.rpc import RemoteService
 from hypha_startup_services.mem0_service.artifact import (
     create_artifact,
@@ -11,6 +12,8 @@ from hypha_startup_services.mem0_service.utils.models import (
     AgentArtifactParams,
 )
 from hypha_startup_services.common.workspace_utils import ws_from_context
+
+logger = logging.getLogger(__name__)
 
 
 async def init_agent(
@@ -120,7 +123,7 @@ async def mem0_add(
     context: dict[str, Any],
     run_id: str | None = None,
     **kwargs,
-) -> None:
+) -> dict[str, Any] | list[Any]:
     """
     Add a new item to the memory service.
 
@@ -159,9 +162,11 @@ async def mem0_add(
 
     await require_permission(server, permission_params)
 
-    await memory.add(
+    add_result = await memory.add(
         messages, user_id=workspace, agent_id=agent_id, run_id=run_id, **kwargs
     )
+    logger.info("Added messages to memory: %s", add_result)
+    return add_result
 
 
 async def mem0_search(
@@ -217,10 +222,12 @@ async def mem0_search(
 
     await require_permission(server, permission_params)
 
-    return await memory.search(
+    results = await memory.search(
         query,
         user_id=workspace,
         agent_id=agent_id,
         run_id=run_id,
         **kwargs,
     )
+    logger.info("Search results for query '%s': %s", query, results)
+    return results

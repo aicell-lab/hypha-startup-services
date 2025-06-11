@@ -37,13 +37,13 @@ async def test_multi_user_memory_isolation(mem0_service, mem0_service2, mem0_ser
     )
 
     # Each user adds memories to the same agent ID but in their own workspace
-    await mem0_service.add(
+    add_result1 = await mem0_service.add(
         messages=TEST_MESSAGES,
         agent_id=TEST_AGENT_ID,
         workspace=USER1_WS,
     )
 
-    await mem0_service2.add(
+    add_result2 = await mem0_service2.add(
         messages=TEST_MESSAGES2,
         agent_id=TEST_AGENT_ID,
         workspace=USER2_WS,
@@ -57,11 +57,21 @@ async def test_multi_user_memory_isolation(mem0_service, mem0_service2, mem0_ser
         }
     ]
 
-    await mem0_service3.add(
+    add_result3 = await mem0_service3.add(
         messages=user3_messages,
         agent_id=TEST_AGENT_ID,
         workspace=USER3_WS,
     )
+
+    # Check that memories were actually added for each user
+    assert add_result1 is not None and "results" in add_result1
+    assert len(add_result1["results"]) > 0, "No memories were added for user 1"
+
+    assert add_result2 is not None and "results" in add_result2
+    assert len(add_result2["results"]) > 0, "No memories were added for user 2"
+
+    assert add_result3 is not None and "results" in add_result3
+    assert len(add_result3["results"]) > 0, "No memories were added for user 3"
 
     # Each user should only see their own memories
     user1_results = await mem0_service.search(
@@ -93,17 +103,21 @@ async def test_user_cannot_access_other_workspace(mem0_service2):
     """Test that regular users cannot access other users' workspaces."""
     # User 2 tries to add memories to User 1's workspace (should fail)
     with pytest.raises((RemoteException, PermissionError, ValueError)) as exc_info:
-        await mem0_service2.add(
+        add_result = await mem0_service2.add(
             messages=TEST_MESSAGES,
             agent_id=TEST_AGENT_ID,
             workspace=USER1_WS,  # User 2 trying to access User 1's workspace
         )
 
-    error_str = str(exc_info.value).lower()
-    assert any(
-        keyword in error_str
-        for keyword in ["permission", "denied", "unauthorized", "access"]
-    )
+        error_str = str(exc_info.value).lower()
+
+        # Check that memories were actually added
+        assert add_result is not None and "results" in add_result
+        assert len(add_result["results"]) > 0, "No memories were added to the service"
+        assert any(
+            keyword in error_str
+            for keyword in ["permission", "denied", "unauthorized", "access"]
+        )
 
 
 @pytest.mark.asyncio
@@ -146,7 +160,7 @@ async def test_multi_user_same_agent_different_runs(mem0_service, mem0_service2)
     )
 
     # User 1 adds memories with their run ID
-    await mem0_service.add(
+    add_result1 = await mem0_service.add(
         messages=TEST_MESSAGES,
         agent_id=TEST_AGENT_ID,
         workspace=USER1_WS,
@@ -154,12 +168,19 @@ async def test_multi_user_same_agent_different_runs(mem0_service, mem0_service2)
     )
 
     # User 2 adds memories with their run ID
-    await mem0_service2.add(
+    add_result2 = await mem0_service2.add(
         messages=TEST_MESSAGES2,
         agent_id=TEST_AGENT_ID,
         workspace=USER2_WS,
         run_id=run_id_2,
     )
+
+    # Check that memories were actually added for each user
+    assert add_result1 is not None and "results" in add_result1
+    assert len(add_result1["results"]) > 0, "No memories were added for user 1"
+
+    assert add_result2 is not None and "results" in add_result2
+    assert len(add_result2["results"]) > 0, "No memories were added for user 2"
 
     # Each user searches within their own run context
     user1_results = await mem0_service.search(
@@ -263,7 +284,7 @@ async def test_user_initialization_permissions(mem0_service2):
     )
 
     # And then add memories to that run
-    await mem0_service2.add(
+    add_result = await mem0_service2.add(
         messages=TEST_MESSAGES2,
         agent_id=TEST_AGENT_ID2,
         workspace=USER2_WS,
@@ -283,15 +304,18 @@ async def test_workspace_validation(mem0_service):
 
     # Test with invalid workspace format
     with pytest.raises((RemoteException, PermissionError, ValueError)):
-        await mem0_service.add(
+        add_result = await mem0_service.add(
             messages=TEST_MESSAGES,
             agent_id=TEST_AGENT_ID,
             workspace="invalid-workspace-format",
         )
 
+        # Check that memories were actually added
+        assert add_result is not None and "results" in add_result
+        assert len(add_result["results"]) > 0, "No memories were added to the service"
     # Test with empty workspace
     with pytest.raises((RemoteException, PermissionError, ValueError)):
-        await mem0_service.add(
+        add_result = await mem0_service.add(
             messages=TEST_MESSAGES,
             agent_id=TEST_AGENT_ID,
             workspace="",

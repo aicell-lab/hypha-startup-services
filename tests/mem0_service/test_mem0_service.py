@@ -22,11 +22,19 @@ async def test_mem0_add_basic(mem0_service):
     )
 
     # Add a memory
-    await mem0_service.add(
+    add_result = await mem0_service.add(
         messages=TEST_MESSAGES,
         agent_id=TEST_AGENT_ID,
         workspace=USER1_WS,
     )
+
+    # Check that memories were actually added
+    assert add_result is not None and "results" in add_result
+    assert len(add_result["results"]) > 0, "No memories were added to the service"
+    # Check that memories were actually added
+    assert add_result is not None
+    assert "results" in add_result
+    assert len(add_result["results"]) > 0, "No memories were added to the service"
 
     # Search for the memory
     result = await mem0_service.search(
@@ -53,12 +61,20 @@ async def test_mem0_add_with_run_id(mem0_service):
     )
 
     # Add a memory with run ID
-    await mem0_service.add(
+    add_result = await mem0_service.add(
         messages=TEST_MESSAGES,
         agent_id=TEST_AGENT_ID,
         workspace=USER1_WS,
         run_id=TEST_RUN_ID,
     )
+
+    # Check that memories were actually added
+    assert add_result is not None and "results" in add_result
+    assert len(add_result["results"]) > 0, "No memories were added to the service"
+    # Check that memories were actually added
+    assert add_result is not None
+    assert "results" in add_result
+    assert len(add_result["results"]) > 0, "No memories were added to the service"
 
     # Search for the memory with run ID
     result = await mem0_service.search(
@@ -83,11 +99,19 @@ async def test_mem0_search_basic(mem0_service):
     )
 
     # First add some memories
-    await mem0_service.add(
+    add_result = await mem0_service.add(
         messages=TEST_MESSAGES,
         agent_id=TEST_AGENT_ID,
         workspace=USER1_WS,
     )
+
+    # Check that memories were actually added
+    assert add_result is not None and "results" in add_result
+    assert len(add_result["results"]) > 0, "No memories were added to the service"
+    # Check that memories were actually added
+    assert add_result is not None
+    assert "results" in add_result
+    assert len(add_result["results"]) > 0, "No memories were added to the service"
 
     # Search for memories
     result = await mem0_service.search(
@@ -116,12 +140,20 @@ async def test_mem0_init_run(mem0_service):
 
     # The init function should create artifacts but doesn't return anything
     # We can verify it worked by trying to add memories with this run
-    await mem0_service.add(
+    add_result = await mem0_service.add(
         messages=TEST_MESSAGES,
         agent_id=TEST_AGENT_ID,
         workspace=USER1_WS,
         run_id=TEST_RUN_ID,
     )
+
+    # Check that memories were actually added
+    assert add_result is not None and "results" in add_result
+    assert len(add_result["results"]) > 0, "No memories were added to the service"
+    # Check that memories were actually added
+    assert add_result is not None
+    assert "results" in add_result
+    assert len(add_result["results"]) > 0, "No memories were added to the service"
 
 
 @pytest.mark.asyncio
@@ -129,17 +161,21 @@ async def test_mem0_permission_error_wrong_workspace(mem0_service2):
     """Test that using wrong workspace raises permission error."""
     # Try to add memory with a workspace that doesn't match the user
     with pytest.raises((RemoteException, PermissionError, ValueError)) as exc_info:
-        await mem0_service2.add(
+        add_result = await mem0_service2.add(
             messages=TEST_MESSAGES,
             agent_id=TEST_AGENT_ID,
             workspace="ws-invalid-workspace",
         )
 
-    error_str = str(exc_info.value).lower()
-    assert any(
-        keyword in error_str
-        for keyword in ["permission", "denied", "unauthorized", "access"]
-    )
+        error_str = str(exc_info.value).lower()
+
+        # Check that memories were actually added
+        assert add_result is not None and "results" in add_result
+        assert len(add_result["results"]) > 0, "No memories were added to the service"
+        assert any(
+            keyword in error_str
+            for keyword in ["permission", "denied", "unauthorized", "access"]
+        )
 
 
 @pytest.mark.asyncio

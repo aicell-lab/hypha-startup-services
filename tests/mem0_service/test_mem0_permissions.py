@@ -27,7 +27,7 @@ async def test_invalid_agent_id_format(mem0_service):
             continue  # Skip None as it would cause typing errors
 
         with pytest.raises((RemoteException, ValueError, TypeError)):
-            await mem0_service.add(
+            add_result = await mem0_service.add(
                 messages=TEST_MESSAGES,
                 agent_id=invalid_id,
                 workspace=USER1_WS,
@@ -47,7 +47,7 @@ async def test_invalid_workspace_format(mem0_service):
 
     for invalid_ws in invalid_workspaces:
         with pytest.raises((RemoteException, ValueError, PermissionError)):
-            await mem0_service.add(
+            add_result = await mem0_service.add(
                 messages=TEST_MESSAGES,
                 agent_id=TEST_AGENT_ID,
                 workspace=invalid_ws,
@@ -66,7 +66,7 @@ async def test_invalid_run_id_format(mem0_service):
 
     for invalid_id in invalid_run_ids:
         with pytest.raises((RemoteException, ValueError)):
-            await mem0_service.add(
+            add_result = await mem0_service.add(
                 messages=TEST_MESSAGES,
                 agent_id=TEST_AGENT_ID,
                 workspace=USER1_WS,
@@ -86,14 +86,17 @@ async def test_empty_messages(mem0_service):
     ]
 
     for invalid_messages in invalid_message_sets:
-        # Some of these might be accepted depending on mem0's validation
-        # We test that the service handles them gracefully
         try:
-            await mem0_service.add(
+            add_result = await mem0_service.add(
                 messages=invalid_messages,
                 agent_id=TEST_AGENT_ID,
                 workspace=USER1_WS,
             )
+            # Check that memories were actually added
+            assert add_result is not None and "results" in add_result
+            assert (
+                len(add_result["results"]) > 0
+            ), "No memories were added to the service"
         except (RemoteException, ValueError, TypeError):
             # Expected for invalid formats
             pass
@@ -104,12 +107,15 @@ async def test_permission_denied_scenarios(mem0_service2):
     """Test various permission denied scenarios."""
     # Try to access another user's workspace
     with pytest.raises((RemoteException, PermissionError, ValueError)):
-        await mem0_service2.add(
+        add_result = await mem0_service2.add(
             messages=TEST_MESSAGES,
             agent_id=TEST_AGENT_ID,
             workspace=USER1_WS,  # User 2 accessing User 1's workspace
         )
 
+        # Check that memories were actually added
+        assert add_result is not None and "results" in add_result
+        assert len(add_result["results"]) > 0, "No memories were added to the service"
     # Try to search another user's workspace
     with pytest.raises((RemoteException, PermissionError, ValueError)):
         await mem0_service2.search(
@@ -131,13 +137,16 @@ async def test_artifact_permission_validation(mem0_service):
     )
 
     # Add memories (should work with proper permissions)
-    await mem0_service.add(
+    add_result = await mem0_service.add(
         messages=TEST_MESSAGES,
         agent_id=TEST_AGENT_ID,
         workspace=USER1_WS,
         run_id=TEST_RUN_ID,
     )
 
+    # Check that memories were actually added
+    assert add_result is not None and "results" in add_result
+    assert len(add_result["results"]) > 0, "No memories were added to the service"
     # Search memories (should work with proper permissions)
     result = await mem0_service.search(
         query="test query",
@@ -160,12 +169,15 @@ async def test_malformed_search_query(mem0_service):
     )
 
     # First add some valid memories
-    await mem0_service.add(
+    add_result = await mem0_service.add(
         messages=TEST_MESSAGES,
         agent_id=TEST_AGENT_ID,
         workspace=USER1_WS,
     )
 
+    # Check that memories were actually added
+    assert add_result is not None and "results" in add_result
+    assert len(add_result["results"]) > 0, "No memories were added to the service"
     # Test various query formats
     query_tests = [
         "",  # Empty query
@@ -258,21 +270,27 @@ async def test_service_error_recovery(mem0_service):
 
     # Try an operation that might fail
     try:
-        await mem0_service.add(
+        add_result = await mem0_service.add(
             messages=[],  # Empty messages might cause an error
             agent_id=TEST_AGENT_ID,
             workspace=USER1_WS,
         )
+        # Check that memories were actually added
+        assert add_result is not None and "results" in add_result
+        assert len(add_result["results"]) > 0, "No memories were added to the service"
     except (RemoteException, ValueError, TypeError):
         pass  # Expected to potentially fail
 
     # Service should still work for valid operations after an error
-    await mem0_service.add(
+    add_result = await mem0_service.add(
         messages=TEST_MESSAGES,
         agent_id=TEST_AGENT_ID,
         workspace=USER1_WS,
     )
 
+    # Check that memories were actually added
+    assert add_result is not None and "results" in add_result
+    assert len(add_result["results"]) > 0, "No memories were added to the service"
     result = await mem0_service.search(
         query="test recovery",
         agent_id=TEST_AGENT_ID,

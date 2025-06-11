@@ -28,13 +28,16 @@ async def test_admin_access_to_other_users_memories(mem0_service, mem0_service2)
         metadata={"test": True, "environment": "pytest"},
     )
 
-    await mem0_service2.add(
+    add_result = await mem0_service2.add(
         messages=TEST_MESSAGES2,
         agent_id=TEST_AGENT_ID2,
         workspace=USER2_WS,
         run_id=TEST_RUN_ID,
     )
 
+    # Check that memories were actually added
+    assert add_result is not None and "results" in add_result
+    assert len(add_result["results"]) > 0, "No memories were added to the service"
     # Admin (User 1) should be able to search User 2's memories by accessing their workspace
     # Note: Admin access to other workspaces depends on the permission model implementation
     try:
@@ -71,19 +74,25 @@ async def test_admin_workspace_isolation(mem0_service, mem0_service2):
     )
 
     # User 1 (admin) adds memories in their workspace
-    await mem0_service.add(
+    add_result = await mem0_service.add(
         messages=TEST_MESSAGES,
         agent_id=TEST_AGENT_ID,
         workspace=USER1_WS,
     )
 
+    # Check that memories were actually added
+    assert add_result is not None and "results" in add_result
+    assert len(add_result["results"]) > 0, "No memories were added to the service"
     # User 2 adds different memories in their workspace
-    await mem0_service2.add(
+    add_result = await mem0_service2.add(
         messages=TEST_MESSAGES2,
         agent_id=TEST_AGENT_ID,  # Same agent ID but different workspace
         workspace=USER2_WS,
     )
 
+    # Check that memories were actually added
+    assert add_result is not None and "results" in add_result
+    assert len(add_result["results"]) > 0, "No memories were added to the service"
     # User 1 searches their workspace
     user1_results = await mem0_service.search(
         query=SEARCH_QUERY_MOVIES,
@@ -118,7 +127,7 @@ async def test_admin_run_initialization_for_other_users(mem0_service):
     )
 
     # Should be able to add memories to this admin-initialized run
-    await mem0_service.add(
+    add_result = await mem0_service.add(
         messages=TEST_MESSAGES,
         agent_id=TEST_AGENT_ID2,
         workspace=USER2_WS,
@@ -129,7 +138,7 @@ async def test_admin_run_initialization_for_other_users(mem0_service):
 @pytest.mark.asyncio
 async def test_cross_agent_memory_isolation(mem0_service):
     """Test that memories are isolated between different agents."""
-    # Initialize agents
+
     await mem0_service.init(
         agent_id=TEST_AGENT_ID,
         workspace=USER1_WS,
@@ -143,19 +152,25 @@ async def test_cross_agent_memory_isolation(mem0_service):
     )
 
     # Add memories for agent 1
-    await mem0_service.add(
+    add_result = await mem0_service.add(
         messages=TEST_MESSAGES,
         agent_id=TEST_AGENT_ID,
         workspace=USER1_WS,
     )
 
+    # Check that memories were actually added
+    assert add_result is not None and "results" in add_result
+    assert len(add_result["results"]) > 0, "No memories were added to the service"
     # Add different memories for agent 2
-    await mem0_service.add(
+    add_result = await mem0_service.add(
         messages=TEST_MESSAGES2,
         agent_id=TEST_AGENT_ID2,
         workspace=USER1_WS,
     )
 
+    # Check that memories were actually added
+    assert add_result is not None and "results" in add_result
+    assert len(add_result["results"]) > 0, "No memories were added to the service"
     # Search for agent 1's memories
     agent1_results = await mem0_service.search(
         query=SEARCH_QUERY_MOVIES,
@@ -197,21 +212,27 @@ async def test_run_id_isolation(mem0_service):
     )
 
     # Add memories to first run
-    await mem0_service.add(
+    add_result = await mem0_service.add(
         messages=TEST_MESSAGES,
         agent_id=TEST_AGENT_ID,
         workspace=USER1_WS,
         run_id=run_id_1,
     )
 
+    # Check that memories were actually added
+    assert add_result is not None and "results" in add_result
+    assert len(add_result["results"]) > 0, "No memories were added to the service"
     # Add different memories to second run
-    await mem0_service.add(
+    add_result = await mem0_service.add(
         messages=TEST_MESSAGES2,
         agent_id=TEST_AGENT_ID,
         workspace=USER1_WS,
         run_id=run_id_2,
     )
 
+    # Check that memories were actually added
+    assert add_result is not None and "results" in add_result
+    assert len(add_result["results"]) > 0, "No memories were added to the service"
     # Search within first run
     run1_results = await mem0_service.search(
         query=SEARCH_QUERY_MOVIES,
