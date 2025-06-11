@@ -1,11 +1,6 @@
 """Tests for the BioImage service."""
 
 import pytest
-from hypha_startup_services.bioimage_service.data_index import (
-    BioimageIndex,
-    EBI_NODES_DATA,
-    EBI_TECHNOLOGIES_DATA,
-)
 from hypha_startup_services.bioimage_service.methods import (
     get_nodes_by_technology_id,
     get_technologies_by_node_id,
@@ -17,11 +12,17 @@ from hypha_startup_services.bioimage_service.methods import (
     get_all_technologies,
     get_service_statistics,
 )
+from hypha_startup_services.bioimage_service.data_index import (
+    BioimageIndex,
+    EBI_NODES_DATA,
+    EBI_TECHNOLOGIES_DATA,
+)
 
 
 @pytest.fixture
 def bioimage_index():
     """Create a fresh bioimage index for testing."""
+
     index = BioimageIndex()
     index.load_data(EBI_NODES_DATA, EBI_TECHNOLOGIES_DATA)
     return index
@@ -48,10 +49,12 @@ async def test_bioimage_index_basic_functionality(bioimage_index):
 
 
 @pytest.mark.asyncio
-async def test_get_nodes_by_technology_id():
+async def test_get_nodes_by_technology_id(bioimage_index):
     """Test getting nodes by technology ID."""
     # Test with known technology ID
-    result = await get_nodes_by_technology_id("f0acc857-fc72-4094-bf14-c36ac40801c5")
+    result = await get_nodes_by_technology_id(
+        bioimage_index, "f0acc857-fc72-4094-bf14-c36ac40801c5"
+    )
 
     assert "technology_id" in result
     assert "nodes" in result
@@ -69,9 +72,9 @@ async def test_get_nodes_by_technology_id():
 
 
 @pytest.mark.asyncio
-async def test_get_nodes_by_technology_id_not_found():
+async def test_get_nodes_by_technology_id_not_found(bioimage_index):
     """Test getting nodes for non-existent technology ID."""
-    result = await get_nodes_by_technology_id("nonexistent-tech-id")
+    result = await get_nodes_by_technology_id(bioimage_index, "nonexistent-tech-id")
 
     assert "error" in result
     assert result["technology_id"] == "nonexistent-tech-id"
@@ -79,10 +82,12 @@ async def test_get_nodes_by_technology_id_not_found():
 
 
 @pytest.mark.asyncio
-async def test_get_technologies_by_node_id():
+async def test_get_technologies_by_node_id(bioimage_index):
     """Test getting technologies by node ID."""
     # Test with known node ID (Italian node)
-    result = await get_technologies_by_node_id("7409a98f-1bdb-47d2-80e7-c89db73efedd")
+    result = await get_technologies_by_node_id(
+        bioimage_index, "7409a98f-1bdb-47d2-80e7-c89db73efedd"
+    )
 
     assert "node_id" in result
     assert "technologies" in result
@@ -100,9 +105,9 @@ async def test_get_technologies_by_node_id():
 
 
 @pytest.mark.asyncio
-async def test_get_technologies_by_node_id_not_found():
+async def test_get_technologies_by_node_id_not_found(bioimage_index):
     """Test getting technologies for non-existent node ID."""
-    result = await get_technologies_by_node_id("nonexistent-node-id")
+    result = await get_technologies_by_node_id(bioimage_index, "nonexistent-node-id")
 
     assert "error" in result
     assert result["node_id"] == "nonexistent-node-id"
@@ -110,25 +115,29 @@ async def test_get_technologies_by_node_id_not_found():
 
 
 @pytest.mark.asyncio
-async def test_get_node_details():
+async def test_get_node_details(bioimage_index):
     """Test getting node details."""
     # Test with known node ID
-    result = await get_node_details("7409a98f-1bdb-47d2-80e7-c89db73efedd")
+    result = await get_node_details(
+        bioimage_index, "7409a98f-1bdb-47d2-80e7-c89db73efedd"
+    )
 
     assert "node_id" in result
     assert "node" in result
     assert result["node"]["name"] == "Advanced Light Microscopy Italian Node"
 
     # Test with non-existent node ID
-    result = await get_node_details("nonexistent-node-id")
+    result = await get_node_details(bioimage_index, "nonexistent-node-id")
     assert "error" in result
 
 
 @pytest.mark.asyncio
-async def test_get_technology_details():
+async def test_get_technology_details(bioimage_index):
     """Test getting technology details."""
     # Test with known technology ID
-    result = await get_technology_details("f0acc857-fc72-4094-bf14-c36ac40801c5")
+    result = await get_technology_details(
+        bioimage_index, "f0acc857-fc72-4094-bf14-c36ac40801c5"
+    )
 
     assert "technology_id" in result
     assert "technology" in result
@@ -137,15 +146,15 @@ async def test_get_technology_details():
     )
 
     # Test with non-existent technology ID
-    result = await get_technology_details("nonexistent-tech-id")
+    result = await get_technology_details(bioimage_index, "nonexistent-tech-id")
     assert "error" in result
 
 
 @pytest.mark.asyncio
-async def test_search_nodes():
+async def test_search_nodes(bioimage_index):
     """Test searching nodes by name."""
     # Test search with partial match
-    result = await search_nodes("microscopy", limit=5)
+    result = await search_nodes(bioimage_index, "microscopy", limit=5)
 
     assert "query" in result
     assert "nodes" in result
@@ -158,10 +167,10 @@ async def test_search_nodes():
 
 
 @pytest.mark.asyncio
-async def test_search_technologies():
+async def test_search_technologies(bioimage_index):
     """Test searching technologies by name."""
     # Test search with partial match
-    result = await search_technologies("microscopy", limit=5)
+    result = await search_technologies(bioimage_index, "microscopy", limit=5)
 
     assert "query" in result
     assert "technologies" in result
@@ -173,9 +182,9 @@ async def test_search_technologies():
 
 
 @pytest.mark.asyncio
-async def test_get_all_nodes():
+async def test_get_all_nodes(bioimage_index):
     """Test getting all nodes."""
-    result = await get_all_nodes(limit=10)
+    result = await get_all_nodes(bioimage_index, limit=10)
 
     assert "nodes" in result
     assert "total_nodes" in result
@@ -186,9 +195,9 @@ async def test_get_all_nodes():
 
 
 @pytest.mark.asyncio
-async def test_get_all_technologies():
+async def test_get_all_technologies(bioimage_index):
     """Test getting all technologies."""
-    result = await get_all_technologies(limit=10)
+    result = await get_all_technologies(bioimage_index, limit=10)
 
     assert "technologies" in result
     assert "total_technologies" in result
@@ -199,9 +208,9 @@ async def test_get_all_technologies():
 
 
 @pytest.mark.asyncio
-async def test_get_service_statistics():
+async def test_get_service_statistics(bioimage_index):
     """Test getting service statistics."""
-    result = await get_service_statistics()
+    result = await get_service_statistics(bioimage_index)
 
     assert "service" in result
     assert "status" in result
