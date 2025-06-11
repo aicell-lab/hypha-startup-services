@@ -13,3 +13,4 @@ DEFAULT_REMOTE_URL = "https://hypha.aicell.io"
 # Service-specific defaults
 DEFAULT_WEAVIATE_SERVICE_ID = "weaviate-test"
 DEFAULT_MEM0_SERVICE_ID = "mem0-test"
+DEFAULT_BIOIMAGE_SERVICE_ID = "bioimage"
