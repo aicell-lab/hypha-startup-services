@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Startup script for running both weaviate and mem0 services
-# This script starts both services in parallel
+# Startup script for running weaviate, mem0, and bioimage services
+# This script starts all services in parallel
 
 set -e
 
@@ -9,11 +9,13 @@ set -e
 SERVER_URL="${SERVER_URL:-https://hypha.aicell.io}"
 WEAVIATE_SERVICE_ID="${WEAVIATE_SERVICE_ID:-weaviate}"
 MEM0_SERVICE_ID="${MEM0_SERVICE_ID:-mem0}"
+BIOIMAGE_SERVICE_ID="${BIOIMAGE_SERVICE_ID:-bioimage}"
 
 echo "Starting Hypha startup services..."
 echo "Server URL: $SERVER_URL"
 echo "Weaviate Service ID: $WEAVIATE_SERVICE_ID"
 echo "Mem0 Service ID: $MEM0_SERVICE_ID"
+echo "Bioimage Service ID: $BIOIMAGE_SERVICE_ID"
 
 # Function to start weaviate service
 start_weaviate_service() {
@@ -33,6 +35,16 @@ start_mem0_service() {
         --service-id="$MEM0_SERVICE_ID" &
     MEM0_PID=$!
     echo "Mem0 service started with PID: $MEM0_PID"
+}
+
+# Function to start bioimage service
+start_bioimage_service() {
+    echo "Starting Bioimage service..."
+    hypha-startup-services bioimage remote \
+        --server-url="$SERVER_URL" \
+        --service-id="$BIOIMAGE_SERVICE_ID" &
+    BIOIMAGE_PID=$!
+    echo "Bioimage service started with PID: $BIOIMAGE_PID"
 }
 
 # Function to wait for weaviate server to be ready
@@ -67,6 +79,10 @@ cleanup() {
         kill $MEM0_PID 2>/dev/null || true
         echo "Stopped Mem0 service"
     fi
+    if [ ! -z "$BIOIMAGE_PID" ]; then
+        kill $BIOIMAGE_PID 2>/dev/null || true
+        echo "Stopped Bioimage service"
+    fi
     exit 0
 }
 
@@ -76,12 +92,13 @@ trap cleanup SIGTERM SIGINT
 # Wait for Weaviate server to be ready
 wait_for_weaviate_server
 
-# Start both services
+# Start all services
 start_weaviate_service
 start_mem0_service
+start_bioimage_service
 
-# Wait for both services to finish
-echo "Both services started. Waiting for completion..."
-wait $WEAVIATE_PID $MEM0_PID
+# Wait for all services to finish
+echo "All services started. Waiting for completion..."
+wait $WEAVIATE_PID $MEM0_PID $BIOIMAGE_PID
 
 echo "All services have stopped."

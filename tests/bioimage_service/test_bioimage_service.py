@@ -1,6 +1,10 @@
 """Tests for the BioImage service."""
 
+import os
 import pytest
+from dotenv import load_dotenv
+from hypha_rpc import connect_to_server
+from hypha_rpc.rpc import RemoteService
 from hypha_startup_services.bioimage_service.methods import (
     get_nodes_by_technology_id,
     get_technologies_by_node_id,
@@ -256,3 +260,113 @@ async def test_synthetic_technology_handling(bioimage_index):
     assert synthetic_tech is not None
     assert synthetic_tech.get("synthetic") is True
     assert "correlative_microscopy" in synthetic_tech["name"]
+
+
+@pytest.mark.asyncio
+async def test_mem0_bioimage_integration():
+    """Test integration between mem0 search and bioimage service."""
+
+    load_dotenv()
+
+    # Get the HYPHA_TOKEN from environment
+    token = os.environ.get("HYPHA_TOKEN")
+    if not token:
+        pytest.skip("HYPHA_TOKEN not available - skipping integration test")
+
+    # Connect to Hypha server
+    server = await connect_to_server(
+        {
+            "server_url": "https://hypha.aicell.io",
+            "token": token,
+        }
+    )
+
+    # Ensure we have the correct server type
+    if not isinstance(server, RemoteService):
+        raise TypeError("connect_to_server did not return a RemoteService instance")
+
+    # Get the services
+    try:
+        mem0_service = await server.get_service("aria-agents/mem0-test")
+        bioimage_service = await server.get_service("aria-agents/bioimage-test")
+    except Exception as e:
+        await server.disconnect()
+        pytest.skip(f"Services not available: {e}")
+
+    try:
+        # Test queries
+        queries = [
+            "Which bioimage nodes are in sweden?",
+            "I want to use an advanced microscope. which bioimage node should i go to?",
+        ]
+
+        for query in queries:
+            print(f"\nTesting query: {query}")
+
+            # Search in mem0 with the specified agent_id and workspace
+            search_result = await mem0_service.search(
+                query=query,
+                agent_id="ebi_file_loader",
+                workspace="aria-agents",
+                limit=3,  # Get top 3 results
+            )
+
+            # Validate mem0 search results
+            assert search_result is not None, f"No search results for query: {query}"
+            assert "results" in search_result, "Search result missing 'results' key"
+            results = search_result["results"]
+            assert len(results) > 0, f"No search results found for query: {query}"
+            assert (
+                len(results) <= 3
+            ), f"Too many results returned (expected max 3): {len(results)}"
+
+            print(f"Found {len(results)} mem0 results")
+
+            # Test bioimage service with known IDs (deterministic)
+            # Test with known technology ID
+            tech_result = await bioimage_service.get_nodes_by_technology_id(
+                technology_id="f0acc857-fc72-4094-bf14-c36ac40801c5"  # 3D-CLEM
+            )
+
+            # Validate bioimage service technology lookup
+            assert tech_result is not None
+            assert "nodes" in tech_result
+            assert "technology" in tech_result
+            assert (
+                len(tech_result["nodes"]) >= 1
+            ), "Expected at least one node for known technology"
+
+            # Test with known node ID
+            node_result = await bioimage_service.get_technologies_by_node_id(
+                node_id="7409a98f-1bdb-47d2-80e7-c89db73efedd"  # Italian node
+            )
+
+            # Validate bioimage service node lookup
+            assert node_result is not None
+            assert "technologies" in node_result
+            assert "node" in node_result
+            assert (
+                len(node_result["technologies"]) >= 1
+            ), "Expected at least one technology for known node"
+
+            # Test service statistics
+            stats_result = await bioimage_service.get_service_statistics()
+            assert stats_result is not None
+            assert "service" in stats_result
+            assert "statistics" in stats_result
+            assert stats_result["service"] == "bioimage_service"
+
+            print(f"✅ Query '{query}' processed successfully:")
+            print(f"   - Found {len(tech_result['nodes'])} nodes for technology lookup")
+            print(
+                f"   - Found {len(node_result['technologies'])} technologies for node lookup"
+            )
+            print(
+                f"   - Service statistics: {stats_result['statistics']['total_nodes']} nodes, {stats_result['statistics']['total_technologies']} technologies"
+            )
+
+    except Exception as e:
+        print(f"Test failed with error: {e}")
+        raise
+    finally:
+        await server.disconnect()
