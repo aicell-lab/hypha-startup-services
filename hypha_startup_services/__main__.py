@@ -20,8 +20,8 @@ def create_parser() -> argparse.ArgumentParser:
 
     parser.add_argument(
         "service",
-        choices=["weaviate", "mem0"],
-        help="Service to start (weaviate or mem0)",
+        choices=["weaviate", "mem0", "bioimage"],
+        help="Service to start (weaviate, mem0, or bioimage)",
     )
 
     subparsers = parser.add_subparsers(dest="mode", help="Running mode")

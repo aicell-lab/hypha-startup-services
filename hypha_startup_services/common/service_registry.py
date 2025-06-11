@@ -4,9 +4,13 @@ from typing import Dict, Callable, Any
 from hypha_rpc.rpc import RemoteService
 from hypha_startup_services.weaviate_service.register_service import register_weaviate
 from hypha_startup_services.mem0_service.register_service import register_mem0_service
+from hypha_startup_services.bioimage_service.register_service import (
+    register_bioimage_service,
+)
 from hypha_startup_services.common.constants import (
     DEFAULT_WEAVIATE_SERVICE_ID,
     DEFAULT_MEM0_SERVICE_ID,
+    DEFAULT_BIOIMAGE_SERVICE_ID,
 )
 
 
@@ -70,4 +74,11 @@ def register_services():
         register_mem0_service,
         "hypha_startup_services.mem0_service.register_service:register_mem0_service",
         DEFAULT_MEM0_SERVICE_ID,
+    )
+
+    service_registry.register_service_type(
+        "bioimage",
+        register_bioimage_service,
+        "hypha_startup_services.bioimage_service.register_service:register_bioimage_service",
+        DEFAULT_BIOIMAGE_SERVICE_ID,
     )
