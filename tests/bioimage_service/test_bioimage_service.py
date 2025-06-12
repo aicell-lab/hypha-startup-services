@@ -350,7 +350,7 @@ async def test_mem0_bioimage_integration():
             ), "Expected at least one technology for known node"
 
             # Test service statistics
-            stats_result = await bioimage_service.get_service_statistics()
+            stats_result = await bioimage_service.get_statistics()
             assert stats_result is not None
             assert "service" in stats_result
             assert "statistics" in stats_result

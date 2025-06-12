@@ -12,6 +12,9 @@ from hypha_startup_services.common.permissions import (
 )
 from hypha_startup_services.mem0_service.utils.models import AgentArtifactParams
 from hypha_startup_services.common.workspace_utils import ws_from_context
+from hypha_startup_services.common.workspace_utils import validate_workspace
+from hypha_startup_services.common.run_utils import validate_run_id
+
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +95,8 @@ async def init_run(
     if workspace is None:
         workspace = accessor_ws
 
+    validate_workspace(workspace)
+
     workspace_artifact_params = agent_artifact_params.for_workspace(workspace)
 
     parent_id = agent_artifact_params.artifact_id
@@ -106,6 +111,7 @@ async def init_run(
     )
 
     if run_id is not None:
+        validate_run_id(run_id)
         run_artifact_params = workspace_artifact_params.for_run(run_id)
         await create_artifact(
             server=server,
@@ -146,6 +152,11 @@ async def mem0_add(
 
     if workspace is None:
         workspace = accessor_ws
+
+    validate_workspace(workspace)
+
+    if run_id is not None:
+        validate_run_id(run_id)
 
     permission_params = AgentPermissionParams(
         agent_id=agent_id,
@@ -202,10 +213,16 @@ async def mem0_search(
         and potentially "relations" if graph store is enabled.
         Example for v1.1+: `{"results": [{"id": "...", "memory": "...", "score": 0.8, ...}]}`
     """
+
     accessor_ws = ws_from_context(context)
 
     if workspace is None:
         workspace = accessor_ws
+
+    validate_workspace(workspace)
+
+    if run_id is not None:
+        validate_run_id(run_id)
 
     permission_params = AgentPermissionParams(
         agent_id=agent_id,
@@ -231,3 +248,70 @@ async def mem0_search(
     )
     logger.info("Search results for query '%s': %s", query, results)
     return results
+
+
+async def mem0_delete_all(
+    agent_id: str,
+    workspace: str | None = None,
+    *,
+    server: RemoteService,
+    memory: AsyncMemory,
+    context: dict[str, Any],
+    run_id: str | None = None,
+    **kwargs,
+) -> dict[str, Any]:
+    """
+    Delete all memories for a specific agent and workspace.
+
+    Args:
+        agent_id: ID of the agent whose memories to delete.
+        workspace: Workspace of the user whose memories to delete.
+        server: The Hypha server instance.
+        memory: The AsyncMemory instance to delete memories from.
+        context: Context from Hypha-rpc for permissions.
+        run_id: ID of the run whose memories to delete. Defaults to None.
+        **kwargs: Additional keyword arguments for the memory service.
+
+    Raises:
+        HyphaPermissionError: If the user does not have permission to delete memories.
+        ValueError: If the permission parameters are invalid.
+
+    Returns:
+        A dictionary containing the deletion result, typically with a "message" key.
+    """
+    accessor_ws = ws_from_context(context)
+
+    if workspace is None:
+        workspace = accessor_ws
+
+    permission_params = AgentPermissionParams(
+        agent_id=agent_id,
+        accessed_workspace=workspace,
+        accessor_workspace=accessor_ws,
+        run_id=run_id,
+        operation="rw",
+    )
+
+    assert await artifact_exists(
+        server=server,
+        artifact_id=permission_params.artifact_id,
+    ), "Please call init() before deleting memories."
+
+    await require_permission(server, permission_params)
+
+    user_id = workspace
+
+    if run_id:
+        logger.warning(
+            "Run-specific deletion not implemented, deleting all memories for user %s",
+            user_id,
+        )
+
+    delete_result = await memory.delete_all(user_id=user_id, **kwargs)
+    logger.info(
+        "Deleted all memories for user %s, agent %s: %s",
+        user_id,
+        agent_id,
+        delete_result,
+    )
+    return delete_result

@@ -65,6 +65,14 @@ class PermissionParams(BasePermissionParams):
             artifact_id += f"{ARTIFACT_DELIMITER}{self.run_id}"
         return artifact_id
 
+    @property
+    def resource_description(self) -> str:
+        """Return a human-readable description of the resource being accessed."""
+        if self.run_id:
+            return f"mem0 memories for agent '{self.agent_id}' in workspace '{self.accessed_workspace}' (run: {self.run_id})"
+        else:
+            return f"mem0 memories for agent '{self.agent_id}' in workspace '{self.accessed_workspace}'"
+
 
 class AgentArtifactParams(BaseModel, BaseArtifactParams):
     """

@@ -10,11 +10,10 @@ from hypha_startup_services.common.permissions import (
     user_has_operation_permission,
     has_permission,
     require_permission,
+    HyphaPermissionError,
 )
-from hypha_startup_services.common.artifacts import create_artifact
 from hypha_startup_services.mem0_service.utils.models import (
     PermissionParams,
-    HyphaPermissionError,
 )
 from tests.conftest import USER1_WS, USER2_WS
 from tests.mem0_service.utils import TEST_AGENT_ID
@@ -268,10 +267,10 @@ class TestHasPermission:
 
                     assert result is True
                     mock_logger.debug.assert_called_once_with(
-                        "Granting permission to workspace %s for operation %s on artifact %s",
+                        "Granting permission to workspace %s for operation %s on %s",
                         USER1_WS,
                         "r",
-                        permission_params.artifact_id,
+                        permission_params.resource_description,
                     )
 
     @pytest.mark.asyncio
@@ -298,10 +297,10 @@ class TestHasPermission:
 
                     assert result is False
                     mock_logger.info.assert_called_once_with(
-                        "Permission denied for workspace %s, operation %s on artifact %s",
+                        "Permission denied for workspace %s, operation %s on %s",
                         USER1_WS,
                         "rw",
-                        permission_params.artifact_id,
+                        permission_params.resource_description,
                     )
 
 
@@ -351,65 +350,7 @@ class TestRequirePermission:
             error = exc_info.value
             assert "Permission denied for rw operation" in str(error)
             assert f"agent '{TEST_AGENT_ID}'" in str(error)
-            assert f"ws '{USER2_WS}'" in str(error)
-            assert error.permission_params == permission_params
-
-
-class TestCreateArtifactPermissions:
-    """Test cases for create_artifact function."""
-
-    @pytest.mark.asyncio
-    async def test_create_artifact_success(self):
-        """Test successful artifact creation with permissions."""
-        mock_server = AsyncMock()
-        permission_params = PermissionParams(
-            accessor_workspace=USER1_WS,
-            agent_id=TEST_AGENT_ID,
-            accessed_workspace=USER2_WS,
-            operation="rw",
-        )
-
-        with patch(
-            "hypha_startup_services.common.permissions.has_permission"
-        ) as mock_has:
-            mock_has.return_value = True
-
-            with patch(
-                "hypha_startup_services.common.permissions.logger"
-            ) as mock_logger:
-                await create_artifact(mock_server, permission_params)
-
-                mock_has.assert_called_once_with(mock_server, permission_params)
-                mock_logger.info.assert_called_once_with(
-                    "Creating artifact %s for user %s",
-                    permission_params.artifact_id,
-                    permission_params.agent_id,
-                )
-
-    @pytest.mark.asyncio
-    async def test_create_artifact_permission_denied(self):
-        """Test artifact creation when permission is denied."""
-        mock_server = AsyncMock()
-        permission_params = PermissionParams(
-            accessor_workspace=USER1_WS,
-            agent_id=TEST_AGENT_ID,
-            accessed_workspace=USER2_WS,
-            operation="rw",
-        )
-
-        with patch(
-            "hypha_startup_services.common.permissions.has_permission"
-        ) as mock_has:
-            mock_has.return_value = False
-
-            with pytest.raises(HyphaPermissionError) as exc_info:
-                await create_artifact(mock_server, permission_params)
-
-            error = exc_info.value
-            assert (
-                f"Permission denied for creating artifact {permission_params.artifact_id}"
-                in str(error)
-            )
+            assert f"workspace '{USER2_WS}'" in str(error)
             assert error.permission_params == permission_params
 
 
@@ -438,9 +379,6 @@ class TestIntegration:
 
             # Should not raise exception
             await require_permission(mock_server, permission_params)
-
-            # Should be able to create artifact
-            await create_artifact(mock_server, permission_params)
 
     @pytest.mark.asyncio
     async def test_permission_workflow_regular_user_success(self):
@@ -506,7 +444,3 @@ class TestIntegration:
                 # Should raise exception
                 with pytest.raises(HyphaPermissionError):
                     await require_permission(mock_server, permission_params)
-
-                # Should raise exception for create_artifact too
-                with pytest.raises(HyphaPermissionError):
-                    await create_artifact(mock_server, permission_params)

@@ -215,6 +215,10 @@ async def user_has_operation_permission(
         # For Weaviate, we accept any permission that includes the operation
         return permission_params.operation in user_permissions
 
+    # Handle list permissions (e.g., ["r", "rw"])
+    if isinstance(user_permissions, list):
+        return permission_params.operation in user_permissions
+
     # Handle mem0-style permission operations
     if isinstance(user_permissions, dict):
         return permission_params.operation in user_permissions
