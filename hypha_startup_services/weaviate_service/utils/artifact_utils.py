@@ -1,18 +1,24 @@
 import uuid
 from typing import Any
 from hypha_rpc.rpc import RemoteService, RemoteException
-from hypha_startup_services.weaviate_service.artifacts import (
+from hypha_startup_services.common.artifacts import (
     create_artifact,
     delete_artifact,
     get_artifact,
 )
+from hypha_startup_services.common.permissions import is_admin_workspace
+from hypha_startup_services.weaviate_service.utils.models import (
+    CollectionArtifactParams,
+    ApplicationArtifactParams,
+)
 from hypha_startup_services.weaviate_service.utils.constants import (
     ADMIN_WORKSPACES,
-    ARTIFACT_DELIMITER,
 )
 from hypha_startup_services.weaviate_service.utils.format_utils import (
     get_full_collection_name,
-    assert_valid_application_name,
+)
+from hypha_startup_services.common.utils import (
+    get_application_artifact_name,
 )
 
 
@@ -24,19 +30,6 @@ def get_collection_artifact_name(short_name: str) -> str:
 def get_collection_artifact_names(short_names: list[str]) -> list[str]:
     """Create full collection artifact names."""
     return [get_full_collection_name(name) for name in short_names]
-
-
-def get_application_artifact_name(
-    full_collection_name: str, user_ws: str, application_id: str
-) -> str:
-    """Create a full application artifact name."""
-    assert_valid_application_name(application_id)
-    return f"{full_collection_name}{ARTIFACT_DELIMITER}{user_ws}{ARTIFACT_DELIMITER}{application_id}"
-
-
-def is_admin_ws(user_ws: str) -> bool:
-    """Check if a user has admin privileges."""
-    return user_ws in ADMIN_WORKSPACES
 
 
 def make_artifact_permissions(owners: str | list[str]) -> dict[str, str]:
@@ -119,20 +112,27 @@ async def delete_collection_artifacts(
 
 async def create_collection_artifact(
     server: RemoteService,
-    settings_full_name: dict[str, Any],
+    settings: dict[str, Any],
 ) -> None:
+    """Create a collection artifact using the model-based approach."""
     permissions = make_artifact_permissions(owners=ADMIN_WORKSPACES)
-    metadata = create_artifact_metadata(
-        description=settings_full_name.get("description", ""),
-        settings=settings_full_name,
+
+    # Extract collection name from settings
+    collection_name = settings["class"]
+
+    # Create artifact parameters using the model
+    artifact_params = CollectionArtifactParams(
+        collection_name=collection_name,
+        desc=settings.get("description", ""),
+        permissions=permissions,
+        metadata={
+            "settings": settings,
+        },
     )
 
     await create_artifact(
-        server,
-        settings_full_name["class"],
-        settings_full_name.get("description", ""),
-        permissions=permissions,
-        metadata=metadata,
+        server=server,
+        artifact_params=artifact_params,
     )
 
 
@@ -167,7 +167,7 @@ async def is_user_in_artifact_permissions(
 async def has_artifact_permission(
     server: RemoteService, user_ws: str, artifact_name: str
 ) -> bool:
-    if user_ws in ADMIN_WORKSPACES:
+    if is_admin_workspace(user_ws):
         return True
 
     if not await is_user_in_artifact_permissions(server, user_ws, artifact_name):
@@ -265,18 +265,6 @@ async def has_collection_permission(
     return True
 
 
-def assert_is_admin_ws(user_ws: str):
-    """Check if user has admin permissions for collections.
-
-    Args:
-        user_ws: The user workspace
-
-    Returns:
-        None if all permissions are granted, raises an error if permissions are missing
-    """
-    assert is_admin_ws(user_ws), "You are not an admin user."
-
-
 async def assert_has_collection_permission(
     server: RemoteService,
     user_ws: str,
@@ -317,34 +305,31 @@ async def create_application_artifact(
     Returns:
         Result of artifact creation
     """
-    # Create application artifact
-    full_collection_name = get_full_collection_name(collection_name)
-    artifact_name = get_application_artifact_name(
-        full_collection_name, user_ws, application_id
-    )
-
-    # Set up application metadata
-    metadata = create_artifact_metadata(
+    # Create artifact parameters using the model
+    artifact_params = ApplicationArtifactParams(
+        collection_name=collection_name,
         application_id=application_id,
-        short_collection_name=collection_name,
+        user_workspace=user_ws,
+        creator_id=user_ws,
+        desc=description,
+        permissions=make_artifact_permissions(owners=user_ws),
+        metadata={
+            "application_id": application_id,
+            "short_collection_name": collection_name,
+        },
     )
 
-    permissions = make_artifact_permissions(owners=user_ws)
-
-    await create_artifact(
+    result = await create_artifact(
         server=server,
-        artifact_name=artifact_name,
-        description=description,
-        permissions=permissions,
-        metadata=metadata,
-        parent_id=full_collection_name,
+        artifact_params=artifact_params,
     )
 
     return {
-        "artifact_name": artifact_name,
+        "artifact_name": artifact_params.artifact_name,
         "description": description,
-        "permissions": permissions,
-        "metadata": metadata,
+        "permissions": artifact_params.permissions,
+        "metadata": artifact_params.metadata,
+        "result": result,
     }
 
 

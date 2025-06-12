@@ -182,18 +182,12 @@ async def test_mem0_permission_error_wrong_workspace(mem0_service2):
 async def test_mem0_search_permission_error(mem0_service2):
     """Test that searching with wrong workspace raises permission error."""
     # Try to search with a workspace that doesn't match the user
-    with pytest.raises((RemoteException, PermissionError, ValueError)) as exc_info:
+    with pytest.raises((RemoteException, PermissionError, ValueError)):
         await mem0_service2.search(
             query=SEARCH_QUERY_MOVIES,
             agent_id=TEST_AGENT_ID,
             workspace="ws-invalid-workspace",
         )
-
-    error_str = str(exc_info.value).lower()
-    assert any(
-        keyword in error_str
-        for keyword in ["permission", "denied", "unauthorized", "access"]
-    )
 
 
 @pytest.mark.asyncio

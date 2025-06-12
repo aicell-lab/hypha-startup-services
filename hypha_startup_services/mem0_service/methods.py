@@ -2,15 +2,15 @@ from typing import Any
 from mem0 import AsyncMemory
 import logging
 from hypha_rpc.rpc import RemoteService
-from hypha_startup_services.mem0_service.artifact import (
+from hypha_startup_services.common.artifacts import (
     create_artifact,
     artifact_exists,
 )
-from hypha_startup_services.mem0_service.permissions import require_permission
-from hypha_startup_services.mem0_service.utils.models import (
-    PermissionParams,
-    AgentArtifactParams,
+from hypha_startup_services.common.permissions import (
+    require_permission,
+    AgentPermissionParams,
 )
+from hypha_startup_services.mem0_service.utils.models import AgentArtifactParams
 from hypha_startup_services.common.workspace_utils import ws_from_context
 
 logger = logging.getLogger(__name__)
@@ -147,7 +147,7 @@ async def mem0_add(
     if workspace is None:
         workspace = accessor_ws
 
-    permission_params = PermissionParams(
+    permission_params = AgentPermissionParams(
         agent_id=agent_id,
         accessed_workspace=workspace,
         accessor_workspace=accessor_ws,
@@ -207,7 +207,7 @@ async def mem0_search(
     if workspace is None:
         workspace = accessor_ws
 
-    permission_params = PermissionParams(
+    permission_params = AgentPermissionParams(
         agent_id=agent_id,
         accessed_workspace=workspace,
         accessor_workspace=accessor_ws,

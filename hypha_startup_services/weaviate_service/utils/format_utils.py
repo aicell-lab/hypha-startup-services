@@ -1,20 +1,8 @@
 from typing import Any
 from weaviate.collections import CollectionAsync
 from weaviate.collections.classes.config import CollectionConfig
-from hypha_startup_services.weaviate_service.utils.constants import (
-    COLLECTION_DELIMITER,
-    ARTIFACT_DELIMITER,
-    SHARED_WORKSPACE,
-)
-
-
-def format_workspace(workspace: str) -> str:
-    """Format workspace name to use in collection names.
-
-    Replaces hyphens with underscores and capitalizes the name.
-    """
-    workspace_formatted = workspace.replace("-", "_").capitalize()
-    return workspace_formatted
+from hypha_startup_services.common.constants import COLLECTION_DELIMITER
+from hypha_startup_services.common.utils import get_full_collection_name
 
 
 def get_short_name(collection_name: str) -> str:
@@ -52,33 +40,6 @@ async def collection_to_config_dict(collection: CollectionAsync) -> dict[str, An
     config = await collection.config.get()
     config_dict = config_with_short_name(config)
     return config_dict
-
-
-def assert_valid_collection_name(collection_name: str) -> None:
-    """Ensure collection name doesn't contain the workspace delimiter."""
-    assert (
-        COLLECTION_DELIMITER not in collection_name
-    ), f"Collection name should not contain '{COLLECTION_DELIMITER}'"
-
-
-def assert_valid_application_name(application_id: str) -> None:
-    """Ensure application name doesn't contain the artifact delimiter."""
-    assert (
-        ARTIFACT_DELIMITER not in application_id
-    ), f"Application ID should not contain '{ARTIFACT_DELIMITER}'"
-
-
-def stringify_keys(d: dict) -> dict:
-    """Convert all keys in a dictionary to strings."""
-    return {str(k): v for k, v in d.items()}
-
-
-def get_full_collection_name(short_name: str) -> str:
-    """Create a full collection name with workspace prefix for a single collection."""
-    assert_valid_collection_name(short_name)
-
-    workspace_formatted = format_workspace(SHARED_WORKSPACE)
-    return f"{workspace_formatted}{COLLECTION_DELIMITER}{short_name}"
 
 
 def get_full_collection_names(short_names: list[str]) -> list[str]:

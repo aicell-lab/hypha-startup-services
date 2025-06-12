@@ -25,7 +25,7 @@ class TestInitAgent:
         context = {"user": {"scope": {"current_workspace": USER1_WS}}}
 
         with patch(
-            "hypha_startup_services.mem0_service.methods.create_artifact"
+            "hypha_startup_services.common.artifacts.create_artifact"
         ) as mock_create:
             await init_agent(
                 agent_id=TEST_AGENT_ID,
@@ -55,7 +55,7 @@ class TestInitAgent:
         context = {"user": {"scope": {"current_workspace": USER1_WS}}}
 
         with patch(
-            "hypha_startup_services.mem0_service.methods.create_artifact"
+            "hypha_startup_services.common.artifacts.create_artifact"
         ) as mock_create:
             await init_agent(
                 agent_id=TEST_AGENT_ID,
@@ -76,7 +76,7 @@ class TestInitAgent:
         context = {"user": {"scope": {"current_workspace": USER1_WS}}}
 
         with patch(
-            "hypha_startup_services.mem0_service.methods.create_artifact"
+            "hypha_startup_services.common.artifacts.create_artifact"
         ) as mock_create:
             mock_create.side_effect = Exception("Creation failed")
 
@@ -98,7 +98,7 @@ class TestInitRun:
         context = {"user": {"scope": {"current_workspace": USER1_WS}}}
 
         with patch(
-            "hypha_startup_services.mem0_service.methods.create_artifact"
+            "hypha_startup_services.common.artifacts.create_artifact"
         ) as mock_create:
             await init_run(
                 agent_id=TEST_AGENT_ID,
@@ -133,7 +133,7 @@ class TestInitRun:
         context = {"user": {"scope": {"current_workspace": USER1_WS}}}
 
         with patch(
-            "hypha_startup_services.mem0_service.methods.create_artifact"
+            "hypha_startup_services.common.artifacts.create_artifact"
         ) as mock_create:
             await init_run(
                 agent_id=TEST_AGENT_ID,
@@ -156,7 +156,7 @@ class TestInitRun:
         context = {"user": {"scope": {"current_workspace": USER1_WS}}}
 
         with patch(
-            "hypha_startup_services.mem0_service.methods.create_artifact"
+            "hypha_startup_services.common.artifacts.create_artifact"
         ) as mock_create:
             await init_run(
                 agent_id=TEST_AGENT_ID,
@@ -183,7 +183,7 @@ class TestMem0Add:
         context = {"user": {"scope": {"current_workspace": USER1_WS}}}
 
         with patch(
-            "hypha_startup_services.mem0_service.methods.require_permission"
+            "hypha_startup_services.common.permissions.require_permission"
         ) as mock_require:
             await mem0_add(
                 messages=TEST_MESSAGES,
@@ -222,7 +222,7 @@ class TestMem0Add:
         context = {"user": {"scope": {"current_workspace": USER1_WS}}}
 
         with patch(
-            "hypha_startup_services.mem0_service.methods.require_permission"
+            "hypha_startup_services.common.permissions.require_permission"
         ) as mock_require:
             mock_require.side_effect = HyphaPermissionError("Permission denied", None)
 
@@ -247,7 +247,7 @@ class TestMem0Add:
         context = {"user": {"scope": {"current_workspace": USER1_WS}}}
 
         with patch(
-            "hypha_startup_services.mem0_service.methods.require_permission"
+            "hypha_startup_services.common.permissions.require_permission"
         ) as mock_require:
             await mem0_add(
                 messages=TEST_MESSAGES,
@@ -283,7 +283,7 @@ class TestMem0Search:
         context = {"user": {"scope": {"current_workspace": USER1_WS}}}
 
         with patch(
-            "hypha_startup_services.mem0_service.methods.require_permission"
+            "hypha_startup_services.common.permissions.require_permission"
         ) as mock_require:
             result = await mem0_search(
                 query="test query",
@@ -324,7 +324,7 @@ class TestMem0Search:
         context = {"user": {"scope": {"current_workspace": USER1_WS}}}
 
         with patch(
-            "hypha_startup_services.mem0_service.methods.require_permission"
+            "hypha_startup_services.common.permissions.require_permission"
         ) as mock_require:
             mock_require.side_effect = HyphaPermissionError("Permission denied", None)
 
@@ -349,7 +349,7 @@ class TestMem0Search:
         mock_memory.search.return_value = {"results": []}
         context = {"user": {"scope": {"current_workspace": USER1_WS}}}
 
-        with patch("hypha_startup_services.mem0_service.methods.require_permission"):
+        with patch("hypha_startup_services.common.permissions.require_permission"):
             result = await mem0_search(
                 query="nonexistent query",
                 agent_id=TEST_AGENT_ID,
@@ -369,7 +369,7 @@ class TestMem0Search:
         mock_memory.search.return_value = {"results": []}
         context = {"user": {"scope": {"current_workspace": USER1_WS}}}
 
-        with patch("hypha_startup_services.mem0_service.methods.require_permission"):
+        with patch("hypha_startup_services.common.permissions.require_permission"):
             await mem0_search(
                 query="test query",
                 agent_id=TEST_AGENT_ID,

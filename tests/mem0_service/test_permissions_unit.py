@@ -2,21 +2,22 @@
 
 from unittest.mock import AsyncMock, patch
 import pytest
+from hypha_rpc.rpc import RemoteException
 
-from hypha_startup_services.mem0_service.permissions import (
+
+from hypha_startup_services.common.permissions import (
     get_user_permissions,
     user_has_operation_permission,
     has_permission,
     require_permission,
-    create_artifact,
 )
+from hypha_startup_services.common.artifacts import create_artifact
 from hypha_startup_services.mem0_service.utils.models import (
     PermissionParams,
     HyphaPermissionError,
 )
 from tests.conftest import USER1_WS, USER2_WS
 from tests.mem0_service.utils import TEST_AGENT_ID
-from hypha_rpc.rpc import RemoteException
 
 
 class TestGetUserPermissions:
@@ -43,7 +44,7 @@ class TestGetUserPermissions:
         }
 
         with patch(
-            "hypha_startup_services.mem0_service.permissions.get_artifact"
+            "hypha_startup_services.common.permissions.get_artifact"
         ) as mock_get:
             mock_get.return_value = mock_artifact
 
@@ -73,7 +74,7 @@ class TestGetUserPermissions:
         }
 
         with patch(
-            "hypha_startup_services.mem0_service.permissions.get_artifact"
+            "hypha_startup_services.common.permissions.get_artifact"
         ) as mock_get:
             mock_get.return_value = mock_artifact
 
@@ -94,13 +95,13 @@ class TestGetUserPermissions:
         )
 
         with patch(
-            "hypha_startup_services.mem0_service.permissions.get_artifact"
+            "hypha_startup_services.common.permissions.get_artifact"
         ) as mock_get:
             error = RemoteException("Artifact not found")
             mock_get.side_effect = error
 
             with patch(
-                "hypha_startup_services.mem0_service.permissions.logger"
+                "hypha_startup_services.common.permissions.logger"
             ) as mock_logger:
                 result = await get_user_permissions(mock_server, permission_params)
 
@@ -125,7 +126,7 @@ class TestGetUserPermissions:
         mock_artifact = {"id": "test", "name": "Test Artifact"}
 
         with patch(
-            "hypha_startup_services.mem0_service.permissions.get_artifact"
+            "hypha_startup_services.common.permissions.get_artifact"
         ) as mock_get:
             mock_get.return_value = mock_artifact
 
@@ -149,7 +150,7 @@ class TestUserHasOperationPermission:
         )
 
         with patch(
-            "hypha_startup_services.mem0_service.permissions.get_user_permissions"
+            "hypha_startup_services.common.permissions.get_user_permissions"
         ) as mock_get:
             mock_get.return_value = ["r", "rw"]
 
@@ -170,7 +171,7 @@ class TestUserHasOperationPermission:
         )
 
         with patch(
-            "hypha_startup_services.mem0_service.permissions.get_user_permissions"
+            "hypha_startup_services.common.permissions.get_user_permissions"
         ) as mock_get:
             mock_get.return_value = ["r"]
 
@@ -190,7 +191,7 @@ class TestUserHasOperationPermission:
         )
 
         with patch(
-            "hypha_startup_services.mem0_service.permissions.get_user_permissions"
+            "hypha_startup_services.common.permissions.get_user_permissions"
         ) as mock_get:
             mock_get.return_value = "*"
 
@@ -210,7 +211,7 @@ class TestUserHasOperationPermission:
         )
 
         with patch(
-            "hypha_startup_services.mem0_service.permissions.get_user_permissions"
+            "hypha_startup_services.common.permissions.get_user_permissions"
         ) as mock_get:
             mock_get.return_value = {}
 
@@ -229,7 +230,7 @@ class TestHasPermission:
 
         # Test with admin workspace from constants
         with patch(
-            "hypha_startup_services.mem0_service.permissions.ADMIN_WORKSPACES",
+            "hypha_startup_services.common.permissions.ADMIN_WORKSPACES",
             ["admin-ws"],
         ):
             permission_params = PermissionParams(
@@ -254,16 +255,14 @@ class TestHasPermission:
             operation="r",
         )
 
-        with patch(
-            "hypha_startup_services.mem0_service.permissions.ADMIN_WORKSPACES", []
-        ):
+        with patch("hypha_startup_services.common.permissions.ADMIN_WORKSPACES", []):
             with patch(
-                "hypha_startup_services.mem0_service.permissions.user_has_operation_permission"
+                "hypha_startup_services.common.permissions.user_has_operation_permission"
             ) as mock_user_perm:
                 mock_user_perm.return_value = True
 
                 with patch(
-                    "hypha_startup_services.mem0_service.permissions.logger"
+                    "hypha_startup_services.common.permissions.logger"
                 ) as mock_logger:
                     result = await has_permission(mock_server, permission_params)
 
@@ -286,16 +285,14 @@ class TestHasPermission:
             operation="rw",
         )
 
-        with patch(
-            "hypha_startup_services.mem0_service.permissions.ADMIN_WORKSPACES", []
-        ):
+        with patch("hypha_startup_services.common.permissions.ADMIN_WORKSPACES", []):
             with patch(
-                "hypha_startup_services.mem0_service.permissions.user_has_operation_permission"
+                "hypha_startup_services.common.permissions.user_has_operation_permission"
             ) as mock_user_perm:
                 mock_user_perm.return_value = False
 
                 with patch(
-                    "hypha_startup_services.mem0_service.permissions.logger"
+                    "hypha_startup_services.common.permissions.logger"
                 ) as mock_logger:
                     result = await has_permission(mock_server, permission_params)
 
@@ -323,7 +320,7 @@ class TestRequirePermission:
         )
 
         with patch(
-            "hypha_startup_services.mem0_service.permissions.has_permission"
+            "hypha_startup_services.common.permissions.has_permission"
         ) as mock_has:
             mock_has.return_value = True
 
@@ -344,7 +341,7 @@ class TestRequirePermission:
         )
 
         with patch(
-            "hypha_startup_services.mem0_service.permissions.has_permission"
+            "hypha_startup_services.common.permissions.has_permission"
         ) as mock_has:
             mock_has.return_value = False
 
@@ -373,12 +370,12 @@ class TestCreateArtifactPermissions:
         )
 
         with patch(
-            "hypha_startup_services.mem0_service.permissions.has_permission"
+            "hypha_startup_services.common.permissions.has_permission"
         ) as mock_has:
             mock_has.return_value = True
 
             with patch(
-                "hypha_startup_services.mem0_service.permissions.logger"
+                "hypha_startup_services.common.permissions.logger"
             ) as mock_logger:
                 await create_artifact(mock_server, permission_params)
 
@@ -401,7 +398,7 @@ class TestCreateArtifactPermissions:
         )
 
         with patch(
-            "hypha_startup_services.mem0_service.permissions.has_permission"
+            "hypha_startup_services.common.permissions.has_permission"
         ) as mock_has:
             mock_has.return_value = False
 
@@ -425,7 +422,7 @@ class TestIntegration:
         mock_server = AsyncMock()
 
         with patch(
-            "hypha_startup_services.mem0_service.permissions.ADMIN_WORKSPACES",
+            "hypha_startup_services.common.permissions.ADMIN_WORKSPACES",
             ["admin-ws"],
         ):
             permission_params = PermissionParams(
@@ -464,11 +461,9 @@ class TestIntegration:
             }
         }
 
-        with patch(
-            "hypha_startup_services.mem0_service.permissions.ADMIN_WORKSPACES", []
-        ):
+        with patch("hypha_startup_services.common.permissions.ADMIN_WORKSPACES", []):
             with patch(
-                "hypha_startup_services.mem0_service.permissions.get_artifact"
+                "hypha_startup_services.common.permissions.get_artifact"
             ) as mock_get:
                 mock_get.return_value = mock_artifact
 
@@ -498,11 +493,9 @@ class TestIntegration:
             }
         }
 
-        with patch(
-            "hypha_startup_services.mem0_service.permissions.ADMIN_WORKSPACES", []
-        ):
+        with patch("hypha_startup_services.common.permissions.ADMIN_WORKSPACES", []):
             with patch(
-                "hypha_startup_services.mem0_service.permissions.get_artifact"
+                "hypha_startup_services.common.permissions.get_artifact"
             ) as mock_get:
                 mock_get.return_value = mock_artifact
 

@@ -1,6 +1,8 @@
 from typing import Any, Literal
 from pydantic import BaseModel, Field
-from hypha_startup_services.mem0_service.utils.constants import ARTIFACT_DELIMITER_MEM0
+from hypha_startup_services.mem0_service.utils.constants import ARTIFACT_DELIMITER
+from hypha_startup_services.common.artifacts import BaseArtifactParams
+from hypha_startup_services.common.permissions import BasePermissionParams
 
 
 # Type alias for permission operations
@@ -19,7 +21,7 @@ class HyphaPermissionError(Exception):
         super().__init__(message)
 
 
-class PermissionParams(BaseModel):
+class PermissionParams(BasePermissionParams):
     """
     Model for permission parameters with validation and computed properties.
     """
@@ -58,15 +60,13 @@ class PermissionParams(BaseModel):
 
         Format: {agent_id}:{workspace} or {agent_id}:{workspace}:{run_id}
         """
-        artifact_id = (
-            f"{self.agent_id}{ARTIFACT_DELIMITER_MEM0}{self.accessed_workspace}"
-        )
+        artifact_id = f"{self.agent_id}{ARTIFACT_DELIMITER}{self.accessed_workspace}"
         if self.run_id:
-            artifact_id += f"{ARTIFACT_DELIMITER_MEM0}{self.run_id}"
+            artifact_id += f"{ARTIFACT_DELIMITER}{self.run_id}"
         return artifact_id
 
 
-class AgentArtifactParams(BaseModel):
+class AgentArtifactParams(BaseModel, BaseArtifactParams):
     """
     Model for artifact parameters with validation and computed properties.
     """
@@ -109,9 +109,9 @@ class AgentArtifactParams(BaseModel):
         """
         artifact_id = self.agent_id
         if self._workspace:
-            artifact_id += f"{ARTIFACT_DELIMITER_MEM0}{self._workspace}"
+            artifact_id += f"{ARTIFACT_DELIMITER}{self._workspace}"
             if self._run_id:
-                artifact_id += f"{ARTIFACT_DELIMITER_MEM0}{self._run_id}"
+                artifact_id += f"{ARTIFACT_DELIMITER}{self._run_id}"
         return artifact_id
 
     @property
@@ -123,7 +123,7 @@ class AgentArtifactParams(BaseModel):
         if self._workspace:
             parent_id = self.agent_id
             if self._run_id:
-                parent_id += f"{ARTIFACT_DELIMITER_MEM0}{self._workspace}"
+                parent_id += f"{ARTIFACT_DELIMITER}{self._workspace}"
         return parent_id
 
     @property

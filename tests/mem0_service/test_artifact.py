@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from hypha_rpc.rpc import RemoteException
-from hypha_startup_services.mem0_service.artifact import (
+from hypha_startup_services.common.artifacts import (
     get_artifact,
     create_artifact,
     delete_artifact,
@@ -50,7 +50,7 @@ class TestGetArtifact:
         error_message = "Artifact not found"
         mock_artifact_manager.read.side_effect = RemoteException(error_message)
 
-        with patch("hypha_startup_services.mem0_service.artifact.logger"):
+        with patch("hypha_startup_services.common.artifacts.logger"):
             try:
                 await get_artifact(mock_server, "nonexistent-artifact")
                 assert False, "Expected RemoteException to be raised"
@@ -89,7 +89,7 @@ class TestCreateArtifact:
         mock_server.get_service.return_value = mock_artifact_manager
 
         with patch(
-            "hypha_startup_services.mem0_service.artifact.artifact_exists"
+            "hypha_startup_services.common.artifacts.artifact_exists"
         ) as mock_exists:
             mock_exists.return_value = False
 
@@ -112,13 +112,11 @@ class TestCreateArtifact:
         mock_server.get_service.return_value = mock_artifact_manager
 
         with patch(
-            "hypha_startup_services.mem0_service.artifact.artifact_exists"
+            "hypha_startup_services.common.artifacts.artifact_exists"
         ) as mock_exists:
             mock_exists.return_value = True
 
-            with patch(
-                "hypha_startup_services.mem0_service.artifact.logger"
-            ) as mock_logger:
+            with patch("hypha_startup_services.common.artifacts.logger") as mock_logger:
                 await create_artifact(mock_server, sample_artifact_params)
 
                 mock_logger.warning.assert_called_once_with(
@@ -138,11 +136,11 @@ class TestCreateArtifact:
         mock_artifact_manager.create.side_effect = RemoteException(error_message)
 
         with patch(
-            "hypha_startup_services.mem0_service.artifact.artifact_exists"
+            "hypha_startup_services.common.artifacts.artifact_exists"
         ) as mock_exists:
             mock_exists.return_value = False
 
-            with patch("hypha_startup_services.mem0_service.artifact.logger"):
+            with patch("hypha_startup_services.common.artifacts.logger"):
                 try:
                     await create_artifact(mock_server, sample_artifact_params)
                     assert False, "Expected RemoteException to be raised"
@@ -177,13 +175,12 @@ class TestDeleteArtifact:
         error_message = "Deletion failed"
         mock_artifact_manager.delete.side_effect = RemoteException(error_message)
 
-        with patch(
-            "hypha_startup_services.mem0_service.artifact.logger"
-        ) as mock_logger:
+        with patch("hypha_startup_services.common.artifacts.logger") as mock_logger:
             await delete_artifact(mock_server, "test-artifact-123")
 
             mock_logger.warning.assert_called_once_with(
-                "Error deleting artifact. Error: %s",
+                "Error deleting artifact '%s'. Error: %s",
+                "test-artifact-123",
                 mock_artifact_manager.delete.side_effect,
             )
 
@@ -205,9 +202,7 @@ class TestArtifactExists:
         """Test artifact_exists returns True when artifact exists."""
         mock_server = AsyncMock()
 
-        with patch(
-            "hypha_startup_services.mem0_service.artifact.get_artifact"
-        ) as mock_get:
+        with patch("hypha_startup_services.common.artifacts.get_artifact") as mock_get:
             mock_get.return_value = {"id": "test-artifact", "name": "Test"}
 
             result = await artifact_exists(mock_server, "test-artifact")
@@ -222,9 +217,7 @@ class TestArtifactExists:
         """Test artifact_exists returns False when artifact doesn't exist."""
         mock_server = AsyncMock()
 
-        with patch(
-            "hypha_startup_services.mem0_service.artifact.get_artifact"
-        ) as mock_get:
+        with patch("hypha_startup_services.common.artifacts.get_artifact") as mock_get:
             mock_get.side_effect = RemoteException("Artifact not found")
 
             result = await artifact_exists(mock_server, "nonexistent-artifact")
@@ -239,9 +232,7 @@ class TestArtifactExists:
         """Test artifact_exists when get_artifact raises exception."""
         mock_server = AsyncMock()
 
-        with patch(
-            "hypha_startup_services.mem0_service.artifact.get_artifact"
-        ) as mock_get:
+        with patch("hypha_startup_services.common.artifacts.get_artifact") as mock_get:
             mock_get.side_effect = Exception("Unexpected error")
 
             with pytest.raises(Exception, match="Unexpected error"):
@@ -266,9 +257,7 @@ class TestIntegration:
 
         # First call to artifact_exists should return False (doesn't exist)
         # Second call should return True (after creation)
-        with patch(
-            "hypha_startup_services.mem0_service.artifact.get_artifact"
-        ) as mock_get:
+        with patch("hypha_startup_services.common.artifacts.get_artifact") as mock_get:
             mock_get.side_effect = [
                 RemoteException("Artifact not found"),  # First call - throws exception
                 {
@@ -295,9 +284,7 @@ class TestIntegration:
 
         artifact_id = "test-artifact-to-delete"
 
-        with patch(
-            "hypha_startup_services.mem0_service.artifact.get_artifact"
-        ) as mock_get:
+        with patch("hypha_startup_services.common.artifacts.get_artifact") as mock_get:
             mock_get.side_effect = [
                 {"id": artifact_id, "name": "Test"},  # First call - exists
                 RemoteException(

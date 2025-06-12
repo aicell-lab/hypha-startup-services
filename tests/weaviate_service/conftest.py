@@ -32,7 +32,7 @@ def setup_weaviate_server(server: RemoteService):
 
 
 @pytest_asyncio.fixture
-async def weaviate_service1():
+async def weaviate_service():
     """Weaviate service fixture for user 1."""
     server = await get_user_server("PERSONAL_TOKEN")
     register_weaviate_codecs(server)

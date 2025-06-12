@@ -21,26 +21,30 @@ from hypha_startup_services.weaviate_service.utils.collection_utils import (
     add_tenant_if_not_exists,
     get_tenant_collection,
 )
-from hypha_startup_services.weaviate_service.utils.format_utils import (
+from hypha_startup_services.common.utils import (
     get_full_collection_name,
+    stringify_keys,
+    get_application_artifact_name,
+)
+from hypha_startup_services.weaviate_service.utils.format_utils import (
     get_full_collection_names,
     collection_to_config_dict,
     config_with_short_name,
-    stringify_keys,
-    get_settings_full_name,
     add_app_id,
+    get_settings_full_name,
 )
 from hypha_startup_services.weaviate_service.utils.artifact_utils import (
-    get_application_artifact_name,
-    assert_has_collection_permission,
-    assert_has_application_permission,
-    assert_is_admin_ws,
     create_collection_artifact,
     delete_collection_artifacts,
     create_application_artifact,
     delete_application_artifact,
 )
-from hypha_startup_services.weaviate_service.artifacts import (
+from hypha_startup_services.common.permissions import (
+    assert_has_collection_permission,
+    assert_has_application_permission,
+    assert_is_admin_ws,
+)
+from hypha_startup_services.common.artifacts import (
     get_artifact,
     artifact_exists,
 )
@@ -144,13 +148,12 @@ async def collections_create(
     caller_ws = ws_from_context(context)
     assert_is_admin_ws(caller_ws)
 
-    settings_full_name = get_settings_full_name(settings)
+    await create_collection_artifact(server, settings)
 
+    settings_full_name = get_settings_full_name(settings)
     collection = await client.collections.create_from_dict(
         settings_full_name,
     )
-
-    await create_collection_artifact(server, settings_full_name)
 
     return await collection_to_config_dict(collection)
 
