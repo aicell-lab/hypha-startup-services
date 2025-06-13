@@ -2,6 +2,7 @@ from typing import Any
 from mem0 import AsyncMemory
 import logging
 from hypha_rpc.rpc import RemoteService
+from hypha_rpc.utils import ObjectProxy
 from hypha_startup_services.common.artifacts import (
     create_artifact,
     artifact_exists,
@@ -10,6 +11,7 @@ from hypha_startup_services.common.permissions import (
     require_permission,
     AgentPermissionParams,
 )
+from hypha_startup_services.common.utils import proxy_to_dict
 from hypha_startup_services.mem0_service.utils.models import AgentArtifactParams
 from hypha_startup_services.common.workspace_utils import ws_from_context
 from hypha_startup_services.common.workspace_utils import validate_workspace
@@ -126,7 +128,7 @@ async def mem0_add(
     *,
     server: RemoteService,
     memory: AsyncMemory,
-    context: dict[str, Any],
+    context: dict[str, Any] | ObjectProxy,
     run_id: str | None = None,
     **kwargs,
 ) -> dict[str, Any] | list[Any]:
@@ -173,8 +175,11 @@ async def mem0_add(
 
     await require_permission(server, permission_params)
 
+    converted_messages = proxy_to_dict(messages)
+    converted_kwargs = proxy_to_dict(kwargs)
+
     add_result = await memory.add(
-        messages, user_id=workspace, agent_id=agent_id, run_id=run_id, **kwargs
+        converted_messages, user_id=workspace, agent_id=agent_id, run_id=run_id, **converted_kwargs  # type: ignore
     )
     logger.info("Added messages to memory: %s", add_result)
     return add_result

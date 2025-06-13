@@ -1,10 +1,19 @@
 """Common utility functions shared between services."""
 
+from typing import Any
+from hypha_rpc.utils import ObjectProxy
 from hypha_startup_services.common.constants import (
     ARTIFACT_DELIMITER,
     COLLECTION_DELIMITER,
     SHARED_WORKSPACE,
 )
+
+
+def proxy_to_dict(proxy: dict[str, Any] | ObjectProxy) -> Any:
+    """Convert an ObjectProxy to a regular dictionary."""
+    if isinstance(proxy, ObjectProxy):
+        return proxy.toDict()
+    return proxy
 
 
 def assert_valid_application_name(application_id: str) -> None:
