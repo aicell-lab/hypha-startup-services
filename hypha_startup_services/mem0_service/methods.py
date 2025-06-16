@@ -1,7 +1,13 @@
 from typing import Any
-from mem0 import AsyncMemory
 import logging
 from hypha_rpc.rpc import RemoteService
+
+# Apply patches before importing AsyncMemory to ensure they take effect
+from hypha_startup_services.mem0_service.weaviate_patches import apply_all_patches
+
+apply_all_patches()
+
+from mem0 import AsyncMemory
 from hypha_rpc.utils import ObjectProxy
 from hypha_startup_services.common.artifacts import (
     create_artifact,
@@ -179,7 +185,7 @@ async def mem0_add(
     converted_kwargs = proxy_to_dict(kwargs)
 
     add_result = await memory.add(
-        converted_messages, user_id=workspace, agent_id=agent_id, run_id=run_id, **converted_kwargs  # type: ignore
+        converted_messages, agent_id=agent_id, run_id=run_id, **converted_kwargs  # type: ignore
     )
     logger.info("Added messages to memory: %s", add_result)
     return add_result
@@ -246,7 +252,6 @@ async def mem0_search(
 
     results = await memory.search(
         query,
-        user_id=workspace,
         agent_id=agent_id,
         run_id=run_id,
         **kwargs,
@@ -304,19 +309,66 @@ async def mem0_delete_all(
 
     await require_permission(server, permission_params)
 
-    user_id = workspace
-
     if run_id:
         logger.warning(
-            "Run-specific deletion not implemented, deleting all memories for user %s",
-            user_id,
+            "Run-specific deletion not implemented, deleting all memories for agent %s",
+            agent_id,
         )
 
-    delete_result = await memory.delete_all(user_id=user_id, **kwargs)
+    delete_result = await memory.delete_all(agent_id=agent_id, **kwargs)
     logger.info(
-        "Deleted all memories for user %s, agent %s: %s",
-        user_id,
+        "Deleted all memories for agent %s: %s",
         agent_id,
         delete_result,
     )
     return delete_result
+
+
+async def mem0_get_all(
+    agent_id: str,
+    workspace: str | None = None,
+    *,
+    server: RemoteService,
+    memory: AsyncMemory,
+    context: dict[str, Any],
+    run_id: str | None = None,
+    **kwargs,
+) -> dict[str, Any]:
+    """
+    Get all memories for a specific agent and workspace.
+
+    Args:
+        agent_id: ID of the agent whose memories to get.
+        workspace: Workspace of the user whose memories to get.
+        server: The Hypha server instance.
+        memory: The AsyncMemory instance to get memories from.
+        context: Context from Hypha-rpc for permissions.
+        run_id: ID of the run whose memories to get. Defaults to None.
+        **kwargs: Additional keyword arguments for the memory service.
+
+    Returns:
+        A dictionary containing all memories.
+    """
+    accessor_ws = ws_from_context(context)
+
+    if workspace is None:
+        workspace = accessor_ws
+
+    permission_params = AgentPermissionParams(
+        agent_id=agent_id,
+        accessed_workspace=workspace,
+        accessor_workspace=accessor_ws,
+        run_id=run_id,
+        operation="r",
+    )
+
+    assert await artifact_exists(
+        server=server,
+        artifact_id=permission_params.artifact_id,
+    ), "Please call init() before getting memories."
+
+    await require_permission(server, permission_params)
+    # Use the memory.get_all method if available
+    get_all_result = await memory.get_all(agent_id=agent_id, **kwargs)
+    logger.info("Retrieved all memories for agent %s", agent_id)
+    return get_all_result

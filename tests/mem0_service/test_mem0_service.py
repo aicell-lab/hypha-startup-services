@@ -210,6 +210,9 @@ async def test_mem0_search_permission_error(mem0_service2):
 @pytest.mark.asyncio
 async def test_mem0_empty_search_results(mem0_service):
     """Test searching with a query that should return no results."""
+    # Clean up any existing memories first
+    await cleanup_mem0_memories(mem0_service, f"{TEST_AGENT_ID}-empty-search", USER1_WS)
+
     # Initialize agent and workspace
     await mem0_service.init_agent(
         agent_id=f"{TEST_AGENT_ID}-empty-search",

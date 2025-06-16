@@ -6,15 +6,8 @@ from dotenv import load_dotenv
 from hypha_rpc import connect_to_server
 from hypha_rpc.rpc import RemoteService
 from hypha_startup_services.bioimage_service.methods import (
-    get_nodes_by_technology_id,
-    get_technologies_by_node_id,
-    get_node_details,
-    get_technology_details,
-    search_nodes,
-    search_technologies,
-    get_all_nodes,
-    get_all_technologies,
-    get_service_statistics,
+    get_entity_details,
+    get_related_entities,
 )
 from hypha_startup_services.bioimage_service.data_index import (
     BioimageIndex,
@@ -54,22 +47,24 @@ async def test_bioimage_index_basic_functionality(bioimage_index):
 
 @pytest.mark.asyncio
 async def test_get_nodes_by_technology_id(bioimage_index):
-    """Test getting nodes by technology ID."""
-    # Test with known technology ID
-    result = await get_nodes_by_technology_id(
-        bioimage_index, "f0acc857-fc72-4094-bf14-c36ac40801c5"
+    """Test getting nodes by technology ID using get_related_entities."""
+    # Test with known technology ID - this should find nodes that provide this technology
+    result = await get_related_entities(
+        bioimage_index,
+        "f0acc857-fc72-4094-bf14-c36ac40801c5",  # Let it infer it's a technology
     )
 
-    assert "technology_id" in result
-    assert "nodes" in result
-    assert "total_nodes" in result
-    assert "technology" in result  # Should include technology details by default
+    assert "entity_id" in result
+    assert "entity_type" in result
+    assert result["entity_type"] == "technology"
+    assert "related_nodes" in result  # Technologies have related nodes
+    assert "total_related" in result
 
     # Should find both Italian and Polish nodes that have 3D-CLEM
-    assert result["total_nodes"] >= 2
+    assert result["total_related"] >= 2
 
     # Check that all returned nodes have the expected structure
-    for node in result["nodes"]:
+    for node in result["related_nodes"]:
         assert "id" in node
         assert "name" in node
         assert "description" in node
@@ -78,31 +73,32 @@ async def test_get_nodes_by_technology_id(bioimage_index):
 @pytest.mark.asyncio
 async def test_get_nodes_by_technology_id_not_found(bioimage_index):
     """Test getting nodes for non-existent technology ID."""
-    result = await get_nodes_by_technology_id(bioimage_index, "nonexistent-tech-id")
+    result = await get_related_entities(bioimage_index, "nonexistent-tech-id")
 
     assert "error" in result
-    assert result["technology_id"] == "nonexistent-tech-id"
-    assert result["nodes"] == []
+    assert result["entity_id"] == "nonexistent-tech-id"
 
 
 @pytest.mark.asyncio
 async def test_get_technologies_by_node_id(bioimage_index):
-    """Test getting technologies by node ID."""
-    # Test with known node ID (Italian node)
-    result = await get_technologies_by_node_id(
-        bioimage_index, "7409a98f-1bdb-47d2-80e7-c89db73efedd"
+    """Test getting technologies by node ID using get_related_entities."""
+    # Test with known node ID (Italian node) - this should find technologies provided by this node
+    result = await get_related_entities(
+        bioimage_index,
+        "7409a98f-1bdb-47d2-80e7-c89db73efedd",  # Let it infer it's a node
     )
 
-    assert "node_id" in result
-    assert "technologies" in result
-    assert "total_technologies" in result
-    assert "node" in result  # Should include node details by default
+    assert "entity_id" in result
+    assert "entity_type" in result
+    assert result["entity_type"] == "node"
+    assert "related_technologies" in result  # Nodes have related technologies
+    assert "total_related" in result
 
     # Should find multiple technologies
-    assert result["total_technologies"] >= 2
+    assert result["total_related"] >= 2
 
     # Check that all returned technologies have the expected structure
-    for tech in result["technologies"]:
+    for tech in result["related_technologies"]:
         assert "id" in tech
         assert "name" in tech
         assert "description" in tech
@@ -111,122 +107,129 @@ async def test_get_technologies_by_node_id(bioimage_index):
 @pytest.mark.asyncio
 async def test_get_technologies_by_node_id_not_found(bioimage_index):
     """Test getting technologies for non-existent node ID."""
-    result = await get_technologies_by_node_id(bioimage_index, "nonexistent-node-id")
+    result = await get_related_entities(bioimage_index, "nonexistent-node-id")
 
     assert "error" in result
-    assert result["node_id"] == "nonexistent-node-id"
-    assert result["technologies"] == []
+    assert result["entity_id"] == "nonexistent-node-id"
 
 
 @pytest.mark.asyncio
 async def test_get_node_details(bioimage_index):
-    """Test getting node details."""
+    """Test getting node details using get_entity_details."""
     # Test with known node ID
-    result = await get_node_details(
-        bioimage_index, "7409a98f-1bdb-47d2-80e7-c89db73efedd"
+    result = await get_entity_details(
+        bioimage_index,
+        "7409a98f-1bdb-47d2-80e7-c89db73efedd",  # Let it infer it's a node
     )
 
-    assert "node_id" in result
-    assert "node" in result
-    assert result["node"]["name"] == "Advanced Light Microscopy Italian Node"
+    assert "entity_id" in result
+    assert "entity_type" in result
+    assert result["entity_type"] == "node"
+    assert "entity_details" in result
+    assert result["entity_details"]["name"] == "Advanced Light Microscopy Italian Node"
 
     # Test with non-existent node ID
-    result = await get_node_details(bioimage_index, "nonexistent-node-id")
+    result = await get_entity_details(bioimage_index, "nonexistent-node-id")
     assert "error" in result
 
 
 @pytest.mark.asyncio
 async def test_get_technology_details(bioimage_index):
-    """Test getting technology details."""
+    """Test getting technology details using get_entity_details."""
     # Test with known technology ID
-    result = await get_technology_details(
-        bioimage_index, "f0acc857-fc72-4094-bf14-c36ac40801c5"
+    result = await get_entity_details(
+        bioimage_index,
+        "f0acc857-fc72-4094-bf14-c36ac40801c5",  # Let it infer it's a technology
     )
 
-    assert "technology_id" in result
-    assert "technology" in result
+    assert "entity_id" in result
+    assert "entity_type" in result
+    assert result["entity_type"] == "technology"
+    assert "entity_details" in result
     assert (
-        "3D Correlative Light and Electron Microscopy" in result["technology"]["name"]
+        "3D Correlative Light and Electron Microscopy"
+        in result["entity_details"]["name"]
     )
 
     # Test with non-existent technology ID
-    result = await get_technology_details(bioimage_index, "nonexistent-tech-id")
+    result = await get_entity_details(bioimage_index, "nonexistent-tech-id")
     assert "error" in result
 
 
 @pytest.mark.asyncio
-async def test_search_nodes(bioimage_index):
-    """Test searching nodes by name."""
+async def test_search_nodes_via_index(bioimage_index):
+    """Test searching nodes by name using the index directly."""
     # Test search with partial match
-    result = await search_nodes(bioimage_index, "microscopy", limit=5)
+    nodes = bioimage_index.search_nodes_by_name("microscopy")
 
-    assert "query" in result
-    assert "nodes" in result
-    assert "total_results" in result
-    assert "returned_results" in result
-
+    assert len(nodes) > 0
     # Should find nodes with "microscopy" in the name
-    assert result["total_results"] >= 2
-    assert len(result["nodes"]) <= 5  # Respects limit
+    assert len(nodes) >= 2
+
+    # Check that results have expected structure
+    for node in nodes:
+        assert "id" in node
+        assert "name" in node
+        assert "microscopy" in node["name"].lower()
 
 
 @pytest.mark.asyncio
-async def test_search_technologies(bioimage_index):
-    """Test searching technologies by name."""
+async def test_search_technologies_via_index(bioimage_index):
+    """Test searching technologies by name using the index directly."""
     # Test search with partial match
-    result = await search_technologies(bioimage_index, "microscopy", limit=5)
+    technologies = bioimage_index.search_technologies_by_name("microscopy")
 
-    assert "query" in result
-    assert "technologies" in result
-    assert "total_results" in result
-    assert "returned_results" in result
-
+    assert len(technologies) > 0
     # Should find technologies with "microscopy" in the name
-    assert result["total_results"] >= 1
+    assert len(technologies) >= 1
+
+    # Check that results have expected structure
+    for tech in technologies:
+        assert "id" in tech
+        assert "name" in tech
+        assert "microscopy" in tech["name"].lower()
 
 
 @pytest.mark.asyncio
-async def test_get_all_nodes(bioimage_index):
-    """Test getting all nodes."""
-    result = await get_all_nodes(bioimage_index, limit=10)
+async def test_get_all_nodes_via_index(bioimage_index):
+    """Test getting all nodes using the index directly."""
+    nodes = bioimage_index.get_all_nodes()
 
-    assert "nodes" in result
-    assert "total_nodes" in result
-    assert "returned_nodes" in result
+    assert len(nodes) > 0
+    assert len(nodes) >= 3
 
-    assert result["total_nodes"] >= 3
-    assert len(result["nodes"]) <= 10  # Respects limit
-
-
-@pytest.mark.asyncio
-async def test_get_all_technologies(bioimage_index):
-    """Test getting all technologies."""
-    result = await get_all_technologies(bioimage_index, limit=10)
-
-    assert "technologies" in result
-    assert "total_technologies" in result
-    assert "returned_technologies" in result
-
-    assert result["total_technologies"] >= 3
-    assert len(result["technologies"]) <= 10  # Respects limit
+    # Check that all nodes have expected structure
+    for node in nodes:
+        assert "id" in node
+        assert "name" in node
 
 
 @pytest.mark.asyncio
-async def test_get_service_statistics(bioimage_index):
-    """Test getting service statistics."""
-    result = await get_service_statistics(bioimage_index)
+async def test_get_all_technologies_via_index(bioimage_index):
+    """Test getting all technologies using the index directly."""
+    technologies = bioimage_index.get_all_technologies()
 
-    assert "service" in result
-    assert "status" in result
-    assert "statistics" in result
+    assert len(technologies) > 0
+    assert len(technologies) >= 3
 
-    assert result["service"] == "bioimage_service"
-    assert result["status"] == "active"
+    # Check that all technologies have expected structure
+    for tech in technologies:
+        assert "id" in tech
+        assert "name" in tech
 
-    stats = result["statistics"]
+
+@pytest.mark.asyncio
+async def test_get_service_statistics_via_index(bioimage_index):
+    """Test getting service statistics using the index directly."""
+    stats = bioimage_index.get_statistics()
+
     assert "total_nodes" in stats
     assert "total_technologies" in stats
     assert "total_relationships" in stats
+
+    assert stats["total_nodes"] >= 3
+    assert stats["total_technologies"] >= 3
+    assert stats["total_relationships"] > 0
 
 
 @pytest.mark.asyncio

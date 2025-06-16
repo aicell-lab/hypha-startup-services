@@ -1,8 +1,9 @@
 """Tests for metadata preservation and score variances in mem0 search results."""
 
-import pytest
 import uuid
+import asyncio
 import time
+import pytest
 from tests.mem0_service.utils import (
     TEST_AGENT_ID,
     TEST_RUN_ID,
@@ -78,9 +79,6 @@ async def test_metadata_preservation(mem0_service):
         )
         assert result is not None
         assert "results" in result
-
-    # Wait for indexing to complete
-    import asyncio
 
     await asyncio.sleep(5)  # Longer wait for indexing
 

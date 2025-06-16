@@ -9,6 +9,7 @@ from hypha_startup_services.mem0_service.methods import (
     mem0_add,
     mem0_search,
     mem0_delete_all,
+    mem0_get_all,
     init_run,
     init_agent,
 )
@@ -38,6 +39,7 @@ async def register_mem0_service(
             "add": partial(mem0_add, server=server, memory=mem0),
             "search": partial(mem0_search, server=server, memory=mem0),
             "delete_all": partial(mem0_delete_all, server=server, memory=mem0),
+            "get_all": partial(mem0_get_all, server=server, memory=mem0),
         }
     )
 
