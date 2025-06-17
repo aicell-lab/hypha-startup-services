@@ -94,9 +94,9 @@ async def get_related_entities(
 
 
 async def query(
+    query_text: str,
     memory: AsyncMemory,
     bioimage_index: BioimageIndex,
-    query_text: str,
     include_related: bool = True,
     limit: int = 10,
 ) -> dict[str, Any]:
@@ -105,10 +105,9 @@ async def query(
     This replaces the separate semantic_query and find_related_entities_semantic methods.
 
     Args:
+        query_text: Natural language query
         memory: AsyncMemory instance
         bioimage_index: BioimageIndex instance for related entity lookups
-        query_text: Natural language query
-        entity_types: Filter by entity types (node, technology)
         include_related: Whether to include related entities for each result
         limit: Maximum number of results
 

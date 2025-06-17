@@ -148,15 +148,49 @@ class RemoteMemoryServiceWrapper:
 
     def __init__(self, service):
         self.service = service
+        self._initialized = False
+
+    async def _ensure_initialized(self, agent_id: str = EBI_AGENT_ID):
+        """Ensure the remote service is properly initialized before any operations."""
+        if not self._initialized:
+            logger.info("Initializing remote service agent and workspace...")
+            try:
+                # Initialize agent first
+                await self.service.init_agent(
+                    agent_id=agent_id,
+                    description="EBI BioImage Assistant for loading and searching bioimage data",
+                    metadata={"service": "bioimage", "data_source": "ebi"},
+                )
+
+                # Initialize workspace/run
+                await self.service.init(agent_id=agent_id)
+                self._initialized = True
+                logger.info("✅ Remote service initialized successfully")
+            except Exception as e:
+                logger.warning("Remote service initialization warning: %s", e)
+                # Continue anyway, the service might already be initialized
+                self._initialized = True
+
+    async def init_agent(self, agent_id: str = EBI_AGENT_ID, **kwargs):
+        """Initialize agent via remote service."""
+        await self._ensure_initialized(agent_id)
+        return await self.service.init_agent(agent_id=agent_id, **kwargs)
+
+    async def init(self, agent_id: str = EBI_AGENT_ID, **kwargs):
+        """Initialize run via remote service."""
+        await self._ensure_initialized(agent_id)
+        return await self.service.init(agent_id=agent_id, **kwargs)
 
     async def add(self, messages, agent_id: str = EBI_AGENT_ID, **kwargs):
         """Add memories via remote service."""
+        await self._ensure_initialized(agent_id)
         return await self.service.add(messages=messages, agent_id=agent_id, **kwargs)
 
     async def search(
         self, query: str, agent_id: str = EBI_AGENT_ID, limit: int = 10, **kwargs
     ):
         """Search memories via remote service."""
+        await self._ensure_initialized(agent_id)
         return await self.service.search(
             query=query, agent_id=agent_id, limit=limit, **kwargs
         )
@@ -172,10 +206,12 @@ class RemoteMemoryServiceWrapper:
 
     async def get_all(self, agent_id: str = EBI_AGENT_ID, limit: int = 10000, **kwargs):
         """Get all memories via remote service."""
+        await self._ensure_initialized(agent_id)
         return await self.service.get_all(agent_id=agent_id, limit=limit, **kwargs)
 
     async def delete_all(self, agent_id: str = EBI_AGENT_ID, **kwargs):
         """Delete all memories via remote service."""
+        await self._ensure_initialized(agent_id)
         return await self.service.delete_all(agent_id=agent_id, **kwargs)
 
 
