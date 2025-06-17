@@ -491,6 +491,7 @@ def patch_mem0_get_all_from_vector_store():
                 "created_at",
                 "updated_at",
                 "id",
+                "metadata",  # Exclude existing metadata to prevent nesting
                 *promoted_payload_keys,
             }
 
@@ -519,6 +520,7 @@ def patch_mem0_get_all_from_vector_store():
                         memory_item_dict[key] = mem.payload[key]  # type: ignore
 
                 # Get additional metadata, ensuring payload exists and is iterable
+                # Exclude core fields and existing metadata to prevent nesting
                 additional_metadata = {}
                 if (
                     hasattr(mem, "payload")
@@ -530,6 +532,20 @@ def patch_mem0_get_all_from_vector_store():
                         for k, v in mem.payload.items()  # type: ignore
                         if k not in core_and_promoted_keys
                     }
+
+                # If there's existing metadata in the payload, merge it properly
+                existing_metadata = {}
+                if (
+                    hasattr(mem, "payload")
+                    and mem.payload
+                    and "metadata" in mem.payload  # type: ignore
+                ):
+                    existing_metadata = mem.payload["metadata"]  # type: ignore
+                    if isinstance(existing_metadata, dict):
+                        # Merge existing metadata with additional metadata
+                        additional_metadata.update(existing_metadata)
+
+                # Set the final metadata
                 if additional_metadata:
                     memory_item_dict["metadata"] = additional_metadata
 

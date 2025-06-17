@@ -80,15 +80,6 @@ def _create_technology_metadata(tech: Dict[str, Any]) -> Dict[str, Any]:
     return {k: v for k, v in metadata.items() if v is not None}
 
 
-def _extract_metadata_from_memory(memory_item: Dict[str, Any]) -> Dict[str, Any]:
-    """Extract and flatten metadata from memory item."""
-    metadata = memory_item.get("metadata", {})
-    # Handle nested metadata structure if it exists
-    if isinstance(metadata, dict) and "metadata" in metadata:
-        return metadata.get("metadata", {})
-    return metadata
-
-
 async def semantic_bioimage_search(
     memory: AsyncMemory,
     search_query: str,
@@ -119,7 +110,7 @@ async def semantic_bioimage_search(
     processed_results = []
 
     for memory_item in memories:
-        metadata = _extract_metadata_from_memory(memory_item)
+        metadata = memory_item.get("metadata", {})
         processed_results.append(
             {
                 "memory": memory_item.get("memory", ""),
