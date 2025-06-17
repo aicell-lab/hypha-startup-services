@@ -5,12 +5,16 @@ Improved script to build the bioimage index with deduplication and character cle
 This script:
 1. Loads EBI nodes and technologies data from JSON files
 2. Builds the Python index for fast lookups
-3. Initializes and populates the mem0 database with bioimage data
+3. Initializes and populates the mem0 database with bioimage data (local or remote)
 4. ENSURES NO DUPLICATES by tracking content hashes
 5. Cleans up problematic characters (null bytes, control characters)
 
 Usage:
+    # Use local mem0 service
     python scripts/build_bioimage_index_deduplicated.py [--nodes-file path] [--tech-file path] [--force-rebuild]
+
+    # Use remote Hypha service (requires HYPHA_TOKEN environment variable)
+    python scripts/build_bioimage_index_deduplicated.py --remote [--service-id aria-agents/mem0]
 """
 
 import argparse
@@ -35,6 +39,10 @@ from hypha_startup_services.bioimage_service.utils import (
     _create_technology_metadata,
 )
 from hypha_startup_services.mem0_service.mem0_client import get_mem0
+from dotenv import load_dotenv
+from hypha_rpc import connect_to_server
+
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(
@@ -87,6 +95,90 @@ def create_content_hash(content: str) -> str:
     return hashlib.sha256(cleaned_content.encode("utf-8")).hexdigest()
 
 
+async def get_memory_service(
+    use_remote: bool = False, service_id: str = "aria-agents/mem0"
+):
+    """
+    Get the memory service - either local mem0 or remote Hypha service.
+
+    Args:
+        use_remote: If True, connect to remote Hypha service
+        service_id: Remote service ID to connect to
+
+    Returns:
+        Memory service instance (either AsyncMemory or RemoteServiceWrapper)
+    """
+    if use_remote:
+        # Get the HYPHA_TOKEN from environment
+        token = os.environ.get("HYPHA_TOKEN")
+        if not token:
+            raise ValueError(
+                "HYPHA_TOKEN environment variable is required for remote connections"
+            )
+
+        logger.info("🌐 Connecting to remote Hypha service...")
+
+        # Connect to Hypha server
+        server = await connect_to_server(
+            {  # type: ignore
+                "server_url": "https://hypha.aicell.io",
+                "token": token,
+            }
+        )
+
+        # Get the remote service
+        try:
+            service = await server.get_service(service_id)  # type: ignore
+            logger.info("✅ Connected to remote service: %s", service_id)
+            return RemoteMemoryServiceWrapper(service)
+        except Exception as e:
+            await server.disconnect()  # type: ignore
+            raise RuntimeError(
+                f"Failed to connect to remote service {service_id}: {e}"
+            ) from e
+    else:
+        logger.info("🔌 Using local mem0 service...")
+        return await get_mem0()
+
+
+class RemoteMemoryServiceWrapper:
+    """
+    Wrapper to adapt the remote Hypha mem0 service API to match local AsyncMemory interface.
+    """
+
+    def __init__(self, service):
+        self.service = service
+
+    async def add(self, messages, agent_id: str = EBI_AGENT_ID, **kwargs):
+        """Add memories via remote service."""
+        return await self.service.add(messages=messages, agent_id=agent_id, **kwargs)
+
+    async def search(
+        self, query: str, agent_id: str = EBI_AGENT_ID, limit: int = 10, **kwargs
+    ):
+        """Search memories via remote service."""
+        return await self.service.search(
+            query=query, agent_id=agent_id, limit=limit, **kwargs
+        )
+
+    async def delete(self, memory_id: str, **kwargs):
+        """Delete single memory via remote service (not directly supported)."""
+        logger.warning(
+            "Individual memory deletion not supported by remote service API. Use delete_all() instead."
+        )
+        raise NotImplementedError(
+            "Single memory deletion not supported by remote service API"
+        )
+
+    async def get_all(self, agent_id: str = EBI_AGENT_ID, limit: int = 10000, **kwargs):
+        """Get all memories via remote service."""
+        return await self.service.get_all(agent_id=agent_id, limit=limit, **kwargs)
+
+    async def delete_all(self, agent_id: str = EBI_AGENT_ID, **kwargs):
+        """Delete all memories via remote service."""
+        return await self.service.delete_all(agent_id=agent_id, **kwargs)
+
+
 async def initialize_bioimage_database_deduplicated(
     memory,
     nodes_data: list,
@@ -118,20 +210,33 @@ async def initialize_bioimage_database_deduplicated(
                 logger.info(
                     "Found %d existing memories, clearing...", len(existing_memories)
                 )
-                # Delete all existing memories
-                deleted_count = 0
-                for mem in existing_memories:
-                    try:
-                        await memory.delete(memory_id=mem["id"])
-                        deleted_count += 1
-                    except (KeyError, ValueError, RuntimeError) as e:
-                        logger.warning(
-                            "Failed to delete memory %s: %s",
-                            mem.get("id", "unknown"),
-                            e,
-                        )
 
-                logger.info("Cleared %d existing bioimage memories", deleted_count)
+                # For remote service, use delete_all; for local, delete individually
+                if isinstance(memory, RemoteMemoryServiceWrapper):
+                    try:
+                        result = await memory.delete_all(agent_id=EBI_AGENT_ID)
+                        logger.info(
+                            "Cleared all existing bioimage memories via remote service: %s",
+                            result,
+                        )
+                    except Exception as e:
+                        logger.warning(
+                            "Failed to clear memories via remote service: %s", e
+                        )
+                else:
+                    # Local service - delete individual memories
+                    deleted_count = 0
+                    for mem in existing_memories:
+                        try:
+                            await memory.delete(memory_id=mem["id"])
+                            deleted_count += 1
+                        except (KeyError, ValueError, RuntimeError) as e:
+                            logger.warning(
+                                "Failed to delete memory %s: %s",
+                                mem.get("id", "unknown"),
+                                e,
+                            )
+                    logger.info("Cleared %d existing bioimage memories", deleted_count)
         except (KeyError, ValueError, RuntimeError) as e:
             logger.warning("Error during cleanup: %s", e)
 
@@ -267,6 +372,8 @@ async def build_bioimage_index_deduplicated(
     nodes_file: str | None = None,
     technologies_file: str | None = None,
     force_rebuild: bool = False,
+    use_remote: bool = False,
+    service_id: str = "aria-agents/mem0",
 ) -> bool:
     """Main function to build the bioimage index and database with deduplication."""
 
@@ -287,10 +394,11 @@ async def build_bioimage_index_deduplicated(
         logger.error("❌ Failed to build Python index: %s", e)
         return False
 
-    # Step 2: Initialize mem0 database with deduplication
-    logger.info("🧠 Initializing mem0 database with deduplication...")
+    # Step 2: Initialize memory database with deduplication
+    service_type = "remote Hypha service" if use_remote else "local mem0"
+    logger.info("🧠 Initializing %s database with deduplication...", service_type)
     try:
-        memory = await get_mem0()
+        memory = await get_memory_service(use_remote=use_remote, service_id=service_id)
 
         # Get the processed data from the index
         nodes_data = bioimage_index.get_all_nodes()
@@ -362,7 +470,7 @@ async def build_bioimage_index_deduplicated(
 def main():
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
-        description="Build bioimage Python index and mem0 database with deduplication"
+        description="Build bioimage Python index and memory database (local mem0 or remote Hypha) with deduplication"
     )
 
     parser.add_argument(
@@ -384,6 +492,19 @@ def main():
     )
 
     parser.add_argument(
+        "--remote",
+        action="store_true",
+        help="Use remote Hypha service instead of local mem0 (requires HYPHA_TOKEN)",
+    )
+
+    parser.add_argument(
+        "--service-id",
+        type=str,
+        default="aria-agents/mem0",
+        help="Remote Hypha service ID to connect to (default: aria-agents/mem0)",
+    )
+
+    parser.add_argument(
         "--verbose",
         "-v",
         action="store_true",
@@ -402,6 +523,8 @@ def main():
                 nodes_file=args.nodes_file,
                 technologies_file=args.tech_file,
                 force_rebuild=args.force_rebuild,
+                use_remote=args.remote,
+                service_id=args.service_id,
             )
         )
 

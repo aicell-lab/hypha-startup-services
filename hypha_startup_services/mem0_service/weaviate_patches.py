@@ -265,11 +265,9 @@ def patch_weaviate_list():
             """
             Patched list method with proper metadata handling.
             """
-            import logging
-
-            logger = logging.getLogger(__name__)
-
-            logger.info(f"Weaviate.list called with filters={filters}, limit={limit}")
+            logger.info(
+                "Weaviate.list called with filters=%s, limit=%s", filters, limit
+            )
 
             collection = self.client.collections.get(str(self.collection_name))
 
@@ -289,7 +287,7 @@ def patch_weaviate_list():
                 return_properties=WEAVIATE_RETURN_PROPERTIES,
             )
 
-            logger.info(f"Filtered query returned {len(response.objects)} objects")
+            logger.info("Filtered query returned %s objects", len(response.objects))
 
             results = []
             for obj in response.objects:
@@ -318,11 +316,11 @@ def patch_weaviate_list():
 
             # Return wrapped in a list to match original Weaviate.list behavior
             # The mem0 code expects memories[0] to contain the actual results
-            logger.info(f"Returning {len(results)} results wrapped in list")
+            logger.info("Returning %s results wrapped in list", len(results))
             return [results]
 
         # Apply the patch
-        Weaviate.list = patched_list
+        Weaviate.list = patched_list  # type: ignore
         logger.info("Successfully patched Weaviate.list method")
         return True
 
@@ -449,19 +447,19 @@ def patch_mem0_get_all_from_vector_store():
             """
             Patched _get_all_from_vector_store method that handles list results correctly.
             """
-            import logging
-
-            logger = logging.getLogger(__name__)
-
             logger.info(
-                f"DEBUG: get_all_from_vector_store called with filters={filters}, limit={limit}"
+                "DEBUG: get_all_from_vector_store called with filters=%s, limit=%s",
+                filters,
+                limit,
             )
 
             memories_result = await asyncio.to_thread(
                 self.vector_store.list, filters=filters, limit=limit
             )
             logger.info(
-                f"DEBUG: vector_store.list returned type={type(memories_result)}, content={memories_result}"
+                "DEBUG: vector_store.list returned type=%s, content=%s",
+                type(memories_result),
+                memories_result,
             )
 
             actual_memories = (
@@ -471,7 +469,13 @@ def patch_mem0_get_all_from_vector_store():
                 else memories_result
             )
             logger.info(
-                f"DEBUG: actual_memories type={type(actual_memories)}, length={len(actual_memories) if hasattr(actual_memories, '__len__') else 'no len'}"
+                "DEBUG: actual_memories type=%s, length=%s",
+                type(actual_memories),
+                (
+                    len(actual_memories)
+                    if hasattr(actual_memories, "__len__")
+                    else "no len"
+                ),
             )
 
             promoted_payload_keys = [
@@ -493,36 +497,46 @@ def patch_mem0_get_all_from_vector_store():
             formatted_memories = []
             for i, mem in enumerate(actual_memories):
                 logger.info(
-                    f"DEBUG: Processing memory {i}: type={type(mem)}, id={getattr(mem, 'id', 'no id')}"
+                    "DEBUG: Processing memory %s: type=%s, id=%s",
+                    i,
+                    type(mem),
+                    getattr(mem, "id", "no id"),
                 )
                 from mem0.configs.base import MemoryItem
 
                 memory_item_dict = MemoryItem(
                     id=mem.id,
-                    memory=mem.payload["data"],
-                    hash=mem.payload.get("hash"),
-                    created_at=mem.payload.get("created_at"),
-                    updated_at=mem.payload.get("updated_at"),
+                    memory=mem.payload["data"],  # type: ignore
+                    hash=mem.payload.get("hash"),  # type: ignore
+                    created_at=mem.payload.get("created_at"),  # type: ignore
+                    updated_at=mem.payload.get("updated_at"),  # type: ignore
                     metadata={},  # Will be set below if needed
                     score=getattr(mem, "score", 1.0),  # Default score
                 ).model_dump(exclude={"score"})
 
                 for key in promoted_payload_keys:
-                    if key in mem.payload:
-                        memory_item_dict[key] = mem.payload[key]
+                    if hasattr(mem, "payload") and mem.payload and key in mem.payload:  # type: ignore
+                        memory_item_dict[key] = mem.payload[key]  # type: ignore
 
-                additional_metadata = {
-                    k: v
-                    for k, v in mem.payload.items()
-                    if k not in core_and_promoted_keys
-                }
+                # Get additional metadata, ensuring payload exists and is iterable
+                additional_metadata = {}
+                if (
+                    hasattr(mem, "payload")
+                    and mem.payload
+                    and hasattr(mem.payload, "items")
+                ):
+                    additional_metadata = {
+                        k: v
+                        for k, v in mem.payload.items()  # type: ignore
+                        if k not in core_and_promoted_keys
+                    }
                 if additional_metadata:
                     memory_item_dict["metadata"] = additional_metadata
 
                 formatted_memories.append(memory_item_dict)
 
             logger.info(
-                f"DEBUG: Returning {len(formatted_memories)} formatted memories"
+                "DEBUG: Returning %s formatted memories", len(formatted_memories)
             )
             return formatted_memories
 
