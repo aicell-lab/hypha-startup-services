@@ -4,74 +4,58 @@ import os
 from typing import Dict, List, Any, Set
 import json
 import logging
+from markdownify import markdownify as md
 
 logger = logging.getLogger(__name__)
 
 
-# Sample EBI data - in a real implementation this would be loaded from external sources
-EBI_NODES_DATA = [
-    {
-        "id": "7409a98f-1bdb-47d2-80e7-c89db73efedd",
-        "name": "Advanced Light Microscopy Italian Node",
-        "description": "The Italian ALM Node comprises five imaging facilities located in Naples, Genoa, Padua, Florence and Milan specializing in correlative light electron microscopy, super-resolution, and functional imaging.",
-        "country": {"name": "Italy", "iso_a2": "IT"},
-        "technologies": [
-            "f0acc857-fc72-4094-bf14-c36ac40801c5",  # 3D CLEM
-            "68a3b6c4-9c19-4446-9617-22e7d37e0f2c",  # 4Pi microscopy
-            "correlative_microscopy",
-            "super_resolution",
-            "functional_imaging",
-        ],
-    },
-    {
-        "id": "099e48ff-7204-46ea-8828-10025e945081",
-        "name": "Advanced Light Microscopy Node Poland",
-        "description": "Multi-sited, multimodal EuroBioimaging Node offering open access to multi-modal ALM, CLEM, EM, functional imaging, high-throughput microscopy and super-resolution microscopy.",
-        "country": {"name": "Poland", "iso_a2": "PL"},
-        "technologies": [
-            "f0acc857-fc72-4094-bf14-c36ac40801c5",  # 3D CLEM
-            "multi_modal_alm",
-            "clem",
-            "electron_microscopy",
-            "high_throughput",
-        ],
-    },
-    {
-        "id": "bc123456-789a-bcde-f012-3456789abcde",
-        "name": "German BioImaging Node",
-        "description": "German node providing advanced microscopy services including super-resolution and live-cell imaging.",
-        "country": {"name": "Germany", "iso_a2": "DE"},
-        "technologies": [
-            "68a3b6c4-9c19-4446-9617-22e7d37e0f2c",  # 4Pi microscopy
-            "super_resolution",
-            "live_cell_imaging",
-        ],
-    },
-]
+def html_to_markdown(html_text: str) -> str:
+    """Convert HTML text to markdown format."""
+    if not html_text:
+        return ""
 
-EBI_TECHNOLOGIES_DATA = [
-    {
-        "id": "f0acc857-fc72-4094-bf14-c36ac40801c5",
-        "name": "3D Correlative Light and Electron Microscopy (3D-CLEM)",
-        "abbr": "3D-CLEM",
-        "description": "3D CLEM combines volume EM methods with 3D light microscopy techniques requiring 3D registration between modalities.",
-        "category": {"name": "Correlative Light Microscopy and Electron Microscopy"},
-    },
-    {
-        "id": "68a3b6c4-9c19-4446-9617-22e7d37e0f2c",
-        "name": "4Pi microscopy",
-        "abbr": "4Pi",
-        "description": "Laser scanning fluorescence microscope with improved axial resolution using two opposing objective lenses for coherent wavefront matching.",
-        "category": {"name": "Fluorescence Nanoscopy"},
-    },
-    {
-        "id": "abc12345-6789-abcd-ef01-23456789abcd",
-        "name": "Super-resolution microscopy",
-        "abbr": "SRM",
-        "description": "Techniques that surpass the diffraction limit of light microscopy to achieve nanometer resolution.",
-        "category": {"name": "Fluorescence Nanoscopy"},
-    },
-]
+    # Convert HTML to markdown, removing extra whitespace
+    markdown_text = md(html_text, heading_style="ATX").strip()
+
+    # Clean up common formatting issues
+    markdown_text = markdown_text.replace("\n\n\n", "\n\n")  # Remove triple newlines
+    markdown_text = markdown_text.replace("\\*", "*")  # Fix escaped asterisks
+
+    return markdown_text
+
+
+def process_node_data(node: Dict[str, Any]) -> Dict[str, Any]:
+    """Process node data to convert HTML descriptions to markdown."""
+    processed_node = node.copy()
+
+    # Convert HTML description to markdown
+    if "description" in processed_node and processed_node["description"]:
+        processed_node["description"] = html_to_markdown(processed_node["description"])
+
+    # Handle long_description if present
+    if "long_description" in processed_node and processed_node["long_description"]:
+        processed_node["long_description"] = html_to_markdown(
+            processed_node["long_description"]
+        )
+
+    return processed_node
+
+
+def process_technology_data(tech: Dict[str, Any]) -> Dict[str, Any]:
+    """Process technology data to convert HTML descriptions to markdown."""
+    processed_tech = tech.copy()
+
+    # Convert HTML description to markdown
+    if "description" in processed_tech and processed_tech["description"]:
+        processed_tech["description"] = html_to_markdown(processed_tech["description"])
+
+    # Handle long_description if present
+    if "long_description" in processed_tech and processed_tech["long_description"]:
+        processed_tech["long_description"] = html_to_markdown(
+            processed_tech["long_description"]
+        )
+
+    return processed_tech
 
 
 class BioimageIndex:
@@ -92,26 +76,32 @@ class BioimageIndex:
     ):
         """Load and index the EBI data."""
 
-        # Index technologies
+        # Process and index technologies
         for tech in technologies_data:
             tech_id = tech["id"]
-            self.technologies[tech_id] = tech
-            # Create name-to-id mapping (case-insensitive)
-            tech_name = tech["name"].lower()
-            self.technology_name_to_id[tech_name] = tech_id
-            if tech.get("abbr"):
-                self.technology_name_to_id[tech["abbr"].lower()] = tech_id
+            # Process HTML descriptions to markdown
+            processed_tech = process_technology_data(tech)
+            self.technologies[tech_id] = processed_tech
 
-        # Index nodes and build relationships
+            # Create name-to-id mapping (case-insensitive)
+            tech_name = processed_tech["name"].lower()
+            self.technology_name_to_id[tech_name] = tech_id
+            if processed_tech.get("abbr"):
+                self.technology_name_to_id[processed_tech["abbr"].lower()] = tech_id
+
+        # Process and index nodes and build relationships
         for node in nodes_data:
             node_id = node["id"]
-            self.nodes[node_id] = node
+            # Process HTML descriptions to markdown
+            processed_node = process_node_data(node)
+            self.nodes[node_id] = processed_node
+
             # Create name-to-id mapping (case-insensitive)
-            node_name = node["name"].lower()
+            node_name = processed_node["name"].lower()
             self.node_name_to_id[node_name] = node_id
 
             # Build technology relationships
-            technologies = node.get("technologies", [])
+            technologies = processed_node.get("technologies", [])
             self.node_to_technologies[node_id] = set()
 
             for tech_ref in technologies:
@@ -237,8 +227,8 @@ def load_external_data(
             os.path.dirname(__file__), "assets", "ebi-tech.json"
         )
 
-    nodes_data = EBI_NODES_DATA
-    technologies_data = EBI_TECHNOLOGIES_DATA
+    nodes_data = []
+    technologies_data = []
 
     if nodes_file and os.path.exists(nodes_file):
         try:

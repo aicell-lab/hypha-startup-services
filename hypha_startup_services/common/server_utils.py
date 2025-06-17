@@ -4,19 +4,18 @@ import os
 import sys
 import subprocess
 import asyncio
-from typing import Optional, Callable, Any
+from typing import Callable, Any
 from websockets.exceptions import InvalidURI
 from hypha_rpc import connect_to_server
 from hypha_rpc.rpc import RemoteService, RemoteException
-
 from .constants import DEFAULT_LOCAL_EXISTING_HOST
 
 
 async def register_to_existing_server(
     provided_url: str,
-    port: Optional[int],
     service_id: str,
     register_function: Callable[[RemoteService, str], Any],
+    port: int | None = None,
 ) -> None:
     """Register a service to an existing Hypha server.
 
@@ -75,14 +74,14 @@ async def run_local_server(
 
 def connect_to_remote(
     server_url: str,
-    port: Optional[int],
+    port: int | None,
     service_id: str,
     register_function: Callable[[RemoteService, str], Any],
 ) -> None:
     """Connect to remote server and register service."""
     loop = asyncio.get_event_loop()
     loop.create_task(
-        register_to_existing_server(server_url, port, service_id, register_function)
+        register_to_existing_server(server_url, service_id, register_function, port)
     )
     loop.run_forever()
 

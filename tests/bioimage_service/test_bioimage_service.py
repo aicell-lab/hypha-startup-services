@@ -9,11 +9,73 @@ from hypha_startup_services.bioimage_service.methods import (
     get_entity_details,
     get_related_entities,
 )
-from hypha_startup_services.bioimage_service.data_index import (
-    BioimageIndex,
-    EBI_NODES_DATA,
-    EBI_TECHNOLOGIES_DATA,
-)
+from hypha_startup_services.bioimage_service.data_index import BioimageIndex
+
+
+# Sample EBI data - in a real implementation this would be loaded from external sources
+EBI_NODES_DATA = [
+    {
+        "id": "7409a98f-1bdb-47d2-80e7-c89db73efedd",
+        "name": "Advanced Light Microscopy Italian Node",
+        "description": "The Italian ALM Node comprises five imaging facilities located in Naples, Genoa, Padua, Florence and Milan specializing in correlative light electron microscopy, super-resolution, and functional imaging.",
+        "country": {"name": "Italy", "iso_a2": "IT"},
+        "technologies": [
+            "f0acc857-fc72-4094-bf14-c36ac40801c5",  # 3D CLEM
+            "68a3b6c4-9c19-4446-9617-22e7d37e0f2c",  # 4Pi microscopy
+            "correlative_microscopy",
+            "super_resolution",
+            "functional_imaging",
+        ],
+    },
+    {
+        "id": "099e48ff-7204-46ea-8828-10025e945081",
+        "name": "Advanced Light Microscopy Node Poland",
+        "description": "Multi-sited, multimodal EuroBioimaging Node offering open access to multi-modal ALM, CLEM, EM, functional imaging, high-throughput microscopy and super-resolution microscopy.",
+        "country": {"name": "Poland", "iso_a2": "PL"},
+        "technologies": [
+            "f0acc857-fc72-4094-bf14-c36ac40801c5",  # 3D CLEM
+            "multi_modal_alm",
+            "clem",
+            "electron_microscopy",
+            "high_throughput",
+        ],
+    },
+    {
+        "id": "bc123456-789a-bcde-f012-3456789abcde",
+        "name": "German BioImaging Node",
+        "description": "German node providing advanced microscopy services including super-resolution and live-cell imaging.",
+        "country": {"name": "Germany", "iso_a2": "DE"},
+        "technologies": [
+            "68a3b6c4-9c19-4446-9617-22e7d37e0f2c",  # 4Pi microscopy
+            "super_resolution",
+            "live_cell_imaging",
+        ],
+    },
+]
+
+EBI_TECHNOLOGIES_DATA = [
+    {
+        "id": "f0acc857-fc72-4094-bf14-c36ac40801c5",
+        "name": "3D Correlative Light and Electron Microscopy (3D-CLEM)",
+        "abbr": "3D-CLEM",
+        "description": "3D CLEM combines volume EM methods with 3D light microscopy techniques requiring 3D registration between modalities.",
+        "category": {"name": "Correlative Light Microscopy and Electron Microscopy"},
+    },
+    {
+        "id": "68a3b6c4-9c19-4446-9617-22e7d37e0f2c",
+        "name": "4Pi microscopy",
+        "abbr": "4Pi",
+        "description": "Laser scanning fluorescence microscope with improved axial resolution using two opposing objective lenses for coherent wavefront matching.",
+        "category": {"name": "Fluorescence Nanoscopy"},
+    },
+    {
+        "id": "abc12345-6789-abcd-ef01-23456789abcd",
+        "name": "Super-resolution microscopy",
+        "abbr": "SRM",
+        "description": "Techniques that surpass the diffraction limit of light microscopy to achieve nanometer resolution.",
+        "category": {"name": "Fluorescence Nanoscopy"},
+    },
+]
 
 
 @pytest.fixture
@@ -51,20 +113,17 @@ async def test_get_nodes_by_technology_id(bioimage_index):
     # Test with known technology ID - this should find nodes that provide this technology
     result = await get_related_entities(
         bioimage_index,
-        "f0acc857-fc72-4094-bf14-c36ac40801c5",  # Let it infer it's a technology
+        "f0acc857-fc72-4094-bf14-c36ac40801c5",  # 3D-CLEM technology
     )
 
-    assert "entity_id" in result
-    assert "entity_type" in result
-    assert result["entity_type"] == "technology"
-    assert "related_nodes" in result  # Technologies have related nodes
-    assert "total_related" in result
-
-    # Should find both Italian and Polish nodes that have 3D-CLEM
-    assert result["total_related"] >= 2
+    # Should return a list of nodes that have this technology
+    assert isinstance(result, list)
+    assert (
+        len(result) >= 2
+    )  # Should find both Italian and Polish nodes that have 3D-CLEM
 
     # Check that all returned nodes have the expected structure
-    for node in result["related_nodes"]:
+    for node in result:
         assert "id" in node
         assert "name" in node
         assert "description" in node
@@ -75,8 +134,9 @@ async def test_get_nodes_by_technology_id_not_found(bioimage_index):
     """Test getting nodes for non-existent technology ID."""
     result = await get_related_entities(bioimage_index, "nonexistent-tech-id")
 
-    assert "error" in result
-    assert result["entity_id"] == "nonexistent-tech-id"
+    # Should return an empty list for non-existent technology
+    assert isinstance(result, list)
+    assert len(result) == 0
 
 
 @pytest.mark.asyncio
@@ -85,20 +145,15 @@ async def test_get_technologies_by_node_id(bioimage_index):
     # Test with known node ID (Italian node) - this should find technologies provided by this node
     result = await get_related_entities(
         bioimage_index,
-        "7409a98f-1bdb-47d2-80e7-c89db73efedd",  # Let it infer it's a node
+        "7409a98f-1bdb-47d2-80e7-c89db73efedd",  # Italian node
     )
 
-    assert "entity_id" in result
-    assert "entity_type" in result
-    assert result["entity_type"] == "node"
-    assert "related_technologies" in result  # Nodes have related technologies
-    assert "total_related" in result
-
-    # Should find multiple technologies
-    assert result["total_related"] >= 2
+    # Should return a list of technologies provided by this node
+    assert isinstance(result, list)
+    assert len(result) >= 2  # Should find multiple technologies
 
     # Check that all returned technologies have the expected structure
-    for tech in result["related_technologies"]:
+    for tech in result:
         assert "id" in tech
         assert "name" in tech
         assert "description" in tech
@@ -109,8 +164,9 @@ async def test_get_technologies_by_node_id_not_found(bioimage_index):
     """Test getting technologies for non-existent node ID."""
     result = await get_related_entities(bioimage_index, "nonexistent-node-id")
 
-    assert "error" in result
-    assert result["entity_id"] == "nonexistent-node-id"
+    # Should return an empty list for non-existent node
+    assert isinstance(result, list)
+    assert len(result) == 0
 
 
 @pytest.mark.asyncio
@@ -119,7 +175,7 @@ async def test_get_node_details(bioimage_index):
     # Test with known node ID
     result = await get_entity_details(
         bioimage_index,
-        "7409a98f-1bdb-47d2-80e7-c89db73efedd",  # Let it infer it's a node
+        "7409a98f-1bdb-47d2-80e7-c89db73efedd",  # Italian node
     )
 
     assert "entity_id" in result
@@ -131,6 +187,7 @@ async def test_get_node_details(bioimage_index):
     # Test with non-existent node ID
     result = await get_entity_details(bioimage_index, "nonexistent-node-id")
     assert "error" in result
+    assert result["entity_id"] == "nonexistent-node-id"
 
 
 @pytest.mark.asyncio
@@ -139,7 +196,7 @@ async def test_get_technology_details(bioimage_index):
     # Test with known technology ID
     result = await get_entity_details(
         bioimage_index,
-        "f0acc857-fc72-4094-bf14-c36ac40801c5",  # Let it infer it's a technology
+        "f0acc857-fc72-4094-bf14-c36ac40801c5",  # 3D-CLEM technology
     )
 
     assert "entity_id" in result
@@ -154,6 +211,7 @@ async def test_get_technology_details(bioimage_index):
     # Test with non-existent technology ID
     result = await get_entity_details(bioimage_index, "nonexistent-tech-id")
     assert "error" in result
+    assert result["entity_id"] == "nonexistent-tech-id"
 
 
 @pytest.mark.asyncio

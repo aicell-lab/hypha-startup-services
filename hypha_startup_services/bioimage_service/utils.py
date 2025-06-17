@@ -1,31 +1,12 @@
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any
 from mem0 import AsyncMemory
-from hypha_startup_services.bioimage_service.data_index import BioimageIndex
 
 logger = logging.getLogger(__name__)
 
 # Constants for mem0 integration
 EBI_AGENT_ID = "ebi_bioimage_assistant"
 EBI_WORKSPACE = "ebi_data"
-
-
-def infer_entity_type(bioimage_index: BioimageIndex, entity_id: str) -> str | None:
-    """
-    Infer entity type from entity ID using bioimage_index.
-
-    Args:
-        bioimage_index: The bioimage index instance
-        entity_id: The entity ID to check
-
-    Returns:
-        The inferred entity type ('node' or 'technology') or None if not found
-    """
-    if entity_id in bioimage_index.nodes:
-        return "node"
-    elif entity_id in bioimage_index.technologies:
-        return "technology"
-    return None
 
 
 def _create_node_content(node: Dict[str, Any]) -> str:
@@ -111,7 +92,6 @@ def _extract_metadata_from_memory(memory_item: Dict[str, Any]) -> Dict[str, Any]
 async def semantic_bioimage_search(
     memory: AsyncMemory,
     search_query: str,
-    entity_types: Optional[List[str]] = None,
     limit: int = 10,
 ) -> Dict[str, Any]:
     """
@@ -128,17 +108,9 @@ async def semantic_bioimage_search(
     """
     logger.info("Performing semantic search for: '%s'", search_query)
 
-    # Build search filters
-    search_filters = {}
-    if entity_types:
-        search_filters["entity_type"] = (
-            entity_types[0] if len(entity_types) == 1 else entity_types
-        )
-
     search_results = await memory.search(
         query=search_query,
         agent_id=EBI_AGENT_ID,
-        filters=search_filters,
         limit=limit,
     )
 
@@ -158,7 +130,6 @@ async def semantic_bioimage_search(
 
     return {
         "query": search_query,
-        "entity_types": entity_types,
         "results": processed_results,
         "total_results": len(processed_results),
     }

@@ -4,15 +4,10 @@ Helper functions to register the BioImage service with proper API endpoints.
 
 from functools import partial
 from hypha_rpc.rpc import RemoteService
-from hypha_startup_services.bioimage_service.data_index import (
-    load_external_data,
-    EBI_NODES_DATA,
-    EBI_TECHNOLOGIES_DATA,
-)
+from hypha_startup_services.bioimage_service.data_index import load_external_data
 from hypha_startup_services.bioimage_service.methods import (
     get_entity_details,
     get_related_entities,
-    initialize_bioimage_database,
     query,
 )
 from hypha_startup_services.mem0_service.mem0_client import get_mem0
@@ -44,13 +39,6 @@ async def register_bioimage_service(
             # Entity-agnostic methods (preferred)
             "get": partial(get_entity_details, bioimage_index=bioimage_index),
             "get_related": partial(get_related_entities, bioimage_index=bioimage_index),
-            # Enhanced semantic search methods
-            "init": partial(
-                initialize_bioimage_database,
-                memory=memory,
-                nodes_data=EBI_NODES_DATA,
-                technologies_data=EBI_TECHNOLOGIES_DATA,
-            ),
             "query": partial(
                 query,
                 memory=memory,

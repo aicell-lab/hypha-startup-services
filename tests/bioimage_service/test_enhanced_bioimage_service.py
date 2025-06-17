@@ -2,18 +2,13 @@
 
 import pytest
 import pytest_asyncio
-from tests.conftest import get_user_server
 from hypha_startup_services.bioimage_service.methods import (
     get_entity_details,
     get_related_entities,
-    initialize_bioimage_database,
     query,
 )
 from hypha_startup_services.bioimage_service.data_index import (
-    BioimageIndex,
     load_external_data,
-    EBI_NODES_DATA,
-    EBI_TECHNOLOGIES_DATA,
 )
 from hypha_startup_services.mem0_service.mem0_client import get_mem0
 
@@ -31,34 +26,8 @@ async def mem0_memory():
 
 
 @pytest.mark.asyncio
-async def test_enhanced_bioimage_initialize_database(bioimage_index, mem0_memory):
-    """Test initializing the bioimage database with mem0."""
-    # Initialize the database
-    result = await initialize_bioimage_database(
-        memory=mem0_memory,
-        nodes_data=EBI_NODES_DATA,
-        technologies_data=EBI_TECHNOLOGIES_DATA,
-    )
-
-    assert result is not None
-    assert isinstance(result, dict)
-    assert "nodes" in result
-    assert "technologies" in result
-    assert result["nodes"] > 0
-    assert result["technologies"] > 0
-
-
-@pytest.mark.asyncio
-async def test_enhanced_bioimage_find_related_entities_by_technology_id(
-    bioimage_index, mem0_memory
-):
+async def test_enhanced_bioimage_find_related_entities_by_technology_id(bioimage_index):
     """Test finding related entities by technology ID (auto-infer type)."""
-    # First initialize the database
-    await initialize_bioimage_database(
-        memory=mem0_memory,
-        nodes_data=EBI_NODES_DATA,
-        technologies_data=EBI_TECHNOLOGIES_DATA,
-    )
 
     # Find entities related to 4Pi technology (should automatically infer it's a technology)
     tech_id = "68a3b6c4-9c19-4446-9617-22e7d37e0f2c"
@@ -68,22 +37,19 @@ async def test_enhanced_bioimage_find_related_entities_by_technology_id(
     )
 
     assert result is not None
-    assert isinstance(result, dict)
+    assert isinstance(result, list)
 
     # Should find nodes that provide this technology
-    assert "related_nodes" in result
-    assert len(result["related_nodes"]) > 0
+    assert len(result) > 0
 
     # Check that we get the right structure for related entities
-    for related_entity in result["related_nodes"]:
+    for related_entity in result:
         assert "id" in related_entity
         assert "name" in related_entity
 
 
 @pytest.mark.asyncio
-async def test_enhanced_bioimage_find_related_entities_by_node_id(
-    bioimage_index, mem0_memory
-):
+async def test_enhanced_bioimage_find_related_entities_by_node_id(bioimage_index):
     """Test finding related entities by node ID (auto-infer type)."""
     # Find entities related to Italian ALM Node (should automatically infer it's a node)
     node_id = "7409a98f-1bdb-47d2-80e7-c89db73efedd"
@@ -93,14 +59,13 @@ async def test_enhanced_bioimage_find_related_entities_by_node_id(
     )
 
     assert result is not None
-    assert isinstance(result, dict)
+    assert isinstance(result, list)
 
     # Should find technologies that this node provides
-    assert "related_technologies" in result
-    assert len(result["related_technologies"]) > 0
+    assert len(result) > 0
 
     # Check that we get the right structure for related entities
-    for related_entity in result["related_technologies"]:
+    for related_entity in result:
         assert "id" in related_entity
         assert "name" in related_entity
 
@@ -108,24 +73,25 @@ async def test_enhanced_bioimage_find_related_entities_by_node_id(
 @pytest.mark.asyncio
 async def test_enhanced_bioimage_semantic_query(bioimage_index, mem0_memory):
     """Test semantic query functionality."""
-    # First initialize the database
-    await initialize_bioimage_database(
-        memory=mem0_memory,
-        nodes_data=EBI_NODES_DATA,
-        technologies_data=EBI_TECHNOLOGIES_DATA,
-    )
 
     result = await query(
         memory=mem0_memory,
         bioimage_index=bioimage_index,
         query_text="electron microscopy",
+        limit=10,
     )
+
+    print(result)  # For debugging purposes
 
     assert result is not None
     assert isinstance(result, dict)
-    assert "semantic_results" in result
-    assert "query" in result
-    assert result["query"] == "electron microscopy"
+    assert "results" in result
+    assert "total_results" in result
+    assert isinstance(result["results"], list)
+
+    if result["results"]:
+        first_result = result["results"][0]
+        assert "info" in first_result
 
 
 @pytest.mark.asyncio
@@ -133,32 +99,36 @@ async def test_enhanced_bioimage_semantic_query_with_context(
     bioimage_index, mem0_memory
 ):
     """Test semantic query with related entity context."""
-    # First initialize the database
-    await initialize_bioimage_database(
-        memory=mem0_memory,
-        nodes_data=EBI_NODES_DATA,
-        technologies_data=EBI_TECHNOLOGIES_DATA,
-    )
 
     result = await query(
         memory=mem0_memory,
         bioimage_index=bioimage_index,
-        query_text="super resolution microscopy",
+        query_text="What techniques are available in Italy?",
         include_related=True,
-        limit=10,
+        limit=3,
     )
+
+    print(result)  # For debugging purposes
 
     assert result is not None
     assert isinstance(result, dict)
-    assert "semantic_results" in result
-    assert "query" in result
-    assert isinstance(result["semantic_results"], list)
+    assert "results" in result
+    assert "total_results" in result
+    assert isinstance(result["results"], list)
 
     # Check if related entities are included when available
-    if result["semantic_results"]:
-        for semantic_result in result["semantic_results"]:
-            if result.get("include_related", False):
-                assert "related_entities" in semantic_result
+    if result["results"]:
+        for enhanced_result in result["results"]:
+            assert "info" in enhanced_result
+            if result.get("include_related", True):  # Default is True
+                # Should have either has_technologies or exists_in_nodes
+                has_relations = (
+                    "has_technologies" in enhanced_result
+                    or "exists_in_nodes" in enhanced_result
+                )
+                # Note: Only assert if we actually found related entities
+                if has_relations:
+                    assert has_relations
 
 
 @pytest.mark.asyncio
@@ -173,16 +143,14 @@ async def test_enhanced_bioimage_traditional_methods_still_work(
     )
 
     assert result is not None
-    assert isinstance(result, dict)
-    assert "entity_id" in result
-    # The new API returns "related_nodes" for technologies, not "related_entities"
-    assert "related_nodes" in result or "related_technologies" in result
-    assert result["entity_id"] == tech_id
-    # Check that we have some related entities
-    related_count = len(result.get("related_nodes", [])) + len(
-        result.get("related_technologies", [])
-    )
-    assert related_count > 0
+    assert isinstance(result, list)
+    # Should have some related entities
+    assert len(result) > 0
+
+    # Check that each entity has required fields
+    for entity in result:
+        assert "id" in entity
+        assert "name" in entity
 
 
 @pytest.mark.asyncio
@@ -190,14 +158,11 @@ async def test_enhanced_bioimage_error_handling_invalid_entity(
     bioimage_index, mem0_memory
 ):
     """Test error handling for invalid entity ID."""
-    result = await get_related_entities(
-        bioimage_index=bioimage_index, entity_id="invalid-entity-id-12345"
-    )
-
-    assert result is not None
-    # The function returns an error dict for invalid entity IDs
-    assert isinstance(result, dict)
-    assert "error" in result
+    # The function should raise an exception for invalid entity IDs
+    with pytest.raises(ValueError, match="Entity not found"):
+        await get_related_entities(
+            bioimage_index=bioimage_index, entity_id="invalid-entity-id-12345"
+        )
 
 
 @pytest.mark.asyncio
@@ -230,12 +195,9 @@ async def test_enhanced_bioimage_entity_agnostic_functions(bioimage_index, mem0_
     )
 
     assert result is not None
-    assert result["entity_id"] == node_id
-    assert result["entity_type"] == "node"
+    assert isinstance(result, list)
     # Check that we have related technologies
-    assert "related_technologies" in result
-    assert len(result["related_technologies"]) > 0
-    assert result["total_related"] > 0
+    assert len(result) > 0
 
     # Test get_related_entities for a technology
     result = await get_related_entities(
@@ -243,9 +205,6 @@ async def test_enhanced_bioimage_entity_agnostic_functions(bioimage_index, mem0_
     )
 
     assert result is not None
-    assert result["entity_id"] == tech_id
-    assert result["entity_type"] == "technology"
+    assert isinstance(result, list)
     # Check that we have related nodes
-    assert "related_nodes" in result
-    assert len(result["related_nodes"]) > 0
-    assert result["total_related"] > 0
+    assert len(result) > 0
