@@ -17,6 +17,7 @@ from .common.server_utils import (
     run_locally,
 )
 from .common.service_registry import service_registry, register_services
+from .common.probes import add_probes
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -98,10 +99,9 @@ async def start_multiple_services(
 ) -> None:
     """Start multiple services sequentially using a shared server connection."""
     print(f"Starting services in order: {', '.join(services)}")
-    print(f"Server URL: {server_url}")
-
-    # Create one shared server connection
+    print(f"Server URL: {server_url}")  # Create one shared server connection
     server = await get_remote_server(server_url, port)
+    registered_service_ids = []
 
     try:
         # Register all services using the shared connection
@@ -111,9 +111,14 @@ async def start_multiple_services(
 
             service_config = service_registry.get_service_config(service_name)
             await service_config["register_function"](server, service_id)
+            registered_service_ids.append(service_id)
 
             # Small delay between service starts
             await asyncio.sleep(1)
+
+        # Register health probes for all services
+        print("Registering health probes...")
+        await add_probes(server, registered_service_ids)
 
         print("All services started. Running forever...")
 
@@ -181,7 +186,13 @@ async def start_single_service_remote(
 
     try:
         await service_config["register_function"](server, service_id)
-        print(f"Service {service_name} registered successfully. Running forever...")
+        print(f"Service {service_name} registered successfully.")
+
+        # Register health probes for the single service
+        print("Registering health probes...")
+        await add_probes(server, [service_id])
+
+        print("Service started with probes. Running forever...")
 
         # Keep running
         while True:

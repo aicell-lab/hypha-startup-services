@@ -9,7 +9,7 @@ EBI_AGENT_ID = "ebi_bioimage_assistant"
 EBI_WORKSPACE = "ebi_data"
 
 
-def _create_node_content(node: Dict[str, Any]) -> str:
+def create_node_content(node: Dict[str, Any]) -> str:
     """Create content string for a node."""
     name = node.get("name", "Unknown")
     description = node.get("description", "")
@@ -24,7 +24,7 @@ def _create_node_content(node: Dict[str, Any]) -> str:
     return f"Bioimaging node: {name} in {country}. Description: {description}. Technologies: {technologies}"
 
 
-def _create_node_metadata(node: Dict[str, Any]) -> Dict[str, Any]:
+def create_node_metadata(node: Dict[str, Any]) -> Dict[str, Any]:
     """Create flat metadata for a node."""
     country_info = node.get("country", {})
     metadata = {
@@ -48,7 +48,7 @@ def _create_node_metadata(node: Dict[str, Any]) -> Dict[str, Any]:
     return {k: v for k, v in metadata.items() if v is not None}
 
 
-def _create_technology_content(tech: Dict[str, Any]) -> str:
+def create_technology_content(tech: Dict[str, Any]) -> str:
     """Create content string for a technology."""
     name = tech.get("name", "Unknown")
     description = tech.get("description", "")
@@ -61,7 +61,7 @@ def _create_technology_content(tech: Dict[str, Any]) -> str:
     return f"Bioimaging technology: {name} ({abbr}). Category: {category}. Description: {description}"
 
 
-def _create_technology_metadata(tech: Dict[str, Any]) -> Dict[str, Any]:
+def create_technology_metadata(tech: Dict[str, Any]) -> Dict[str, Any]:
     """Create flat metadata for a technology."""
     category_info = tech.get("category", {})
     metadata = {
@@ -74,7 +74,7 @@ def _create_technology_metadata(tech: Dict[str, Any]) -> Dict[str, Any]:
             if isinstance(category_info, dict)
             else str(category_info)
         ),
-        "description": tech.get("description"),
+        # "description": tech.get("description"),
     }
     # Remove None values to avoid empty metadata fields
     return {k: v for k, v in metadata.items() if v is not None}
