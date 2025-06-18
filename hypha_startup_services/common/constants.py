@@ -9,7 +9,7 @@ DEFAULT_LOCAL_PORT = 9527
 DEFAULT_LOCAL_EXISTING_HOST = "http://127.0.0.1"
 DEFAULT_REMOTE_URL = "https://hypha.aicell.io"
 
-# Service-specific defaults
+# Service-specific defaults (matching start-services.sh)
 DEFAULT_WEAVIATE_SERVICE_ID = "weaviate-test"
 DEFAULT_MEM0_SERVICE_ID = "mem0-test"
-DEFAULT_BIOIMAGE_SERVICE_ID = "bioimage"
+DEFAULT_BIOIMAGE_SERVICE_ID = "bioimage-test"

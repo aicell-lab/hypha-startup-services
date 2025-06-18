@@ -38,10 +38,6 @@ RUN git clean -fdX && rm -rf .git
 RUN pip install -r requirements.txt
 RUN pip install .
 
-# Copy startup scripts and make them executable
-COPY scripts/start-services.sh /app/start-services.sh
-RUN chmod +x /app/start-services.sh
-
 # Set environment variables for mem0 and other services
 ENV HOME=/home/hypha_startup_services
 ENV MEM0_DIR=/home/hypha_startup_services/.mem0
@@ -49,7 +45,9 @@ ENV MEM0_DIR=/home/hypha_startup_services/.mem0
 # Switch to the non-root user
 USER hypha_startup_services
 
-# Default entry point - can be overridden in Kubernetes deployment
-# For running both services: use default CMD
-# For single service: command: ["hypha-startup-services", "weaviate", "remote", ...]
-CMD ["/app/start-services.sh"]
+# Default entry point - starts all services (weaviate, mem0, bioimage) with --remote
+# Can be overridden in Kubernetes deployment for single services:
+# command: ["hypha-startup-services", "weaviate", "--remote"]
+# command: ["hypha-startup-services", "mem0", "--remote"] 
+# command: ["hypha-startup-services", "weaviate", "mem0", "--remote"]
+CMD ["hypha-startup-services", "weaviate", "mem0", "bioimage", "--remote"]

@@ -11,19 +11,18 @@ from hypha_rpc.rpc import RemoteService, RemoteException
 from .constants import DEFAULT_LOCAL_EXISTING_HOST
 
 
-async def register_to_existing_server(
+async def get_remote_server(
     provided_url: str,
-    service_id: str,
-    register_function: Callable[[RemoteService, str], Any],
     port: int | None = None,
-) -> None:
-    """Register a service to an existing Hypha server.
+) -> RemoteService:
+    """Get a connection to a remote Hypha server.
 
     Args:
         provided_url: The base URL of the server
         port: Optional port number
-        service_id: The ID for the service
-        register_function: Function to register the specific service
+
+    Returns:
+        The server connection
     """
     server_url = provided_url if port is None else f"{provided_url}:{port}"
     token = os.environ.get("HYPHA_TOKEN")
@@ -33,7 +32,29 @@ async def register_to_existing_server(
     if not isinstance(server, RemoteService):
         raise ValueError("Server is not a RemoteService instance.")
 
+    return server
+
+
+async def register_to_existing_server(
+    provided_url: str,
+    service_id: str,
+    register_function: Callable[[RemoteService, str], Any],
+    port: int | None = None,
+) -> RemoteService:
+    """Register a service to an existing Hypha server.
+
+    Args:
+        provided_url: The base URL of the server
+        port: Optional port number
+        service_id: The ID for the service
+        register_function: Function to register the specific service
+
+    Returns:
+        The server connection for cleanup purposes
+    """
+    server = await get_remote_server(provided_url, port)
     await register_function(server, service_id)
+    return server
 
 
 async def run_local_server(
