@@ -2,6 +2,7 @@
 
 import argparse
 import asyncio
+import logging
 import signal
 import sys
 from argparse import Namespace
@@ -18,6 +19,22 @@ from .common.server_utils import (
 )
 from .common.service_registry import service_registry, register_services
 from .common.probes import add_probes
+
+
+def setup_logging():
+    """Set up logging configuration."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        force=True,  # Force reconfiguration even if logging was already configured
+    )
+    # Ensure root logger level is set
+    logging.root.setLevel(logging.INFO)
+
+
+# Configure logging when module is imported
+setup_logging()
+logger = logging.getLogger(__name__)
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -60,6 +77,11 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--bioimage-service-id", type=str, help="Custom Bioimage service ID"
     )
+    parser.add_argument(
+        "--probes-service-id",
+        type=str,
+        help="Custom ID for the probes service (default: startup-services-probes)",
+    )
 
     return parser
 
@@ -98,16 +120,17 @@ async def start_multiple_services(
     args: Namespace,
 ) -> None:
     """Start multiple services sequentially using a shared server connection."""
-    print(f"Starting services in order: {', '.join(services)}")
-    print(f"Server URL: {server_url}")  # Create one shared server connection
+    logger.info("Starting services in order: %s", ", ".join(services))
+    logger.info("Server URL: %s", server_url)  # Create one shared server connection
     server = await get_remote_server(server_url, port)
+    probes_service_id: str | None = args.probes_service_id
     registered_service_ids = []
 
     try:
         # Register all services using the shared connection
         for service_name in services:
             service_id = get_service_id_for_service(args, service_name)
-            print(f"Starting {service_name} service with ID: {service_id}")
+            logger.info("Starting %s service with ID: %s", service_name, service_id)
 
             service_config = service_registry.get_service_config(service_name)
             await service_config["register_function"](server, service_id)
@@ -117,14 +140,14 @@ async def start_multiple_services(
             await asyncio.sleep(1)
 
         # Register health probes for all services
-        print("Registering health probes...")
-        await add_probes(server, registered_service_ids)
+        logger.info("Registering health probes...")
+        await add_probes(server, registered_service_ids, probes_service_id)
 
-        print("All services started. Running forever...")
+        logger.info("All services started. Running forever...")
 
         # Set up signal handlers for graceful shutdown
         def signal_handler(_signum, _frame):
-            print("\nReceived shutdown signal. Shutting down services...")
+            logger.info("Received shutdown signal. Shutting down services...")
             # The finally block will handle disconnection
             sys.exit(0)
 
@@ -136,16 +159,16 @@ async def start_multiple_services(
             await asyncio.sleep(1)
 
     except KeyboardInterrupt:
-        print("\nShutting down services...")
+        logger.info("Shutting down services...")
     finally:
         # Properly disconnect the shared server
         if server and hasattr(server, "disconnect"):
             try:
-                print("Disconnecting from server...")
+                logger.info("Disconnecting from server...")
                 await server.disconnect()
-                print("Server disconnected successfully.")
+                logger.info("Server disconnected successfully.")
             except (OSError, RuntimeError) as e:
-                print(f"Warning: Failed to disconnect server: {e}")
+                logger.warning("Failed to disconnect server: %s", e)
 
 
 def handle_single_service(args: Namespace) -> None:
@@ -154,9 +177,10 @@ def handle_single_service(args: Namespace) -> None:
     server_url = args.server_url or get_default_server_url(args.local)
     port = args.port or get_default_port(args.local)
     service_id = get_service_id_for_service(args, service_name)
+    probes_service_id = args.probes_service_id
 
-    print(f"Starting {service_name} service with ID: {service_id}")
-    print(f"Server URL: {server_url}")
+    logger.info("Starting %s service with ID: %s", service_name, service_id)
+    logger.info("Server URL: %s", server_url)
 
     if args.local:
         service_config = service_registry.get_service_config(service_name)
@@ -173,12 +197,22 @@ def handle_single_service(args: Namespace) -> None:
     else:
         # For remote mode, run async
         asyncio.run(
-            start_single_service_remote(service_name, server_url, port, service_id)
+            start_single_service_remote(
+                service_name,
+                server_url,
+                service_id,
+                port,
+                probes_service_id,
+            )
         )
 
 
 async def start_single_service_remote(
-    service_name: str, server_url: str, port: int | None, service_id: str
+    service_name: str,
+    server_url: str,
+    service_id: str,
+    port: int | None = None,
+    probes_service_id: str | None = None,
 ) -> None:
     """Start a single service in remote mode."""
     server = await get_remote_server(server_url, port)
@@ -186,25 +220,23 @@ async def start_single_service_remote(
 
     try:
         await service_config["register_function"](server, service_id)
-        print(f"Service {service_name} registered successfully.")
+        logger.info("Service %s registered successfully.", service_name)
 
         # Register health probes for the single service
-        print("Registering health probes...")
-        await add_probes(server, [service_id])
+        logger.info("Registering health probes...")
+        await add_probes(server, [service_id], probes_service_id)
 
-        print("Service started with probes. Running forever...")
+        logger.info("Service started with probes. Running forever...")
 
-        # Keep running
-        while True:
-            await asyncio.sleep(1)
+        await server.serve()
     except KeyboardInterrupt:
-        print(f"\nShutting down {service_name} service...")
+        logger.info("Shutting down %s service...", service_name)
     finally:
         if hasattr(server, "disconnect"):
             try:
                 await server.disconnect()
             except (OSError, RuntimeError) as e:
-                print(f"Warning: Failed to disconnect server: {e}")
+                logger.warning("Failed to disconnect server: %s", e)
 
 
 def handle_multiple_services(args: Namespace) -> None:
@@ -214,8 +246,8 @@ def handle_multiple_services(args: Namespace) -> None:
 
     # Multiple services mode only supports remote connections for now
     if args.local:
-        print(
-            "ERROR: Multiple services mode currently only supports remote connections"
+        logger.error(
+            "Multiple services mode currently only supports remote connections"
         )
         sys.exit(1)
 
