@@ -3,15 +3,14 @@
 import os
 import sys
 import subprocess
-import asyncio
-from typing import Callable, Any
-from websockets.exceptions import InvalidURI
+import logging
 from hypha_rpc import connect_to_server
-from hypha_rpc.rpc import RemoteService, RemoteException
-from .constants import DEFAULT_LOCAL_EXISTING_HOST
+from hypha_rpc.rpc import RemoteService
+
+logger = logging.getLogger(__name__)
 
 
-async def get_remote_server(
+async def get_server(
     provided_url: str,
     port: int | None = None,
 ) -> RemoteService:
@@ -35,92 +34,27 @@ async def get_remote_server(
     return server
 
 
-async def register_to_existing_server(
-    provided_url: str,
-    service_id: str,
-    register_function: Callable[[RemoteService, str], Any],
-    port: int | None = None,
-) -> RemoteService:
-    """Register a service to an existing Hypha server.
-
-    Args:
-        provided_url: The base URL of the server
-        port: Optional port number
-        service_id: The ID for the service
-        register_function: Function to register the specific service
-
-    Returns:
-        The server connection for cleanup purposes
-    """
-    server = await get_remote_server(provided_url, port)
-    await register_function(server, service_id)
-    return server
-
-
-async def run_local_server(
+async def run_local_services(
     server_url: str,
     port: int,
-    service_id_existing_server: str,
-    startup_function_path: str,
-    register_function: Callable[[RemoteService, str], Any],
+    startup_function_paths: list[str],
 ) -> None:
-    """Run a local Hypha server with the specified service.
+    """Run a local Hypha server with multiple services.
 
     Args:
         server_url: The URL of the server to connect to
         port: The port of the server
-        service_id_existing_server: The ID of the service
-        startup_function_path: Path to the startup function for the service
-        register_function: Function to register the specific service
+        startup_function_paths: List of paths to startup functions
     """
-    try:
-        await register_to_existing_server(
-            DEFAULT_LOCAL_EXISTING_HOST,
-            port=port,
-            service_id=service_id_existing_server,
-            register_function=register_function,
-        )
-    except (ConnectionRefusedError, InvalidURI, RemoteException) as e:
-        print(f"Failed to connect to the server at {server_url}:{port}. Error: {e}")
-        command = [
-            sys.executable,
-            "-m",
-            "hypha.server",
-            f"--host={server_url}",
-            f"--port={port}",
-            f"--startup-functions={startup_function_path}",
-        ]
-        subprocess.run(command, check=True)
+    # Join all startup function paths with spaces
+    startup_functions_arg = " ".join(startup_function_paths)
 
-
-def connect_to_remote(
-    server_url: str,
-    port: int | None,
-    service_id: str,
-    register_function: Callable[[RemoteService, str], Any],
-) -> None:
-    """Connect to remote server and register service."""
-    loop = asyncio.get_event_loop()
-    loop.create_task(
-        register_to_existing_server(server_url, service_id, register_function, port)
-    )
-    loop.run_forever()
-
-
-def run_locally(
-    server_url: str,
-    port: int,
-    service_id_existing_server: str,
-    startup_function_path: str,
-    register_function: Callable[[RemoteService, str], Any],
-) -> None:
-    """Run the local server with the provided arguments."""
-    asyncio.run(
-        run_local_server(
-            server_url,
-            port,
-            service_id_existing_server,
-            startup_function_path,
-            register_function,
-        )
-    )
+    command = [
+        sys.executable,
+        "-m",
+        "hypha.server",
+        f"--host={server_url}",
+        f"--port={port}",
+        f"--startup-functions={startup_functions_arg}",
+    ]
+    subprocess.run(command, check=True)

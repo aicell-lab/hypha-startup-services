@@ -3,20 +3,16 @@
 import argparse
 import asyncio
 import logging
-import signal
-import sys
 from argparse import Namespace
-from typing import List
-
+from typing import Callable, Optional
+from hypha_rpc.rpc import RemoteException, RemoteService
 from .common.constants import (
     DEFAULT_LOCAL_HOST,
     DEFAULT_LOCAL_PORT,
     DEFAULT_REMOTE_URL,
+    DEFAULT_LOCAL_EXISTING_HOST,
 )
-from .common.server_utils import (
-    get_remote_server,
-    run_locally,
-)
+from .common.server_utils import get_server, run_local_services
 from .common.service_registry import service_registry, register_services
 from .common.probes import add_probes
 
@@ -86,172 +82,119 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def get_default_server_url(is_local: bool) -> str:
-    """Get default server URL based on mode."""
-    return DEFAULT_LOCAL_HOST if is_local else DEFAULT_REMOTE_URL
-
-
-def get_default_port(is_local: bool) -> int | None:
-    """Get default port based on mode."""
-    return DEFAULT_LOCAL_PORT if is_local else None
-
-
-def get_service_id_for_service(args: Namespace, service_name: str) -> str:
-    """Get service ID for a specific service, with fallbacks to defaults."""
-    # Check for service-specific override first
-    if hasattr(args, f"{service_name}_service_id"):
-        service_specific_id = getattr(args, f"{service_name}_service_id")
-        if service_specific_id:
-            return service_specific_id
-
-    # Check for general service ID override
-    if hasattr(args, "service_id") and args.service_id:
-        return args.service_id
-
-    # Fall back to service default
-    service_config = service_registry.get_service_config(service_name)
-    return service_config["default_service_id"]
-
-
-async def start_multiple_services(
-    services: List[str],
-    server_url: str,
-    port: int | None,
+def get_service_configurations(
     args: Namespace,
-) -> None:
-    """Start multiple services sequentially using a shared server connection."""
-    logger.info("Starting services in order: %s", ", ".join(services))
-    logger.info("Server URL: %s", server_url)  # Create one shared server connection
-    server = await get_remote_server(server_url, port)
-    probes_service_id: str | None = args.probes_service_id
-    registered_service_ids = []
+) -> tuple[list[str], list[str], list[Callable]]:
+    """Extract service configurations from arguments.
+
+    Args:
+        args: Parsed command line arguments
+
+    Returns:
+        Tuple of (service_ids, startup_function_paths, register_functions)
+    """
+    service_ids = []
+    startup_function_paths = []
+    register_functions = []
+
+    for service_name in args.services:
+        registry = service_registry.get_service_config(service_name)
+        service_id = (
+            args.service_id
+            or getattr(args, f"{service_name}_service_id", None)
+            or registry["default_service_id"]
+        )
+
+        service_ids.append(service_id)
+        startup_function_paths.append(registry["startup_function_path"])
+        register_functions.append(registry["register_function"])
+
+    return service_ids, startup_function_paths, register_functions
+
+
+async def handle_local_services(
+    args: Namespace, service_ids: list[str], startup_function_paths: list[str]
+) -> Optional[RemoteService]:
+    """Handle local services setup.
+
+    Args:
+        args: Parsed command line arguments
+        service_ids: List of service IDs
+        startup_function_paths: List of startup function paths
+
+    Returns:
+        Server connection if connected to existing server, None if started new server
+    """
+    port = args.port or DEFAULT_LOCAL_PORT
 
     try:
-        # Register all services using the shared connection
-        for service_name in services:
-            service_id = get_service_id_for_service(args, service_name)
-            logger.info("Starting %s service with ID: %s", service_name, service_id)
+        server_url = args.server_url or DEFAULT_LOCAL_EXISTING_HOST
+        server = await get_server(server_url, port)
+        logger.info("Connected to existing local server at %s:%s", server_url, port)
 
-            service_config = service_registry.get_service_config(service_name)
-            await service_config["register_function"](server, service_id)
-            registered_service_ids.append(service_id)
+        return server
+    except (RemoteException, ValueError, OSError):
+        server_url = args.server_url or DEFAULT_LOCAL_HOST
+        for service_id in service_ids:
+            logger.info(
+                "Service %s available at %s:%s/services/%s",
+                service_id,
+                server_url,
+                port,
+                service_id,
+            )
+        await run_local_services(server_url, port, startup_function_paths)
 
-            # Small delay between service starts
-            await asyncio.sleep(1)
-
-        # Register health probes for all services
-        logger.info("Registering health probes...")
-        await add_probes(server, registered_service_ids, probes_service_id)
-
-        logger.info("All services started. Running forever...")
-
-        # Set up signal handlers for graceful shutdown
-        def signal_handler(_signum, _frame):
-            logger.info("Received shutdown signal. Shutting down services...")
-            # The finally block will handle disconnection
-            sys.exit(0)
-
-        signal.signal(signal.SIGINT, signal_handler)
-        signal.signal(signal.SIGTERM, signal_handler)
-
-        # Keep the event loop running forever
-        while True:
-            await asyncio.sleep(1)
-
-    except KeyboardInterrupt:
-        logger.info("Shutting down services...")
-    finally:
-        # Properly disconnect the shared server
-        if server and hasattr(server, "disconnect"):
-            try:
-                logger.info("Disconnecting from server...")
-                await server.disconnect()
-                logger.info("Server disconnected successfully.")
-            except (OSError, RuntimeError) as e:
-                logger.warning("Failed to disconnect server: %s", e)
+        return None  # Server started in subprocess
 
 
-def handle_single_service(args: Namespace) -> None:
-    """Handle single service mode."""
-    service_name = args.services[0]  # Get the single service
-    server_url = args.server_url or get_default_server_url(args.local)
-    port = args.port or get_default_port(args.local)
-    service_id = get_service_id_for_service(args, service_name)
-    probes_service_id = args.probes_service_id
+async def register_services_to_server(
+    server: RemoteService, register_functions: list[Callable], service_ids: list[str]
+) -> None:
+    """Register services to an existing server.
 
-    logger.info("Starting %s service with ID: %s", service_name, service_id)
-    logger.info("Server URL: %s", server_url)
+    Args:
+        server: The server connection
+        register_functions: List of registration functions
+        service_ids: List of service IDs
+    """
+    for register_function, service_id in zip(register_functions, service_ids):
+        await register_function(server, service_id)
+        logger.info("Registered service %s", service_id)
+
+
+async def handle_services(args: Namespace) -> None:
+    """Handle multiple services mode."""
+    service_ids, startup_function_paths, register_functions = (
+        get_service_configurations(args)
+    )
 
     if args.local:
-        service_config = service_registry.get_service_config(service_name)
-        # For local mode, we need a valid port
-        if port is None:
-            port = DEFAULT_LOCAL_PORT
-        run_locally(
-            server_url,
-            port,
-            service_id,
-            service_config["startup_function_path"],
-            service_config["register_function"],
-        )
+        server = await handle_local_services(args, service_ids, startup_function_paths)
+        if server is None:
+            return
     else:
-        # For remote mode, run async
-        asyncio.run(
-            start_single_service_remote(
-                service_name,
-                server_url,
-                service_id,
-                port,
-                probes_service_id,
-            )
-        )
-
-
-async def start_single_service_remote(
-    service_name: str,
-    server_url: str,
-    service_id: str,
-    port: int | None = None,
-    probes_service_id: str | None = None,
-) -> None:
-    """Start a single service in remote mode."""
-    server = await get_remote_server(server_url, port)
-    service_config = service_registry.get_service_config(service_name)
+        server_url = args.server_url or DEFAULT_REMOTE_URL
+        server = await get_server(server_url)
+        logger.info("Connected to remote server at %s", server_url)
 
     try:
-        await service_config["register_function"](server, service_id)
-        logger.info("Service %s registered successfully.", service_name)
+        await register_services_to_server(server, register_functions, service_ids)
+        for service_id in service_ids:
+            base_url = server.config.public_base_url
+            workspace = server.config.workspace
+            service_url = f"{base_url}/{workspace}/services/{service_id}"
+            logger.info("Service %s available at %s", service_id, service_url)
 
-        # Register health probes for the single service
-        logger.info("Registering health probes...")
-        await add_probes(server, [service_id], probes_service_id)
-
-        logger.info("Service started with probes. Running forever...")
+        probes_service_id = args.probes_service_id
+        await add_probes(server, service_ids, probes_service_id)
+        logger.info("Health probes registered, server running...")
 
         await server.serve()
     except KeyboardInterrupt:
-        logger.info("Shutting down %s service...", service_name)
-    finally:
+        logger.info("Shutting down services...")
         if hasattr(server, "disconnect"):
-            try:
-                await server.disconnect()
-            except (OSError, RuntimeError) as e:
-                logger.warning("Failed to disconnect server: %s", e)
-
-
-def handle_multiple_services(args: Namespace) -> None:
-    """Handle multiple services mode."""
-    server_url = args.server_url or get_default_server_url(args.local)
-    port = args.port or get_default_port(args.local)
-
-    # Multiple services mode only supports remote connections for now
-    if args.local:
-        logger.error(
-            "Multiple services mode currently only supports remote connections"
-        )
-        sys.exit(1)
-
-    asyncio.run(start_multiple_services(args.services, server_url, port, args))
+            await server.disconnect()
 
 
 def main() -> None:
@@ -263,10 +206,7 @@ def main() -> None:
     args = parser.parse_args()
 
     # Determine mode based on number of services
-    if len(args.services) == 1:
-        handle_single_service(args)
-    else:
-        handle_multiple_services(args)
+    asyncio.run(handle_services(args))
 
 
 if __name__ == "__main__":
