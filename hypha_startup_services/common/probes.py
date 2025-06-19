@@ -10,14 +10,14 @@ logger = logging.getLogger(__name__)
 async def add_probes(
     server: RemoteService,
     service_ids: List[str],
-    probe_service_id: str = "startup-services-probes",
+    probes_service_id: str | None = None,
 ) -> None:
     """Add health probes to monitor all registered services.
 
     Args:
         server (RemoteService): The server instance to register the probes with.
         service_ids (List[str]): List of service IDs to monitor.
-        probe_service_id (str): ID for the probe service itself.
+        probes_service_id (str | None): ID for the probes service itself.
     """
 
     async def is_service_available(service_id: str) -> bool:
@@ -108,17 +108,20 @@ async def add_probes(
         """Get detailed status of all services (for debugging/monitoring)."""
         return await check_all_services()
 
+    if probes_service_id is None:
+        probes_service_id = "startup-services-probes"
+
     # Register the probe service
     logger.info(
         "Registering probes service '%s' to monitor: %s",
-        probe_service_id,
+        probes_service_id,
         ", ".join(service_ids),
     )
 
     await server.register_service(
         {
             "name": "Startup Services Health Probes",
-            "id": probe_service_id,
+            "id": probes_service_id,
             "config": {"visibility": "public"},
             "type": "probes",
             "readiness": readiness_probe,

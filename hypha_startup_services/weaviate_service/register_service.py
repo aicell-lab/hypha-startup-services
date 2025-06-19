@@ -2,6 +2,7 @@
 Helper functions to register the Weaviate service with proper API endpoints.
 """
 
+import logging
 from functools import partial
 from hypha_rpc.rpc import RemoteService
 from weaviate import WeaviateAsyncClient
@@ -33,6 +34,8 @@ from hypha_startup_services.weaviate_service.methods import (
     generate_near_text,
 )
 from hypha_startup_services.weaviate_service.utils.constants import DEFAULT_SERVICE_ID
+
+logger = logging.getLogger(__name__)
 
 
 async def register_weaviate(
@@ -96,7 +99,10 @@ async def register_weaviate_service(
         }
     )
 
-    print(
-        f"Service {service_id} registered at",
-        f"{server.config.public_base_url}/{server.config.workspace}/services/{service_id}",
+    logger.info(
+        "Service %s registered at %s/%s/services/%s",
+        service_id,
+        server.config.public_base_url,
+        server.config.workspace,
+        service_id,
     )

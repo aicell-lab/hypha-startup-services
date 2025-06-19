@@ -1,3 +1,4 @@
+import logging
 import uuid
 from typing import Any
 from hypha_rpc.rpc import RemoteService, RemoteException
@@ -20,6 +21,8 @@ from hypha_startup_services.weaviate_service.utils.format_utils import (
 from hypha_startup_services.common.utils import (
     get_application_artifact_name,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def get_collection_artifact_name(short_name: str) -> str:
@@ -153,7 +156,7 @@ async def is_user_in_artifact_permissions(
     try:
         artifact = await get_artifact(server, artifact_name)
     except RemoteException as e:
-        print(f"Error getting artifact. Error: {e}")
+        logger.error("Error getting artifact: %s", e)
         return False
 
     permissions = artifact.get("config", {}).get("permissions", {})
@@ -167,6 +170,16 @@ async def is_user_in_artifact_permissions(
 async def has_artifact_permission(
     server: RemoteService, user_ws: str, artifact_name: str
 ) -> bool:
+    """Check if the user has permission for a specific artifact.
+
+    Args:
+        server (RemoteService): The RemoteService instance
+        user_ws (str): The user workspace
+        artifact_name (str): The name of the artifact to check permissions for
+
+    Returns:
+        bool: True if the user has permission, False otherwise
+    """
     if is_admin_workspace(user_ws):
         return True
 

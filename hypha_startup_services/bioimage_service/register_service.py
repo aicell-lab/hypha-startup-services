@@ -2,6 +2,7 @@
 Helper functions to register the BioImage service with proper API endpoints.
 """
 
+import logging
 from functools import partial
 from hypha_rpc.rpc import RemoteService
 from hypha_startup_services.bioimage_service.data_index import load_external_data
@@ -11,6 +12,8 @@ from hypha_startup_services.bioimage_service.methods import (
     query,
 )
 from hypha_startup_services.mem0_service.mem0_client import get_mem0
+
+logger = logging.getLogger(__name__)
 
 
 async def register_bioimage_service(
@@ -47,7 +50,9 @@ async def register_bioimage_service(
         }
     )
 
-    print(
-        "BioImage Service registered at",
-        f"{server.config.public_base_url}/{server.config.workspace}/services/{service_id}",
+    logger.info(
+        "BioImage Service registered at %s/%s/services/%s",
+        server.config.public_base_url,
+        server.config.workspace,
+        service_id,
     )
