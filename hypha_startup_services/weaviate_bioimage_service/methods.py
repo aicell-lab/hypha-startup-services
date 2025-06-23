@@ -4,9 +4,12 @@ import logging
 from typing import Any, Dict, Callable, Coroutine
 
 from weaviate import WeaviateAsyncClient
+from weaviate.classes.query import Filter
+
 from hypha_rpc.rpc import RemoteService
 from hypha_rpc.utils.schema import schema_function
 from pydantic import Field
+
 
 from hypha_startup_services.weaviate_service.methods import (
     generate_near_text,
@@ -62,18 +65,11 @@ def create_query(
                     f"Invalid entity types: {invalid_types}. Must be 'node' or 'technology'"
                 )
 
-        # Create where filter for entity types if specified
         where_filter = None
         if entity_types:
             if len(entity_types) == 1:
-                # Use Weaviate Filter object instead of dict
-                from weaviate.classes.query import Filter
-
                 where_filter = Filter.by_property("entity_type").equal(entity_types[0])
             else:
-                # Multiple entity types - use ContainsAny
-                from weaviate.classes.query import Filter
-
                 where_filter = Filter.by_property("entity_type").contains_any(
                     entity_types
                 )
@@ -86,11 +82,12 @@ def create_query(
             query=query_text,
             filters=where_filter,
             limit=limit,
+            target_vector="text_vector",  # Use available vector field
             single_prompt=(
-                "Based on the bioimage data below, provide a comprehensive answer about: {query}. "
-                "Focus on nodes (facilities) and technologies that are relevant."
+                "Based on the bioimage data below, provide a comprehensive answer about the user's query. "
+                "Focus on nodes (facilities) and technologies that are relevant to: {text}"
             ),
-            grouped_task="Summarize the bioimage information to answer: {query}",
+            grouped_task="Summarize the bioimage information to answer the user's question about: {text}",
             grouped_properties=["text", "entity_type", "name"],
             context=context,
         )
