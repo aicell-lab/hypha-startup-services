@@ -73,7 +73,7 @@ async def collections_exists(
     """
     return await collection_exists(
         client=client,
-        collection_name=get_full_collection_name(collection_name),
+        collection_name=collection_name,
     )
 
 

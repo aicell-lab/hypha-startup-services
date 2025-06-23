@@ -185,7 +185,7 @@ async def mem0_add(
     converted_kwargs = proxy_to_dict(kwargs)
 
     add_result = await memory.add(
-        converted_messages, agent_id=agent_id, run_id=run_id, **converted_kwargs  # type: ignore
+        converted_messages, user_id=workspace, agent_id=agent_id, run_id=run_id, **converted_kwargs  # type: ignore
     )
     logger.info("Added messages to memory: %s", add_result)
     return add_result
@@ -252,6 +252,7 @@ async def mem0_search(
 
     results = await memory.search(
         query,
+        user_id=workspace,
         agent_id=agent_id,
         run_id=run_id,
         **kwargs,
