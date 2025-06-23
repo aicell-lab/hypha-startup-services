@@ -31,6 +31,10 @@ def create_query(
         query_text: str = Field(
             description="Natural language query to search bioimage data"
         ),
+        entity_types: list[str] | None = Field(
+            default=None,
+            description="Filter by entity types: 'node', 'technology', or both. Defaults to both if not specified.",
+        ),
         limit: int = Field(
             default=10, description="Maximum number of results to return"
         ),
@@ -42,18 +46,45 @@ def create_query(
 
         Args:
             query_text: Natural language query
+            entity_types: Filter by entity types ('node', 'technology', or both)
             limit: Maximum number of results
             context: Context containing caller information
 
         Returns:
             Dictionary with query results and generated response
         """
+        # Validate entity_types if provided
+        if entity_types:
+            valid_types = {"node", "technology"}
+            invalid_types = set(entity_types) - valid_types
+            if invalid_types:
+                raise ValueError(
+                    f"Invalid entity types: {invalid_types}. Must be 'node' or 'technology'"
+                )
+
+        # Create where filter for entity types if specified
+        where_filter = None
+        if entity_types:
+            if len(entity_types) == 1:
+                # Use Weaviate Filter object instead of dict
+                from weaviate.classes.query import Filter
+
+                where_filter = Filter.by_property("entity_type").equal(entity_types[0])
+            else:
+                # Multiple entity types - use ContainsAny
+                from weaviate.classes.query import Filter
+
+                where_filter = Filter.by_property("entity_type").contains_any(
+                    entity_types
+                )
+
         return await generate_near_text(
             client=client,
             server=server,
             collection_name=BIOIMAGE_COLLECTION,
             application_id=DEFAULT_APPLICATION_ID,
             query=query_text,
+            filters=where_filter,
             limit=limit,
             single_prompt=(
                 "Based on the bioimage data below, provide a comprehensive answer about: {query}. "

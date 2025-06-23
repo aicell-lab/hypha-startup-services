@@ -12,10 +12,6 @@ from hypha_startup_services.mem0_bioimage_service.utils import (
 
 logger = logging.getLogger(__name__)
 
-# Constants for mem0 integration
-EBI_AGENT_ID = "ebi_bioimage_assistant"
-EBI_WORKSPACE = "ebi_data"
-
 
 def create_get_entity_details(
     bioimage_index: BioimageIndex,
@@ -106,6 +102,10 @@ def create_query(
         query_text: str = Field(
             description="Natural language query to search bioimage data"
         ),
+        entity_types: list[str] | None = Field(
+            default=None,
+            description="Filter by entity types: 'node', 'technology', or both. Defaults to both if not specified.",
+        ),
         include_related: bool = Field(
             default=True,
             description="Whether to include related entities for each result",
@@ -120,6 +120,7 @@ def create_query(
 
         Args:
             query_text: Natural language query
+            entity_types: Filter by entity types ('node', 'technology', or both)
             include_related: Whether to include related entities for each result
             limit: Maximum number of results
 
@@ -128,10 +129,20 @@ def create_query(
         """
         logger.info("Performing unified query for: '%s'", query_text)
 
+        # Validate entity_types if provided
+        if entity_types:
+            valid_types = {"node", "technology"}
+            invalid_types = set(entity_types) - valid_types
+            if invalid_types:
+                raise ValueError(
+                    f"Invalid entity types: {invalid_types}. Must be 'node' or 'technology'"
+                )
+
         # Step 1: Perform semantic search
         semantic_results = await semantic_bioimage_search(
             memory=memory,
             search_query=query_text,
+            entity_types=entity_types,
             limit=limit,
         )
 

@@ -7,6 +7,8 @@ logger = logging.getLogger(__name__)
 
 # Constants for mem0 integration
 EBI_AGENT_ID = "ebi_bioimage_assistant"
+EBI_NODES_AGENT_ID = "ebi_bioimage_nodes_assistant"
+EBI_TECHNOLOGIES_AGENT_ID = "ebi_bioimage_technologies_assistant"
 EBI_WORKSPACE = "ebi_data"
 
 
@@ -124,15 +126,16 @@ def create_technology_metadata(tech: Dict[str, Any]) -> Dict[str, Any]:
 async def semantic_bioimage_search(
     memory: AsyncMemory,
     search_query: str,
+    entity_types: list[str] | None = None,
     limit: int = 10,
 ) -> Dict[str, Any]:
     """
-    Perform semantic search on the bioimage database.
+    Perform semantic search on the bioimage database using specialized agents.
 
     Args:
         memory: AsyncMemory instance
-        query: Natural language query
-        entity_types: Filter by entity types (node, technology)
+        search_query: Natural language query
+        entity_types: Filter by entity types (node, technology, or both). Defaults to both.
         limit: Maximum number of results
 
     Returns:
@@ -140,28 +143,54 @@ async def semantic_bioimage_search(
     """
     logger.info("Performing semantic search for: '%s'", search_query)
 
-    search_results = await memory.search(
-        query=search_query,
-        agent_id=EBI_AGENT_ID,
-        limit=limit,
-    )
+    # Determine which agent(s) to use based on entity_types
+    agent_ids = []
+    if (
+        not entity_types
+        or len(entity_types) == 2
+        or ("node" in entity_types and "technology" in entity_types)
+    ):
+        # Search both, use the combined agent
+        agent_ids = [EBI_AGENT_ID]
+    elif len(entity_types) == 1:
+        if "node" in entity_types:
+            agent_ids = [EBI_NODES_AGENT_ID]
+        elif "technology" in entity_types:
+            agent_ids = [EBI_TECHNOLOGIES_AGENT_ID]
+    else:
+        # Multiple specific types, search each agent separately
+        if "node" in entity_types:
+            agent_ids.append(EBI_NODES_AGENT_ID)
+        if "technology" in entity_types:
+            agent_ids.append(EBI_TECHNOLOGIES_AGENT_ID)
 
-    # Process results
-    memories = search_results.get("results", [])
-    processed_results = []
-
-    for memory_item in memories:
-        metadata = memory_item.get("metadata", {})
-        processed_results.append(
-            {
-                "memory": memory_item.get("memory", ""),
-                "score": memory_item.get("score", 0.0),
-                "metadata": metadata,
-            }
+    # Collect results from all relevant agents
+    all_results = []
+    for agent_id in agent_ids:
+        search_results = await memory.search(
+            query=search_query,
+            agent_id=agent_id,
+            limit=limit,
         )
+
+        memories = search_results.get("results", [])
+        for memory_item in memories:
+            metadata = memory_item.get("metadata", {})
+            all_results.append(
+                {
+                    "memory": memory_item.get("memory", ""),
+                    "score": memory_item.get("score", 0.0),
+                    "metadata": metadata,
+                }
+            )
+
+    # Sort by score and limit results
+    all_results.sort(key=lambda x: x.get("score", 0.0), reverse=True)
+    processed_results = all_results[:limit]
 
     return {
         "query": search_query,
+        "entity_types": entity_types,
         "results": processed_results,
         "total_results": len(processed_results),
     }

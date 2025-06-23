@@ -21,7 +21,7 @@ async def register_mem0_bioimage_service(
     """Register the Mem0-BioImage service with entity-agnostic methods.
 
     Sets up all service endpoints with both traditional exact matching and semantic search.
-    Only entity-agnostic methods are exposed - no node/technology-specific endpoints.
+    The query method supports filtering by entity types through the entity_types parameter.
     """
 
     bioimage_index = load_external_data()
