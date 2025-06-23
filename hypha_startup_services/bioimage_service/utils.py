@@ -1,4 +1,5 @@
 import logging
+import re
 from typing import Dict, Any
 from mem0 import AsyncMemory
 
@@ -9,17 +10,51 @@ EBI_AGENT_ID = "ebi_bioimage_assistant"
 EBI_WORKSPACE = "ebi_data"
 
 
+def clean_text_for_json(text: str) -> str:
+    """
+    Clean text to prevent JSON parsing issues.
+
+    Args:
+        text: The text to clean
+
+    Returns:
+        Cleaned text safe for JSON encoding
+    """
+    if not isinstance(text, str):
+        text = str(text)
+
+    # Remove null bytes and control characters
+    text = re.sub(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]", "", text)
+
+    # Replace problematic quotes with safe alternatives
+    text = text.replace('"', "'").replace("'", "'")
+
+    # Remove or replace other potentially problematic characters
+    text = re.sub(r"[\\]", "/", text)  # Replace backslashes
+
+    # Normalize whitespace
+    text = re.sub(r"\s+", " ", text).strip()
+
+    # Ensure text is not too long (mem0 might have limits)
+    if len(text) > 8000:
+        text = text[:8000] + "..."
+
+    return text
+
+
 def create_node_content(node: Dict[str, Any]) -> str:
     """Create content string for a node."""
-    name = node.get("name", "Unknown")
-    description = node.get("description", "")
+    name = clean_text_for_json(node.get("name", "Unknown"))
+    description = clean_text_for_json(node.get("description", ""))
     country = (
-        node.get("country", {}).get("name", "Unknown")
+        clean_text_for_json(node.get("country", {}).get("name", "Unknown"))
         if isinstance(node.get("country"), dict)
-        else str(node.get("country", "Unknown"))
+        else clean_text_for_json(str(node.get("country", "Unknown")))
     )
     technologies = (
-        ", ".join(node.get("technologies", [])) if node.get("technologies") else "None"
+        ", ".join([clean_text_for_json(tech) for tech in node.get("technologies", [])])
+        if node.get("technologies")
+        else "None"
     )
     return f"Bioimaging node: {name} in {country}. Description: {description}. Technologies: {technologies}"
 
@@ -29,35 +64,41 @@ def create_node_metadata(node: Dict[str, Any]) -> Dict[str, Any]:
     country_info = node.get("country", {})
     metadata = {
         "entity_type": "node",
-        "entity_id": node.get("id"),
-        "name": node.get("name"),
+        "entity_id": clean_text_for_json(str(node.get("id", ""))),
+        "name": clean_text_for_json(node.get("name", "")),
         "country": (
-            country_info.get("name")
+            clean_text_for_json(country_info.get("name", ""))
             if isinstance(country_info, dict)
-            else str(country_info)
+            else clean_text_for_json(str(country_info))
         ),
         "country_code": (
-            country_info.get("iso_a2") if isinstance(country_info, dict) else None
+            clean_text_for_json(country_info.get("iso_a2", ""))
+            if isinstance(country_info, dict)
+            else None
         ),
-        "description": node.get("description"),
+        "description": clean_text_for_json(node.get("description", "")),
         "technologies": (
-            ",".join(node.get("technologies", [])) if node.get("technologies") else None
+            ",".join(
+                [clean_text_for_json(tech) for tech in node.get("technologies", [])]
+            )
+            if node.get("technologies")
+            else None
         ),
     }
-    # Remove None values to avoid empty metadata fields
-    return {k: v for k, v in metadata.items() if v is not None}
+    # Remove None values and empty strings to avoid empty metadata fields
+    return {k: v for k, v in metadata.items() if v is not None and v != ""}
 
 
 def create_technology_content(tech: Dict[str, Any]) -> str:
     """Create content string for a technology."""
-    name = tech.get("name", "Unknown")
-    description = tech.get("description", "")
+    name = clean_text_for_json(tech.get("name", "Unknown"))
+    description = clean_text_for_json(tech.get("description", ""))
     category = (
-        tech.get("category", {}).get("name", "Unknown")
+        clean_text_for_json(tech.get("category", {}).get("name", "Unknown"))
         if isinstance(tech.get("category"), dict)
-        else str(tech.get("category", "Unknown"))
+        else clean_text_for_json(str(tech.get("category", "Unknown")))
     )
-    abbr = tech.get("abbr", "")
+    abbr = clean_text_for_json(tech.get("abbr", ""))
     return f"Bioimaging technology: {name} ({abbr}). Category: {category}. Description: {description}"
 
 
@@ -66,18 +107,18 @@ def create_technology_metadata(tech: Dict[str, Any]) -> Dict[str, Any]:
     category_info = tech.get("category", {})
     metadata = {
         "entity_type": "technology",
-        "entity_id": tech.get("id"),
-        "name": tech.get("name"),
-        "abbreviation": tech.get("abbr"),
+        "entity_id": clean_text_for_json(str(tech.get("id", ""))),
+        "name": clean_text_for_json(tech.get("name", "")),
+        "abbreviation": clean_text_for_json(tech.get("abbr", "")),
         "category": (
-            category_info.get("name")
+            clean_text_for_json(category_info.get("name", ""))
             if isinstance(category_info, dict)
-            else str(category_info)
+            else clean_text_for_json(str(category_info))
         ),
         # "description": tech.get("description"),
     }
-    # Remove None values to avoid empty metadata fields
-    return {k: v for k, v in metadata.items() if v is not None}
+    # Remove None values and empty strings to avoid empty metadata fields
+    return {k: v for k, v in metadata.items() if v is not None and v != ""}
 
 
 async def semantic_bioimage_search(

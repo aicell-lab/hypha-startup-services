@@ -126,25 +126,33 @@ async def query(
     # Step 2: For each result, find related entities using bioimage_index
     enhanced_results = []
     for result in semantic_results["results"]:
-        enhanced_result = {"info": result.get("memory", {})}
+        enhanced_result = {"info": result.get("memory", "")}
 
         if include_related:
-            entity_id = result["metadata"].get("entity_id")
-            entity_type = result["metadata"].get("entity_type")
+            # Extract entity_id and entity_type from flattened metadata structure
+            metadata = result.get("metadata", {})
+            entity_id = metadata.get("entity_id")
+            entity_type = metadata.get("entity_type")
             relation_type = (
                 "exists_in_nodes" if entity_type == "technology" else "has_technologies"
             )
 
             if entity_id:
-                related_entities = await get_related_entities(
-                    entity_id=entity_id,
-                    bioimage_index=bioimage_index,
-                )
-                related_entities_names = [
-                    entity.get("name", entity.get("id", "Unknown"))
-                    for entity in related_entities
-                ]
-                enhanced_result[relation_type] = related_entities_names
+                try:
+                    related_entities = await get_related_entities(
+                        entity_id=entity_id,
+                        bioimage_index=bioimage_index,
+                    )
+                    related_entities_names = [
+                        entity.get("name", entity.get("id", "Unknown"))
+                        for entity in related_entities
+                    ]
+                    enhanced_result[relation_type] = related_entities_names
+                except ValueError as e:
+                    logger.warning(
+                        "Failed to get related entities for %s: %s", entity_id, e
+                    )
+                    # Continue without related entities
 
         enhanced_results.append(enhanced_result)
 
