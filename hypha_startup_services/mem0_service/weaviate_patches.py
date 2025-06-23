@@ -117,6 +117,19 @@ def patch_weaviate_search():
                 # FIX: Parse JSON metadata if it's a string
                 payload = parse_metadata_field(payload)
 
+                # FIX: Flatten nested metadata structure to avoid double nesting
+                # If metadata contains another metadata dict, merge it up
+                if "metadata" in payload and isinstance(payload["metadata"], dict):
+                    nested_metadata = payload["metadata"]
+                    # Check if this looks like our custom metadata (has entity_id, entity_type)
+                    if (
+                        "entity_id" in nested_metadata
+                        or "entity_type" in nested_metadata
+                    ):
+                        # Remove the nested metadata and merge its contents into the top level
+                        del payload["metadata"]
+                        payload.update(nested_metadata)
+
                 results.append(
                     OutputData(
                         id=str(obj.uuid),
@@ -170,8 +183,11 @@ def patch_weaviate_insert():
                         del data_object["ids"]
 
                     # FIX: Extract custom metadata fields and store as JSON string under "metadata" field
-                    # Mem0 stores custom metadata as top-level fields, but we need to collect them
+                    # BUT: Only do this if there's no existing metadata field from mem0
                     custom_metadata = {}
+
+                    # If there's already a metadata field, preserve it as-is
+                    existing_metadata = data_object.get("metadata")
 
                     for key, value in list(data_object.items()):
                         if key not in MEM0_SYSTEM_FIELDS:
@@ -179,9 +195,24 @@ def patch_weaviate_insert():
                             # Remove from top-level to avoid duplication
                             del data_object[key]
 
-                    # If there are custom metadata fields, store them as JSON string under "metadata"
-                    if custom_metadata:
+                    # Only set metadata from custom fields if:
+                    # 1. There are custom metadata fields, AND
+                    # 2. There's no existing metadata field from mem0
+                    if custom_metadata and existing_metadata is None:
                         data_object["metadata"] = json.dumps(custom_metadata)
+                    elif custom_metadata and existing_metadata is not None:
+                        # If there's both existing metadata and custom fields,
+                        # merge them (but this shouldn't happen in normal mem0 usage)
+                        if isinstance(existing_metadata, dict):
+                            # Merge custom fields into existing metadata dict
+                            existing_metadata.update(custom_metadata)
+                        else:
+                            # If existing metadata is not a dict (e.g., JSON string),
+                            # log a warning but don't overwrite it
+                            logger.warning(
+                                "Found both existing metadata and custom fields, preserving existing metadata"
+                            )
+                    # If no custom metadata but existing metadata exists, just leave it alone
 
                     batch.add_object(
                         collection=self.collection_name,
@@ -232,6 +263,16 @@ def patch_weaviate_get():
 
             # Parse JSON metadata if it's a string
             payload = parse_metadata_field(payload)
+
+            # FIX: Flatten nested metadata structure to avoid double nesting
+            # If metadata contains another metadata dict, merge it up
+            if "metadata" in payload and isinstance(payload["metadata"], dict):
+                nested_metadata = payload["metadata"]
+                # Check if this looks like our custom metadata (has entity_id, entity_type)
+                if "entity_id" in nested_metadata or "entity_type" in nested_metadata:
+                    # Remove the nested metadata and merge its contents into the top level
+                    del payload["metadata"]
+                    payload.update(nested_metadata)
 
             results = OutputData(
                 id=str(response.uuid).split("'")[0],
@@ -305,6 +346,19 @@ def patch_weaviate_list():
 
                 # Parse JSON metadata if it's a string
                 payload = parse_metadata_field(payload)
+
+                # FIX: Flatten nested metadata structure to avoid double nesting
+                # If metadata contains another metadata dict, merge it up
+                if "metadata" in payload and isinstance(payload["metadata"], dict):
+                    nested_metadata = payload["metadata"]
+                    # Check if this looks like our custom metadata (has entity_id, entity_type)
+                    if (
+                        "entity_id" in nested_metadata
+                        or "entity_type" in nested_metadata
+                    ):
+                        # Remove the nested metadata and merge its contents into the top level
+                        del payload["metadata"]
+                        payload.update(nested_metadata)
 
                 results.append(
                     OutputData(
@@ -468,8 +522,8 @@ def patch_mem0_get_all_from_vector_store():
                 and len(memories_result) > 0
                 else memories_result
             )
-            logger.info(
-                "DEBUG: actual_memories type=%s, length=%s",
+            logger.debug(
+                "actual_memories type=%s, length=%s",
                 type(actual_memories),
                 (
                     len(actual_memories)
@@ -497,50 +551,55 @@ def patch_mem0_get_all_from_vector_store():
 
             formatted_memories = []
             for i, mem in enumerate(actual_memories):
-                logger.info(
-                    "DEBUG: Processing memory %s: type=%s, id=%s",
+                logger.debug(
+                    "Processing memory %s: type=%s, id=%s, payload_type=%s",
                     i,
                     type(mem),
                     getattr(mem, "id", "no id"),
+                    type(getattr(mem, "payload", None)),
                 )
                 from mem0.configs.base import MemoryItem
 
+                # Handle different payload types safely
+                payload = getattr(mem, "payload", {})
+                if isinstance(payload, str):
+                    try:
+                        payload = json.loads(payload)
+                    except (json.JSONDecodeError, ValueError):
+                        logger.warning("Could not parse payload as JSON: %s", payload)
+                        payload = {"data": payload}  # Fallback: treat as raw data
+                elif not isinstance(payload, dict):
+                    logger.warning("Unexpected payload type: %s", type(payload))
+                    payload = {"data": str(payload)}  # Fallback: convert to string
+
                 memory_item_dict = MemoryItem(
                     id=mem.id,
-                    memory=mem.payload["data"],  # type: ignore
-                    hash=mem.payload.get("hash"),  # type: ignore
-                    created_at=mem.payload.get("created_at"),  # type: ignore
-                    updated_at=mem.payload.get("updated_at"),  # type: ignore
+                    memory=payload.get("data", ""),
+                    hash=payload.get("hash"),
+                    created_at=payload.get("created_at"),
+                    updated_at=payload.get("updated_at"),
                     metadata={},  # Will be set below if needed
                     score=getattr(mem, "score", 1.0),  # Default score
                 ).model_dump(exclude={"score"})
 
                 for key in promoted_payload_keys:
-                    if hasattr(mem, "payload") and mem.payload and key in mem.payload:  # type: ignore
-                        memory_item_dict[key] = mem.payload[key]  # type: ignore
+                    if key in payload:
+                        memory_item_dict[key] = payload[key]
 
                 # Get additional metadata, ensuring payload exists and is iterable
                 # Exclude core fields and existing metadata to prevent nesting
                 additional_metadata = {}
-                if (
-                    hasattr(mem, "payload")
-                    and mem.payload
-                    and hasattr(mem.payload, "items")
-                ):
+                if isinstance(payload, dict):
                     additional_metadata = {
                         k: v
-                        for k, v in mem.payload.items()  # type: ignore
+                        for k, v in payload.items()
                         if k not in core_and_promoted_keys
                     }
 
                 # If there's existing metadata in the payload, merge it properly
                 existing_metadata = {}
-                if (
-                    hasattr(mem, "payload")
-                    and mem.payload
-                    and "metadata" in mem.payload  # type: ignore
-                ):
-                    existing_metadata = mem.payload["metadata"]  # type: ignore
+                if isinstance(payload, dict) and "metadata" in payload:
+                    existing_metadata = payload["metadata"]
                     if isinstance(existing_metadata, dict):
                         # Merge existing metadata with additional metadata
                         additional_metadata.update(existing_metadata)
@@ -551,9 +610,7 @@ def patch_mem0_get_all_from_vector_store():
 
                 formatted_memories.append(memory_item_dict)
 
-            logger.info(
-                "DEBUG: Returning %s formatted memories", len(formatted_memories)
-            )
+            logger.debug("Returning %s formatted memories", len(formatted_memories))
             return formatted_memories
 
         # Apply the patch
