@@ -12,6 +12,7 @@ from weaviate.collections.classes.internal import QueryReturn, GenerativeReturn
 from weaviate.collections.classes.batch import DeleteManyReturn
 from hypha_rpc.rpc import RemoteService
 from hypha_startup_services.common.workspace_utils import ws_from_context
+from hypha_startup_services.common.chunking import chunk_text, chunk_documents
 from hypha_startup_services.weaviate_service.utils.collection_utils import (
     acquire_collection,
     objects_part_coll_name,
@@ -380,9 +381,6 @@ async def applications_exists(
     return await artifact_exists(server, artifact_name)
 
 
-# TODO: implement semantic splitting
-
-
 async def data_insert_many(
     client: WeaviateAsyncClient,
     server: RemoteService,
@@ -391,11 +389,16 @@ async def data_insert_many(
     objects: list[dict[str, Any]],
     user_ws: str | None = None,
     context: dict[str, Any] | None = None,
+    enable_chunking: bool = False,
+    chunk_size: int = 512,
+    chunk_overlap: int = 50,
+    text_field: str = "text",
 ) -> dict[str, Any]:
     """Insert multiple objects into the collection.
 
     Gets a tenant-specific collection after verifying permissions.
     Automatically adds application_id to each object before insertion.
+    Optionally chunks text content for better vector search performance.
 
     Args:
         client: WeaviateAsyncClient instance
@@ -405,11 +408,14 @@ async def data_insert_many(
         objects: List of objects to insert
         user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
+        enable_chunking: Whether to chunk text content
+        chunk_size: Maximum number of tokens per chunk (if chunking enabled)
+        chunk_overlap: Number of tokens to overlap between chunks (if chunking enabled)
+        text_field: Name of the field containing text to chunk
 
     Returns:
         Dictionary with insertion results including UUIDs and any errors
     """
-
     tenant_collection = await get_permitted_collection(
         client,
         server,
@@ -419,7 +425,28 @@ async def data_insert_many(
         context=context,
     )
 
-    app_objects = add_app_id(objects, application_id)
+    # Process objects with optional chunking
+    if enable_chunking:
+        chunked_objects = []
+        for obj in objects:
+            if text_field in obj and obj[text_field]:
+                text_content = obj[text_field]
+                chunks = chunk_text(text_content, chunk_size, chunk_overlap)
+
+                for chunk_idx, chunk in enumerate(chunks):
+                    chunked_obj = obj.copy()
+                    chunked_obj[text_field] = chunk
+                    chunked_obj["chunk_index"] = chunk_idx
+                    chunked_obj["total_chunks"] = len(chunks)
+                    chunked_objects.append(chunked_obj)
+            else:
+                chunked_objects.append(obj)
+
+        processed_objects = chunked_objects
+    else:
+        processed_objects = objects
+
+    app_objects = add_app_id(processed_objects, application_id)
 
     response = await tenant_collection.data.insert_many(objects=app_objects)
 
@@ -439,12 +466,17 @@ async def data_insert(
     properties: dict[str, Any],
     user_ws: str | None = None,
     context: dict[str, Any] | None = None,
+    enable_chunking: bool = False,
+    chunk_size: int = 512,
+    chunk_overlap: int = 50,
+    text_field: str = "text",
     **kwargs,
 ) -> uuid_class.UUID:
     """Insert a single object into the collection.
 
     Gets a tenant-specific collection after verifying permissions.
     Automatically adds application_id to the object before insertion.
+    Optionally chunks text content for better vector search performance.
     Forwards all kwargs to collection.data.insert().
 
     Args:
@@ -455,11 +487,36 @@ async def data_insert(
         properties: Object properties to insert
         user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
+        enable_chunking: Whether to chunk text content
+        chunk_size: Maximum number of tokens per chunk (if chunking enabled)
+        chunk_overlap: Number of tokens to overlap between chunks (if chunking enabled)
+        text_field: Name of the field containing text to chunk
         **kwargs: Additional arguments to pass to insert()
 
     Returns:
-        UUID of the inserted object
+        UUID of the inserted object (or first chunk if chunking enabled)
     """
+    if enable_chunking and text_field in properties and properties[text_field]:
+        # For single insert with chunking, use data_insert_many and return first UUID
+        result = await data_insert_many(
+            client=client,
+            server=server,
+            collection_name=collection_name,
+            application_id=application_id,
+            objects=[properties],
+            user_ws=user_ws,
+            context=context,
+            enable_chunking=True,
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            text_field=text_field,
+        )
+        # Return the first UUID from the chunked inserts
+        if result.get("uuids"):
+            return list(result["uuids"].values())[0]
+        else:
+            raise RuntimeError("No UUIDs returned from chunked insert")
+
     tenant_collection = await get_permitted_collection(
         client,
         server,

@@ -43,7 +43,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "services",
         nargs="+",
-        choices=["weaviate", "mem0", "bioimage"],
+        choices=["weaviate", "mem0", "bioimage", "weaviate-bioimage"],
         help="Service(s) to start. Single service or multiple services in order.",
     )
 
@@ -74,6 +74,11 @@ def create_parser() -> argparse.ArgumentParser:
         "--bioimage-service-id", type=str, help="Custom Bioimage service ID"
     )
     parser.add_argument(
+        "--weaviate-bioimage-service-id",
+        type=str,
+        help="Custom Weaviate Bioimage service ID",
+    )
+    parser.add_argument(
         "--probes-service-id",
         type=str,
         help="Custom ID for the probes service (default: startup-services-probes)",
@@ -99,9 +104,11 @@ def get_service_configurations(
 
     for service_name in args.services:
         registry = service_registry.get_service_config(service_name)
+        # Convert hyphenated service names to underscores for attribute lookup
+        service_attr_name = service_name.replace("-", "_")
         service_id = (
             args.service_id
-            or getattr(args, f"{service_name}_service_id", None)
+            or getattr(args, f"{service_attr_name}_service_id", None)
             or registry["default_service_id"]
         )
 
