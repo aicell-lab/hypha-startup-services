@@ -7,10 +7,14 @@ from hypha_startup_services.mem0_service.register_service import register_mem0_s
 from hypha_startup_services.bioimage_service.register_service import (
     register_bioimage_service,
 )
+from hypha_startup_services.weaviate_bioimage_service.register_service import (
+    register_weaviate_bioimage,
+)
 from hypha_startup_services.common.constants import (
     DEFAULT_WEAVIATE_SERVICE_ID,
     DEFAULT_MEM0_SERVICE_ID,
     DEFAULT_BIOIMAGE_SERVICE_ID,
+    DEFAULT_WEAVIATE_BIOIMAGE_SERVICE_ID,
 )
 
 
@@ -81,4 +85,11 @@ def register_services():
         register_bioimage_service,
         "hypha_startup_services.bioimage_service.register_service:register_bioimage_service",
         DEFAULT_BIOIMAGE_SERVICE_ID,
+    )
+
+    service_registry.register_service_type(
+        "weaviate-bioimage",
+        register_weaviate_bioimage,
+        "hypha_startup_services.weaviate_bioimage_service.register_service:register_weaviate_bioimage",
+        DEFAULT_WEAVIATE_BIOIMAGE_SERVICE_ID,
     )
