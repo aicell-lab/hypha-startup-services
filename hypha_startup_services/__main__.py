@@ -43,7 +43,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "services",
         nargs="+",
-        choices=["weaviate", "mem0", "bioimage", "weaviate-bioimage"],
+        choices=["weaviate", "mem0", "mem0-bioimage", "weaviate-bioimage"],
         help="Service(s) to start. Single service or multiple services in order.",
     )
 
@@ -71,7 +71,7 @@ def create_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--mem0-service-id", type=str, help="Custom Mem0 service ID")
     parser.add_argument(
-        "--bioimage-service-id", type=str, help="Custom Bioimage service ID"
+        "--mem0-bioimage-service-id", type=str, help="Custom Mem0-Bioimage service ID"
     )
     parser.add_argument(
         "--weaviate-bioimage-service-id",
