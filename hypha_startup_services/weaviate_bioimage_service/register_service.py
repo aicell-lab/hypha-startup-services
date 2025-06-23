@@ -1,14 +1,13 @@
 """Service registration for the Weaviate BioImage service."""
 
 import logging
-from functools import partial
 from hypha_rpc.rpc import RemoteService
 from weaviate import WeaviateAsyncClient
 
 from hypha_startup_services.weaviate_service.client import instantiate_and_connect
 from hypha_startup_services.weaviate_bioimage_service.methods import (
-    query,
-    get_entity,
+    create_query,
+    create_get_entity,
 )
 
 logger = logging.getLogger(__name__)
@@ -53,6 +52,10 @@ async def register_weaviate_bioimage_service(
         service_id: Unique identifier for the service
     """
 
+    # Create schema functions with dependency injection
+    query_func = create_query(weaviate_client, server)
+    get_entity_func = create_get_entity(weaviate_client, server)
+
     # Register the service
     await server.register_service(
         {
@@ -62,16 +65,8 @@ async def register_weaviate_bioimage_service(
                 "visibility": "public",
                 "require_context": True,
             },
-            "query": partial(
-                query,
-                client=weaviate_client,
-                server=server,
-            ),
-            "get_entity": partial(
-                get_entity,
-                client=weaviate_client,
-                server=server,
-            ),
+            "query": query_func,
+            "get_entity": get_entity_func,
         }
     )
 

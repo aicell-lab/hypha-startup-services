@@ -3,8 +3,8 @@
 import pytest
 import pytest_asyncio
 from hypha_startup_services.bioimage_service.methods import (
-    query,
-    get_related_entities,
+    create_query,
+    create_get_related_entities,
 )
 from hypha_startup_services.bioimage_service.data_index import (
     load_external_data,
@@ -28,9 +28,8 @@ async def mem0_memory():
 async def test_query_returns_only_info_issue(bioimage_index, mem0_memory):
     """Test to confirm that query currently only returns 'info' field."""
 
-    result = await query(
-        memory=mem0_memory,
-        bioimage_index=bioimage_index,
+    query_func = create_query(mem0_memory, bioimage_index)
+    result = await query_func(
         query_text="confocal microscopy",
         include_related=True,
         limit=5,
@@ -73,9 +72,8 @@ async def test_query_returns_only_info_issue(bioimage_index, mem0_memory):
 async def test_query_should_include_related_entities(bioimage_index, mem0_memory):
     """Test that query includes related entities when include_related=True."""
 
-    result = await query(
-        memory=mem0_memory,
-        bioimage_index=bioimage_index,
+    query_func = create_query(mem0_memory, bioimage_index)
+    result = await query_func(
         query_text="electron microscopy",
         include_related=True,
         limit=3,
@@ -118,9 +116,8 @@ async def test_query_should_include_related_entities(bioimage_index, mem0_memory
 async def test_query_without_related_entities(bioimage_index, mem0_memory):
     """Test that query doesn't include related entities when include_related=False."""
 
-    result = await query(
-        memory=mem0_memory,
-        bioimage_index=bioimage_index,
+    query_func = create_query(mem0_memory, bioimage_index)
+    result = await query_func(
         query_text="microscopy",
         include_related=False,
         limit=3,
@@ -145,8 +142,8 @@ async def test_get_related_entities_works_correctly(bioimage_index):
     # Test with a known technology ID that should have related nodes
     tech_id = "68a3b6c4-9c19-4446-9617-22e7d37e0f2c"  # 4Pi microscopy
 
-    related_entities = await get_related_entities(
-        bioimage_index=bioimage_index,
+    get_related_func = create_get_related_entities(bioimage_index)
+    related_entities = await get_related_func(
         entity_id=tech_id,
     )
 

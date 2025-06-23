@@ -12,15 +12,18 @@ from weaviate.collections.classes.internal import QueryReturn, GenerativeReturn
 from weaviate.collections.classes.batch import DeleteManyReturn
 from hypha_rpc.rpc import RemoteService
 from hypha_startup_services.common.workspace_utils import ws_from_context
-from hypha_startup_services.common.chunking import chunk_text, chunk_documents
+from hypha_startup_services.common.chunking import chunk_text
 from hypha_startup_services.weaviate_service.utils.collection_utils import (
     acquire_collection,
     objects_part_coll_name,
     create_application_filter,
     get_short_name,
     and_app_filter,
-    add_tenant_if_not_exists,
-    get_tenant_collection,
+)
+from hypha_startup_services.weaviate_service.utils.service_utils import (
+    prepare_application_creation,
+    get_permitted_collection,
+    collection_exists,
 )
 from hypha_startup_services.common.utils import (
     get_full_collection_name,
@@ -42,7 +45,6 @@ from hypha_startup_services.weaviate_service.utils.artifact_utils import (
 )
 from hypha_startup_services.common.permissions import (
     assert_has_collection_permission,
-    assert_has_application_permission,
     assert_is_admin_ws,
 )
 from hypha_startup_services.common.artifacts import (
@@ -51,77 +53,28 @@ from hypha_startup_services.common.artifacts import (
 )
 
 
-async def prepare_application_creation(
-    client: WeaviateAsyncClient,
-    collection_name: str,
-    user_ws: str,
-) -> dict[str, str] | None:
-    """Prepare for application creation by checking collection existence and adding tenant.
-
-    Args:
-        client: WeaviateAsyncClient instance
-        collection_name: Name of the collection for the application
-        user_ws: User workspace
-
-    Returns:
-        Error dict if preparation fails, None if successful
-    """
-    # Make sure the collection exists and the user has the tenant
-    if not await collections_exists(client, collection_name):
-        return {"error": f"Collection '{collection_name}' does not exist."}
-
-    # Add tenant for this user if it doesn't exist
-    await add_tenant_if_not_exists(
-        client,
-        collection_name,
-        user_ws,
-    )
-
-    return None
-
-
-async def get_permitted_collection(
-    client: WeaviateAsyncClient,
-    server: RemoteService,
-    collection_name: str,
-    application_id: str,
-    user_ws: str | None = None,
-    context: dict[str, Any] | None = None,
-):
-    """Get a collection with appropriate tenant permissions.
-
-    Verifies that the caller has permission to access the application.
-    Returns a collection object with the appropriate tenant configured.
-
-    Args:
-        client: WeaviateAsyncClient instance
-        server: RemoteService instance for permission checking
-        collection_name: Name of the collection to access
-        application_id: ID of the application being accessed
-        user_ws: Optional user workspace to use as tenant (if different from caller)
-        context: Context containing caller information
-
-    Returns:
-        Collection object with tenant permissions configured
-    """
-    caller_ws = ws_from_context(context) if context else ""
-    if user_ws is not None:
-        await assert_has_application_permission(
-            server, collection_name, application_id, caller_ws, user_ws
-        )
-        return get_tenant_collection(client, collection_name, user_ws)
-
-    return get_tenant_collection(client, collection_name, caller_ws)
-
-
 async def collections_exists(
     client: WeaviateAsyncClient,
     collection_name: str,
-    context: dict[str, Any] | None = None,
+    context: dict[str, Any] | None = None,  # pylint: disable=W0613
 ) -> bool:
-    """Check if a collection exists."""
-    collection_name = get_full_collection_name(collection_name)
-    return await client.collections.exists(collection_name)
+    """Check if a collection exists by its name.
+
+    Verifies that the caller has admin permissions.
+    Converts the collection name to a full name before checking existence.
+
+    Args:
+        client: WeaviateAsyncClient instance
+        name: Short collection name to check
+        context: Context containing caller information
+
+    Returns:
+        True if the collection exists, False otherwise
+    """
+    return await collection_exists(
+        client=client,
+        collection_name=get_full_collection_name(collection_name),
+    )
 
 
 async def collections_create(

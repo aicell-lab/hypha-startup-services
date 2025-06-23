@@ -6,8 +6,8 @@ from dotenv import load_dotenv
 from hypha_rpc import connect_to_server
 from hypha_rpc.rpc import RemoteService
 from hypha_startup_services.bioimage_service.methods import (
-    get_entity_details,
-    get_related_entities,
+    create_get_entity_details,
+    create_get_related_entities,
 )
 from hypha_startup_services.bioimage_service.data_index import BioimageIndex
 
@@ -111,9 +111,9 @@ async def test_bioimage_index_basic_functionality(bioimage_index):
 async def test_get_nodes_by_technology_id(bioimage_index):
     """Test getting nodes by technology ID using get_related_entities."""
     # Test with known technology ID - this should find nodes that provide this technology
-    result = await get_related_entities(
-        bioimage_index,
-        "f0acc857-fc72-4094-bf14-c36ac40801c5",  # 3D-CLEM technology
+    get_related_func = create_get_related_entities(bioimage_index)
+    result = await get_related_func(
+        entity_id="f0acc857-fc72-4094-bf14-c36ac40801c5",  # 3D-CLEM technology
     )
 
     # Should return a list of nodes that have this technology
@@ -133,17 +133,18 @@ async def test_get_nodes_by_technology_id(bioimage_index):
 async def test_get_nodes_by_technology_id_not_found(bioimage_index):
     """Test getting nodes for non-existent technology ID."""
     # Should raise ValueError for non-existent technology ID
+    get_related_func = create_get_related_entities(bioimage_index)
     with pytest.raises(ValueError, match="Entity not found"):
-        await get_related_entities(bioimage_index, "nonexistent-tech-id")
+        await get_related_func(entity_id="nonexistent-tech-id")
 
 
 @pytest.mark.asyncio
 async def test_get_technologies_by_node_id(bioimage_index):
     """Test getting technologies by node ID using get_related_entities."""
     # Test with known node ID (Italian node) - this should find technologies provided by this node
-    result = await get_related_entities(
-        bioimage_index,
-        "7409a98f-1bdb-47d2-80e7-c89db73efedd",  # Italian node
+    get_related_func = create_get_related_entities(bioimage_index)
+    result = await get_related_func(
+        entity_id="7409a98f-1bdb-47d2-80e7-c89db73efedd",  # Italian node
     )
 
     # Should return a list of technologies provided by this node
@@ -161,17 +162,18 @@ async def test_get_technologies_by_node_id(bioimage_index):
 async def test_get_technologies_by_node_id_not_found(bioimage_index):
     """Test getting technologies for non-existent node ID."""
     # Should raise ValueError for non-existent node ID
+    get_related_func = create_get_related_entities(bioimage_index)
     with pytest.raises(ValueError, match="Entity not found"):
-        await get_related_entities(bioimage_index, "nonexistent-node-id")
+        await get_related_func(entity_id="nonexistent-node-id")
 
 
 @pytest.mark.asyncio
 async def test_get_node_details(bioimage_index):
     """Test getting node details using get_entity_details."""
     # Test with known node ID
-    result = await get_entity_details(
-        bioimage_index,
-        "7409a98f-1bdb-47d2-80e7-c89db73efedd",  # Italian node
+    get_entity_func = create_get_entity_details(bioimage_index)
+    result = await get_entity_func(
+        entity_id="7409a98f-1bdb-47d2-80e7-c89db73efedd",  # Italian node
     )
 
     assert "entity_id" in result
@@ -182,16 +184,16 @@ async def test_get_node_details(bioimage_index):
 
     # Test with non-existent node ID - should raise ValueError
     with pytest.raises(ValueError, match="Entity not found"):
-        await get_entity_details(bioimage_index, "nonexistent-node-id")
+        await get_entity_func(entity_id="nonexistent-node-id")
 
 
 @pytest.mark.asyncio
 async def test_get_technology_details(bioimage_index):
     """Test getting technology details using get_entity_details."""
     # Test with known technology ID
-    result = await get_entity_details(
-        bioimage_index,
-        "f0acc857-fc72-4094-bf14-c36ac40801c5",  # 3D-CLEM technology
+    get_entity_func = create_get_entity_details(bioimage_index)
+    result = await get_entity_func(
+        entity_id="f0acc857-fc72-4094-bf14-c36ac40801c5",  # 3D-CLEM technology
     )
 
     assert "entity_id" in result
@@ -205,7 +207,7 @@ async def test_get_technology_details(bioimage_index):
 
     # Test with non-existent technology ID - should raise ValueError
     with pytest.raises(ValueError, match="Entity not found"):
-        await get_entity_details(bioimage_index, "nonexistent-tech-id")
+        await get_entity_func(entity_id="nonexistent-tech-id")
 
 
 @pytest.mark.asyncio

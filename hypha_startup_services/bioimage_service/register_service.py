@@ -3,13 +3,12 @@ Helper functions to register the BioImage service with proper API endpoints.
 """
 
 import logging
-from functools import partial
 from hypha_rpc.rpc import RemoteService
 from hypha_startup_services.bioimage_service.data_index import load_external_data
 from hypha_startup_services.bioimage_service.methods import (
-    get_entity_details,
-    get_related_entities,
-    query,
+    create_get_entity_details,
+    create_get_related_entities,
+    create_query,
 )
 from hypha_startup_services.mem0_service.mem0_client import get_mem0
 
@@ -25,11 +24,13 @@ async def register_bioimage_service(
     Only entity-agnostic methods are exposed - no node/technology-specific endpoints.
     """
 
-    # Load the bioimage index data for exact matching
     bioimage_index = load_external_data()
 
-    # Get mem0 instance for semantic search
     memory = await get_mem0()
+
+    get_entity_details_func = create_get_entity_details(bioimage_index)
+    get_related_entities_func = create_get_related_entities(bioimage_index)
+    query_func = create_query(memory, bioimage_index)
 
     await server.register_service(
         {
@@ -37,16 +38,11 @@ async def register_bioimage_service(
             "id": service_id,
             "config": {
                 "visibility": "public",
-                "require_context": False,  # No authentication required for read operations
+                "require_context": False,
             },
-            # Entity-agnostic methods (preferred)
-            "get": partial(get_entity_details, bioimage_index=bioimage_index),
-            "get_related": partial(get_related_entities, bioimage_index=bioimage_index),
-            "query": partial(
-                query,
-                memory=memory,
-                bioimage_index=bioimage_index,
-            ),
+            "get": get_entity_details_func,
+            "get_related": get_related_entities_func,
+            "query": query_func,
         }
     )
 
