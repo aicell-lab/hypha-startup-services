@@ -7,7 +7,9 @@ from hypha_startup_services.weaviate_bioimage_service.methods import (
     create_query,
     create_get_entity,
     BIOIMAGE_COLLECTION,
-    DEFAULT_APPLICATION_ID,
+)
+from hypha_startup_services.weaviate_bioimage_service.methods import (
+    SHARED_APPLICATION_ID,
 )
 
 
@@ -17,7 +19,7 @@ class TestConstants:
     def test_constants_defined(self):
         """Test that required constants are defined."""
         assert BIOIMAGE_COLLECTION == "bioimage_data"
-        assert DEFAULT_APPLICATION_ID == "bioimage_app"
+        assert SHARED_APPLICATION_ID == "eurobioimaging-shared"
 
 
 class TestQueryMethods:
@@ -50,7 +52,7 @@ class TestQueryMethods:
         assert call_kwargs["client"] == mock_client
         assert call_kwargs["server"] == mock_server
         assert call_kwargs["collection_name"] == BIOIMAGE_COLLECTION
-        assert call_kwargs["application_id"] == DEFAULT_APPLICATION_ID
+        assert call_kwargs["application_id"] == SHARED_APPLICATION_ID
         assert call_kwargs["query"] == "test query"
         assert call_kwargs["limit"] == 5
         assert call_kwargs["context"] == mock_context
@@ -81,7 +83,7 @@ class TestQueryMethods:
         assert call_kwargs["client"] == mock_client
         assert call_kwargs["server"] == mock_server
         assert call_kwargs["collection_name"] == BIOIMAGE_COLLECTION
-        assert call_kwargs["application_id"] == DEFAULT_APPLICATION_ID
+        assert call_kwargs["application_id"] == SHARED_APPLICATION_ID
         assert call_kwargs["context"] == mock_context
 
         # Check the where filter

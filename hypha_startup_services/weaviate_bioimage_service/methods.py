@@ -1,11 +1,13 @@
 """Service methods for the Weaviate BioImage service."""
 
 import logging
+import os
 from typing import Any, Dict, Callable, Coroutine
 
 from weaviate import WeaviateAsyncClient
 from weaviate.classes.query import Filter
 
+from hypha_rpc import connect_to_server
 from hypha_rpc.rpc import RemoteService
 from hypha_rpc.utils.schema import schema_function
 from pydantic import Field
@@ -20,7 +22,40 @@ logger = logging.getLogger(__name__)
 
 # Constants for bioimage collections
 BIOIMAGE_COLLECTION = "bioimage_data"
-DEFAULT_APPLICATION_ID = "bioimage_app"
+SHARED_APPLICATION_ID = "eurobioimaging-shared"
+SHARED_APPLICATION_DESCRIPTION = "Shared EuroBioImaging nodes and technologies database"
+
+
+async def ensure_shared_application_exists() -> None:
+    """Ensure the shared bioimage application exists."""
+    token = os.getenv("HYPHA_TOKEN")
+
+    admin_server: RemoteService = await connect_to_server(
+        {  # type: ignore
+            "server_url": "https://hypha.aicell.io",
+            "token": token,
+        }
+    )
+
+    weaviate_service = await admin_server.get_service("aria-agents/weaviate")
+
+    exists = await weaviate_service.applications.exists(
+        collection_name=BIOIMAGE_COLLECTION,
+        application_id=SHARED_APPLICATION_ID,
+    )
+
+    if not exists:
+        logger.info("Creating shared application: %s", SHARED_APPLICATION_ID)
+        await weaviate_service.applications.create(
+            collection_name=BIOIMAGE_COLLECTION,
+            application_id=SHARED_APPLICATION_ID,
+            description=SHARED_APPLICATION_DESCRIPTION,
+        )
+        logger.info("Shared application created successfully")
+    else:
+        logger.debug("Shared application already exists")
+
+    await admin_server.disconnect()
 
 
 def create_query(
@@ -56,6 +91,9 @@ def create_query(
         Returns:
             Dictionary with query results and generated response
         """
+        # Ensure the shared application exists before querying
+        await ensure_shared_application_exists()
+
         # Validate entity_types if provided
         if entity_types:
             valid_types = {"node", "technology"}
@@ -74,23 +112,41 @@ def create_query(
                     entity_types
                 )
 
-        return await generate_near_text(
-            client=client,
-            server=server,
-            collection_name=BIOIMAGE_COLLECTION,
-            application_id=DEFAULT_APPLICATION_ID,
-            query=query_text,
-            filters=where_filter,
-            limit=limit,
-            target_vector="text_vector",  # Use available vector field
-            single_prompt=(
-                "Based on the bioimage data below, provide a comprehensive answer about the user's query. "
-                "Focus on nodes (facilities) and technologies that are relevant to: {text}"
-            ),
-            grouped_task="Summarize the bioimage information to answer the user's question about: {text}",
-            grouped_properties=["text", "entity_type", "name"],
-            context=context,
-        )
+        # Try vector search first, but fall back to simple search if it fails
+        try:
+            logger.info("Attempting vector search for query: %s", query_text)
+            return await generate_near_text(
+                client=client,
+                server=server,
+                collection_name=BIOIMAGE_COLLECTION,
+                application_id=SHARED_APPLICATION_ID,
+                query=query_text,
+                filters=where_filter,
+                limit=limit,
+                target_vector="text_vector",  # Use available vector field
+                single_prompt=(
+                    "Based on the bioimage data below, provide a comprehensive answer about the user's query. "
+                    "Focus on nodes (facilities) and technologies that are relevant to: {text}"
+                ),
+                grouped_task="Summarize the bioimage information to answer the user's question about: {text}",
+                grouped_properties=["text", "entity_type", "name"],
+                context=context,
+            )
+        except Exception as e:
+            logger.warning(
+                "Vector search failed (%s), falling back to text-based search", str(e)
+            )
+
+            # Fall back to simple text search using query_fetch_objects
+            return await query_fetch_objects(
+                client=client,
+                server=server,
+                collection_name=BIOIMAGE_COLLECTION,
+                application_id=SHARED_APPLICATION_ID,
+                filters=where_filter,
+                limit=limit,
+                context=context,
+            )
 
     return query
 
@@ -117,16 +173,15 @@ def create_get_entity(
         Returns:
             Dictionary with entity details
         """
+        # Ensure the shared application exists before querying
+        await ensure_shared_application_exists()
+
         return await query_fetch_objects(
             client=client,
             server=server,
             collection_name=BIOIMAGE_COLLECTION,
-            application_id=DEFAULT_APPLICATION_ID,
-            where_filter={
-                "path": ["entity_id"],
-                "operator": "Equal",
-                "value": entity_id,
-            },
+            application_id=SHARED_APPLICATION_ID,
+            where=Filter.by_property("entity_id").equal(entity_id),
             limit=10,
             context=context,
         )

@@ -2,7 +2,7 @@
 
 import logging
 from typing import Any, Dict, List
-from hypha_startup_services.bioimage_service.data_index import BioimageIndex
+from hypha_startup_services.mem0_bioimage_service.data_index import BioimageIndex
 from hypha_startup_services.common.chunking import chunk_text
 
 logger = logging.getLogger(__name__)
@@ -24,21 +24,39 @@ def process_bioimage_nodes(
     objects = []
 
     for node in nodes:
+        # Debug: check if original node has id field
+        if "id" in node:
+            logger.debug("Original node has id field: %s", node["id"])
+
         node_text = _create_node_text(node)
         chunks = chunk_text(node_text, chunk_size, chunk_overlap)
 
         for chunk_idx, chunk in enumerate(chunks):
-            objects.append(
-                {
-                    "text": chunk,
-                    "entity_type": "node",
-                    "entity_id": node.get("id", ""),
-                    "name": node.get("name", ""),
-                    "country": node.get("country", {}).get("name", ""),
-                    "chunk_index": chunk_idx,
-                    "total_chunks": len(chunks),
-                }
+            # Extract country name from nested object if it exists
+            country = node.get("country", {})
+            country_name = (
+                country.get("name", "") if isinstance(country, dict) else str(country)
             )
+
+            obj = {
+                "text": chunk,
+                "entity_type": "node",
+                "entity_id": node.get("id", ""),
+                "name": node.get("name", ""),
+                "country": country_name,  # Use only the name, not the full object
+                "chunk_index": chunk_idx,
+                "total_chunks": len(chunks),
+            }
+            # Debug: confirm no id field in processed object
+            if "id" in obj:
+                logger.warning("Processed object unexpectedly has id field: %s", obj)
+            else:
+                logger.debug(
+                    "Processed object correctly has no id field, keys: %s",
+                    list(obj.keys()),
+                )
+
+            objects.append(obj)
 
     return objects
 
@@ -59,22 +77,42 @@ def process_bioimage_technologies(
     objects = []
 
     for tech in technologies:
+        # Debug: check if original tech has id field
+        if "id" in tech:
+            logger.debug("Original technology has id field: %s", tech["id"])
+
         tech_text = _create_technology_text(tech)
         chunks = chunk_text(tech_text, chunk_size, chunk_overlap)
 
         for chunk_idx, chunk in enumerate(chunks):
-            objects.append(
-                {
-                    "text": chunk,
-                    "entity_type": "technology",
-                    "entity_id": tech.get("id", ""),
-                    "name": tech.get("name", ""),
-                    "abbreviation": tech.get("abbr", ""),
-                    "category": tech.get("category", {}).get("name", ""),
-                    "chunk_index": chunk_idx,
-                    "total_chunks": len(chunks),
-                }
+            # Extract category name from nested object if it exists
+            category = tech.get("category", {})
+            category_name = (
+                category.get("name", "")
+                if isinstance(category, dict)
+                else str(category)
             )
+
+            obj = {
+                "text": chunk,
+                "entity_type": "technology",
+                "entity_id": tech.get("id", ""),
+                "name": tech.get("name", ""),
+                "abbreviation": tech.get("abbr", ""),
+                "category": category_name,  # Use only the name, not the full object
+                "chunk_index": chunk_idx,
+                "total_chunks": len(chunks),
+            }
+            # Debug: confirm no id field in processed object
+            if "id" in obj:
+                logger.warning("Processed object unexpectedly has id field: %s", obj)
+            else:
+                logger.debug(
+                    "Processed object correctly has no id field, keys: %s",
+                    list(obj.keys()),
+                )
+
+            objects.append(obj)
 
     return objects
 
