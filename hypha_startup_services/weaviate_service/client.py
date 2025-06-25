@@ -20,7 +20,7 @@ async def instantiate_and_connect() -> WeaviateAsyncClient:
             grpc_secure=True,
         ),
         additional_config=AdditionalConfig(
-            timeout=(10, 180),  # (connection_timeout_sec, request_timeout_sec)
+            timeout=(60, 180),  # (connection_timeout_sec, request_timeout_sec)
             trust_env=True,  # Use environment variables for connection params
         ),
         skip_init_checks=True,
