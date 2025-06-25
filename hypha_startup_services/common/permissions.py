@@ -204,26 +204,14 @@ async def user_has_operation_permission(
     """
     user_permissions = await get_user_permissions(server, permission_params)
 
-    # Handle wildcard permissions
     if user_permissions == "*":
         return True
 
-    # Handle Weaviate-style string permissions
     if isinstance(user_permissions, str):
         if user_permissions in ("*", "rw+"):
             return True
-        # For Weaviate, we accept any permission that includes the operation
-        return permission_params.operation in user_permissions
 
-    # Handle list permissions (e.g., ["r", "rw"])
-    if isinstance(user_permissions, list):
-        return permission_params.operation in user_permissions
-
-    # Handle mem0-style permission operations
-    if isinstance(user_permissions, dict):
-        return permission_params.operation in user_permissions
-
-    return False
+    return permission_params.operation in user_permissions
 
 
 async def has_permission(

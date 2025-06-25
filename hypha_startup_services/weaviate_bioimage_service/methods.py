@@ -113,40 +113,23 @@ def create_query(
                 )
 
         # Try vector search first, but fall back to simple search if it fails
-        try:
-            logger.info("Attempting vector search for query: %s", query_text)
-            return await generate_near_text(
-                client=client,
-                server=server,
-                collection_name=BIOIMAGE_COLLECTION,
-                application_id=SHARED_APPLICATION_ID,
-                query=query_text,
-                filters=where_filter,
-                limit=limit,
-                target_vector="text_vector",  # Use available vector field
-                single_prompt=(
-                    "Based on the bioimage data below, provide a comprehensive answer about the user's query. "
-                    "Focus on nodes (facilities) and technologies that are relevant to: {text}"
-                ),
-                grouped_task="Summarize the bioimage information to answer the user's question about: {text}",
-                grouped_properties=["text", "entity_type", "name"],
-                context=context,
-            )
-        except Exception as e:
-            logger.warning(
-                "Vector search failed (%s), falling back to text-based search", str(e)
-            )
-
-            # Fall back to simple text search using query_fetch_objects
-            return await query_fetch_objects(
-                client=client,
-                server=server,
-                collection_name=BIOIMAGE_COLLECTION,
-                application_id=SHARED_APPLICATION_ID,
-                filters=where_filter,
-                limit=limit,
-                context=context,
-            )
+        return await generate_near_text(
+            client=client,
+            server=server,
+            collection_name=BIOIMAGE_COLLECTION,
+            application_id=SHARED_APPLICATION_ID,
+            query=query_text,
+            filters=where_filter,
+            limit=limit,
+            target_vector="text_vector",  # Use available vector field
+            single_prompt=(
+                f"Based on the bioimage data below, provide a comprehensive answer about the user's query: '{query_text}'. "
+                "Focus on nodes (facilities) and technologies that are relevant to this query."
+            ),
+            grouped_task=f"Summarize the bioimage information to answer the user's question about: '{query_text}'",
+            grouped_properties=["text", "entity_type", "name"],
+            context=context,
+        )
 
     return query
 
@@ -181,7 +164,7 @@ def create_get_entity(
             server=server,
             collection_name=BIOIMAGE_COLLECTION,
             application_id=SHARED_APPLICATION_ID,
-            where=Filter.by_property("entity_id").equal(entity_id),
+            filters=Filter.by_property("entity_id").equal(entity_id),
             limit=10,
             context=context,
         )

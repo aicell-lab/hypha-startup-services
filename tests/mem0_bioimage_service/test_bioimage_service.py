@@ -362,6 +362,11 @@ async def test_mem0_bioimage_integration():
         for query in queries:
             print(f"\nTesting query: {query}")
 
+            await mem0_service.init_agent(
+                agent_id="ebi_file_loader",
+                description="Test agent for EBI file loading",
+            )
+
             # Search in mem0 with the specified agent_id and workspace
             search_result = await mem0_service.search(
                 query=query,

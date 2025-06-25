@@ -133,3 +133,40 @@ async def test_application_exists_across_users(weaviate_service, weaviate_servic
     await weaviate_service.applications.delete(
         collection_name="Movie", application_id=USER1_APP_ID
     )
+
+
+@pytest.mark.asyncio
+async def test_insert_data_invalid_application(weaviate_service):
+    """Test inserting data into an invalid application should fail with an error."""
+    # First create a valid collection
+    await create_test_application(weaviate_service)
+
+    # Try to insert data into a non-existent application
+    test_object = {
+        "title": "Test Movie",
+        "description": "A test movie for error testing",
+        "genre": "Test Genre",
+        "year": 2024,
+    }
+
+    # This should fail because the application doesn't exist
+    with pytest.raises(Exception) as exc_info:
+        await weaviate_service.data.insert(
+            collection_name="Movie",
+            application_id="NonExistentApplication",
+            properties=test_object,
+        )
+    # Verify that an error was raised
+    assert exc_info.value is not None
+    # The error message should indicate something about the application not existing
+    error_message = str(exc_info.value).lower()
+    assert any(
+        keyword in error_message
+        for keyword in [
+            "application",
+            "not found",
+            "not exist",
+            "invalid",
+            "permission",
+        ]
+    )

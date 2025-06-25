@@ -55,6 +55,7 @@ from hypha_startup_services.common.artifacts import (
 
 async def collections_exists(
     client: WeaviateAsyncClient,
+    server: RemoteService,
     collection_name: str,
     context: dict[str, Any] | None = None,  # pylint: disable=W0613
 ) -> bool:
@@ -74,6 +75,9 @@ async def collections_exists(
     return await collection_exists(
         client=client,
         collection_name=collection_name,
+    ) and await artifact_exists(
+        server=server,
+        artifact_id=get_full_collection_name(collection_name),
     )
 
 
@@ -309,6 +313,40 @@ async def applications_get(
     return await get_artifact(server, artifact_name)
 
 
+async def ws_app_exists(
+    server: RemoteService,
+    collection_name: str,
+    application_id: str,
+    workspace: str | None = None,
+    context: dict[str, Any] | None = None,
+):
+    """Check if an application exists for a specific user workspace.
+
+    Args:
+        server: RemoteService instance for artifact checking (Note: This is actually WeaviateAsyncClient, param name is incorrect)
+        collection_name: Name of the collection to check
+        application_id: ID of the application to check
+        user_ws: User workspace to check against
+
+    Returns:
+        Boolean indicating whether the application exists for the user workspace
+    """
+    if workspace is not None:
+        target_ws = workspace
+    elif context is not None:
+        target_ws = ws_from_context(context)
+    else:
+        raise ValueError(
+            "Either user_ws or context must be provided to determine the tenant workspace"
+        )
+
+    full_collection_name = get_full_collection_name(collection_name)
+    artifact_name = get_application_artifact_name(
+        full_collection_name, target_ws, application_id
+    )
+    return await artifact_exists(server, artifact_name)
+
+
 async def applications_exists(
     server: RemoteService,
     collection_name: str,
@@ -326,12 +364,12 @@ async def applications_exists(
     Returns:
         Boolean indicating whether the application exists
     """
-    full_collection_name = get_full_collection_name(collection_name)
-    caller_ws = ws_from_context(context)
-    artifact_name = get_application_artifact_name(
-        full_collection_name, caller_ws, application_id
+    return await ws_app_exists(
+        server,
+        collection_name,
+        application_id,
+        context=context,
     )
-    return await artifact_exists(server, artifact_name)
 
 
 async def data_insert_many(
@@ -369,6 +407,14 @@ async def data_insert_many(
     Returns:
         Dictionary with insertion results including UUIDs and any errors
     """
+    assert await ws_app_exists(
+        server,
+        collection_name,
+        application_id,
+        workspace=user_ws,
+        context=context,
+    ), f"Application {application_id} does not exist in collection {collection_name}"
+
     tenant_collection = await get_permitted_collection(
         client,
         server,
@@ -449,6 +495,14 @@ async def data_insert(
     Returns:
         UUID of the inserted object (or first chunk if chunking enabled)
     """
+    assert await ws_app_exists(
+        server,
+        collection_name,
+        application_id,
+        workspace=user_ws,
+        context=context,
+    ), f"Application {application_id} does not exist in collection {collection_name}"
+
     if enable_chunking and text_field in properties and properties[text_field]:
         # For single insert with chunking, use data_insert_many and return first UUID
         result = await data_insert_many(
@@ -511,6 +565,14 @@ async def query_near_vector(
     Returns:
         Dictionary containing objects with shortened collection names
     """
+    assert await ws_app_exists(
+        server,
+        collection_name,
+        application_id,
+        workspace=user_ws,
+        context=context,
+    ), f"Application {application_id} does not exist in collection {collection_name}"
+
     tenant_collection = await get_permitted_collection(
         client,
         server,
@@ -556,6 +618,7 @@ async def query_fetch_objects(
     Returns:
         Dictionary containing objects with shortened collection names
     """
+
     tenant_collection = await get_permitted_collection(
         client,
         server,
@@ -600,6 +663,14 @@ async def query_hybrid(
     Returns:
         Dictionary containing objects with shortened collection names
     """
+    assert await ws_app_exists(
+        server,
+        collection_name,
+        application_id,
+        workspace=user_ws,
+        context=context,
+    ), f"Application {application_id} does not exist in collection {collection_name}"
+
     tenant_collection = await get_permitted_collection(
         client,
         server,
@@ -644,6 +715,14 @@ async def generate_near_text(
     Returns:
         Dictionary containing objects with shortened collection names and generated content
     """
+    assert await ws_app_exists(
+        server,
+        collection_name,
+        application_id,
+        workspace=user_ws,
+        context=context,
+    ), f"Application {application_id} does not exist in collection {collection_name}"
+
     tenant_collection = await get_permitted_collection(
         client,
         server,
@@ -688,6 +767,14 @@ async def data_update(
     Returns:
         None
     """
+    assert await ws_app_exists(
+        server,
+        collection_name,
+        application_id,
+        workspace=user_ws,
+        context=context,
+    ), f"Application {application_id} does not exist in collection {collection_name}"
+
     tenant_collection = await get_permitted_collection(
         client,
         server,

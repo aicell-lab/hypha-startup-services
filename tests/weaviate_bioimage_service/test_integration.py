@@ -103,10 +103,12 @@ class TestRemoteBioImageService:
         ]
 
         for tech in technologies:
+            print(f"Querying for technology: {tech}")
             result = await remote_service.query(tech)
             assert isinstance(result, dict)
             assert "objects" in result
             assert isinstance(result["objects"], list)
+            print(f"Querying for {tech} returned {result['generated']}")
             # We don't assert on result count as it depends on the data
 
     @pytest.mark.asyncio

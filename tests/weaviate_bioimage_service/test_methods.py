@@ -1,7 +1,8 @@
 """Tests for the Weaviate BioImage service methods."""
 
-import pytest
 from unittest.mock import Mock, patch
+import pytest
+from weaviate.collections.classes.filters import _FilterValue, _Operator
 
 from hypha_startup_services.weaviate_bioimage_service.methods import (
     create_query,
@@ -87,7 +88,7 @@ class TestQueryMethods:
         assert call_kwargs["context"] == mock_context
 
         # Check the where filter
-        where_filter = call_kwargs["where_filter"]
-        assert where_filter["path"] == ["entity_id"]
-        assert where_filter["operator"] == "Equal"
-        assert where_filter["value"] == "test_entity_123"
+        where_filter: _FilterValue = call_kwargs["filters"]
+        assert where_filter.target == "entity_id"
+        assert where_filter.operator == _Operator.EQUAL
+        assert where_filter.value == "test_entity_123"

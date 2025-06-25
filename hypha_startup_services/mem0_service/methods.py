@@ -177,7 +177,7 @@ async def mem0_add(
     assert await artifact_exists(
         server=server,
         artifact_id=permission_params.artifact_id,
-    ), "Please call init() before adding memories."
+    ), "Please call init_agent() and init() before adding memories."
 
     await require_permission(server, permission_params)
 

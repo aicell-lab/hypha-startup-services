@@ -149,21 +149,16 @@ async def test_separate_user_applications(
     assert len(user3_results["objects"]) == 1
     assert user3_results["objects"][0]["properties"]["title"] == "User 3's Movie"
 
-    # User 2 cannot access User 3's application
-    user2_user3_results = await weaviate_service2.query.fetch_objects(
-        collection_name="Movie", application_id=USER3_APP_ID, limit=10
-    )
-    assert (
-        len(user2_user3_results["objects"]) == 0
-    ), "User 2 should not be able to access User 3's application"
+    with pytest.raises(RemoteException):
+        await weaviate_service2.query.fetch_objects(
+            collection_name="Movie", application_id=USER3_APP_ID, limit=10
+        )
 
     # User 3 cannot access User 2's application
-    user3_user2_results = await weaviate_service3.query.fetch_objects(
-        collection_name="Movie", application_id=USER2_APP_ID, limit=10
-    )
-    assert (
-        len(user3_user2_results["objects"]) == 0
-    ), "User 3 should not be able to access User 2's application"
+    with pytest.raises(RemoteException):
+        await weaviate_service3.query.fetch_objects(
+            collection_name="Movie", application_id=USER2_APP_ID, limit=10
+        )
 
     # Admin user (User 1) can access both User 2 and User 3's applications
     admin_user2_results = await weaviate_service.query.fetch_objects(

@@ -4,8 +4,19 @@ Populate the shared bioimage application with EuroBioImaging data.
 
 This script uses the Weaviate service directly to insert nodes and technologies data
 into the shared application that was created by the bioimage service.
+
+This is the primary script for populating the remote shared bioimage database.
+It handles data preparation, batching, and error recovery.
+
+Usage:
+    python examples/populate_shared_bioimage_data.py
+
+Prerequisites:
+    - HYPHA_TOKEN environment variable set
+    - EuroBioImaging data files present in the assets directory
 """
 
+import argparse
 import asyncio
 import json
 import logging
@@ -17,14 +28,14 @@ from hypha_rpc import connect_to_server
 from hypha_rpc.rpc import RemoteService
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 # Constants
 COLLECTION_NAME = "bioimage_data"
 SHARED_APPLICATION_ID = "eurobioimaging-shared"
 DEFAULT_SERVER_URL = "https://hypha.aicell.io"
-WEAVIATE_SERVICE_ID = "aria-agents/weaviate"
+WEAVIATE_SERVICE_ID = "aria-agents/weaviate-test"
 
 
 async def load_data_files() -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
@@ -151,6 +162,155 @@ async def get_weaviate_service(server_url: str):
     return server, weaviate_service
 
 
+async def ensure_collection_exists(
+    weaviate_service,
+    ollama_model: str = "mxbai-embed-large:latest",
+    ollama_llm_model: str = "qwen3:8b",
+    ollama_endpoint: str = "https://hypha-ollama.scilifelab-2-dev.sys.kth.se",
+) -> None:
+    """Ensure the bioimage collection exists with proper configuration."""
+    try:
+        # Check if collection exists
+        exists = await weaviate_service.collections.exists(COLLECTION_NAME)
+        if exists:
+            logger.info("Collection %s already exists", COLLECTION_NAME)
+            return
+    except Exception as e:
+        logger.warning("Error checking if collection exists: %s", e)
+
+    logger.info("Creating collection %s...", COLLECTION_NAME)
+
+    class_obj = {
+        "class": COLLECTION_NAME,
+        "multiTenancyConfig": {
+            "enabled": True,
+        },
+        "description": "EuroBioImaging nodes and technologies data",
+        "properties": [
+            {
+                "name": "application_id",
+                "dataType": ["text"],
+                "description": "The ID of the application",
+            },
+            {
+                "name": "entity_id",
+                "dataType": ["text"],
+                "description": "Unique identifier for the entity (node or technology)",
+            },
+            {
+                "name": "entity_type",
+                "dataType": ["text"],
+                "description": "Type of entity: 'node' or 'technology'",
+            },
+            {
+                "name": "name",
+                "dataType": ["text"],
+                "description": "Name of the node or technology",
+            },
+            {
+                "name": "text",
+                "dataType": ["text"],
+                "description": "Searchable text content (chunked if necessary)",
+            },
+            {
+                "name": "description",
+                "dataType": ["text"],
+                "description": "Full description of the entity",
+            },
+            {
+                "name": "country",
+                "dataType": ["text"],
+                "description": "Country for nodes",
+            },
+            {
+                "name": "category",
+                "dataType": ["text"],
+                "description": "Category for technologies",
+            },
+            {
+                "name": "ebi_id",
+                "dataType": ["text"],
+                "description": "EBI identifier for the entity",
+            },
+            {
+                "name": "chunk_index",
+                "dataType": ["int"],
+                "description": "Index of the chunk if text was chunked",
+            },
+            {
+                "name": "total_chunks",
+                "dataType": ["int"],
+                "description": "Total number of chunks for this entity",
+            },
+        ],
+        "vectorConfig": {
+            "text_vector": {
+                "vectorizer": {
+                    "text2vec-ollama": {
+                        "model": ollama_model,
+                        "apiEndpoint": ollama_endpoint,
+                    }
+                },
+                "sourceProperties": ["text", "name"],
+                "vectorIndexType": "hnsw",
+                "vectorIndexConfig": {"distance": "cosine"},
+            },
+            "description_vector": {
+                "vectorizer": {
+                    "text2vec-ollama": {
+                        "model": ollama_model,
+                        "apiEndpoint": ollama_endpoint,
+                    }
+                },
+                "sourceProperties": ["description"],
+                "vectorIndexType": "hnsw",
+                "vectorIndexConfig": {"distance": "cosine"},
+            },
+        },
+        "moduleConfig": {
+            "generative-ollama": {
+                "model": ollama_llm_model,
+                "apiEndpoint": ollama_endpoint,
+            }
+        },
+    }
+
+    try:
+        await weaviate_service.collections.create(class_obj)
+        logger.info("✅ Created collection %s successfully", COLLECTION_NAME)
+    except Exception as e:
+        logger.error("Failed to create collection %s: %s", COLLECTION_NAME, e)
+        raise
+
+
+async def ensure_application_exists(weaviate_service) -> None:
+    """Ensure the shared bioimage application exists."""
+    try:
+        # Check if application exists
+        exists = await weaviate_service.applications.exists(
+            collection_name=COLLECTION_NAME,
+            application_id=SHARED_APPLICATION_ID,
+        )
+        if exists:
+            logger.info("Application %s already exists", SHARED_APPLICATION_ID)
+            return
+    except Exception as e:
+        logger.warning("Error checking if application exists: %s", e)
+
+    logger.info("Creating application %s...", SHARED_APPLICATION_ID)
+
+    try:
+        await weaviate_service.applications.create(
+            collection_name=COLLECTION_NAME,
+            application_id=SHARED_APPLICATION_ID,
+            description="Shared EuroBioImaging nodes and technologies database",
+        )
+        logger.info("✅ Created application %s successfully", SHARED_APPLICATION_ID)
+    except Exception as e:
+        logger.error("Failed to create application %s: %s", SHARED_APPLICATION_ID, e)
+        raise
+
+
 async def insert_data_in_batches(
     weaviate_service,
     objects: List[Dict[str, Any]],
@@ -164,22 +324,6 @@ async def insert_data_in_batches(
         data_type,
         batch_size,
     )
-
-    # Debug: Check first object for any id fields
-    if objects:
-        first_obj = objects[0]
-        logger.info(
-            "DEBUG: First %s object keys: %s", data_type, list(first_obj.keys())
-        )
-        for key, value in first_obj.items():
-            if "id" in key.lower():
-                logger.info("DEBUG: Found ID-like field: %s = %s", key, value)
-            if isinstance(value, dict) and "id" in value:
-                logger.warning("DEBUG: Found nested id in %s: %s", key, value)
-        # Assert no 'id' field exists in any object
-        for i, obj in enumerate(objects[:5]):  # Check first 5 objects
-            assert "id" not in obj, f"Object {i} contains 'id' field: {obj}"
-        logger.info("✅ Verified: No 'id' fields found in %s objects", data_type)
 
     total_results = {"has_errors": False, "successful": 0, "failed": 0, "errors": []}
 
@@ -230,12 +374,49 @@ async def insert_data_in_batches(
 
 async def main():
     """Main function to populate shared bioimage application with data."""
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(
+        description="Populate shared bioimage application with data"
+    )
+    parser.add_argument(
+        "--ollama-model",
+        default="mxbai-embed-large:latest",
+        help="Ollama model to use for embeddings (default: mxbai-embed-large:latest)",
+    )
+    parser.add_argument(
+        "--ollama-llm-model",
+        default="qwen3:8b",
+        help="Ollama model to use for generation (default: qwen3:8b)",
+    )
+    parser.add_argument(
+        "--ollama-endpoint",
+        default="https://hypha-ollama.scilifelab-2-dev.sys.kth.se",
+        help="Ollama endpoint URL (default: https://hypha-ollama.scilifelab-2-dev.sys.kth.se)",
+    )
+    args = parser.parse_args()
+
     logger.info("🚀 Populating shared bioimage application with data")
+    logger.info("Using Ollama endpoint: %s", args.ollama_endpoint)
+    logger.info("Using embedding model: %s", args.ollama_model)
+    logger.info("Using generation model: %s", args.ollama_llm_model)
 
     server = None
     try:
         # Connect to server
         server, weaviate_service = await get_weaviate_service(DEFAULT_SERVER_URL)
+
+        # Ensure collection exists
+        logger.info("🔧 Ensuring collection exists...")
+        await ensure_collection_exists(
+            weaviate_service,
+            ollama_model=args.ollama_model,
+            ollama_llm_model=args.ollama_llm_model,
+            ollama_endpoint=args.ollama_endpoint,
+        )
+
+        # Ensure application exists
+        logger.info("🔧 Ensuring application exists...")
+        await ensure_application_exists(weaviate_service)
 
         # Load data
         nodes_data, tech_data = await load_data_files()
