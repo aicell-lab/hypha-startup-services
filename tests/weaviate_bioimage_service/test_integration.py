@@ -96,19 +96,17 @@ class TestRemoteBioImageService:
         """Test querying for a specific technology."""
         # Try some common microscopy technologies
         technologies = [
-            "confocal",
-            "fluorescence",
-            "electron microscopy",
-            "super-resolution",
+            "In which nodes can I find electron microscopy?",
+            "In which nodes can I find super-resolution microscopy?",
         ]
 
         for tech in technologies:
             print(f"Querying for technology: {tech}")
-            result = await remote_service.query(tech)
+            result = await remote_service.query(tech, limit=10, entity_types=["node"])
             assert isinstance(result, dict)
             assert "objects" in result
             assert isinstance(result["objects"], list)
-            print(f"Querying for {tech} returned {result['generated']}")
+            print(result["generated"])
             # We don't assert on result count as it depends on the data
 
     @pytest.mark.asyncio

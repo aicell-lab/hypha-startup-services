@@ -35,7 +35,22 @@ logger.setLevel(logging.INFO)
 COLLECTION_NAME = "bioimage_data"
 SHARED_APPLICATION_ID = "eurobioimaging-shared"
 DEFAULT_SERVER_URL = "https://hypha.aicell.io"
-WEAVIATE_SERVICE_ID = "aria-agents/weaviate-test"
+WEAVIATE_SERVICE_ID = "aria-agents/weaviate"
+
+
+async def delete_all_objects_in_application(weaviate_service):
+    """Delete all objects in the shared application before populating."""
+    logger.warning(
+        "Deleting all objects in application '%s' in collection '%s'...",
+        SHARED_APPLICATION_ID,
+        COLLECTION_NAME,
+    )
+    result = await weaviate_service.data.delete_many(
+        collection_name=COLLECTION_NAME,
+        application_id=SHARED_APPLICATION_ID,
+        where=None,  # Delete all objects in the application
+    )
+    logger.info("Delete result: %s", result)
 
 
 async def load_data_files() -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
@@ -393,6 +408,12 @@ async def main():
         default="https://hypha-ollama.scilifelab-2-dev.sys.kth.se",
         help="Ollama endpoint URL (default: https://hypha-ollama.scilifelab-2-dev.sys.kth.se)",
     )
+    parser.add_argument(
+        "--delete-existing",
+        action="store_true",
+        help="Delete all existing objects in the shared application before populating",
+    )
+
     args = parser.parse_args()
 
     logger.info("🚀 Populating shared bioimage application with data")
@@ -417,6 +438,9 @@ async def main():
         # Ensure application exists
         logger.info("🔧 Ensuring application exists...")
         await ensure_application_exists(weaviate_service)
+
+        if args.delete_existing:
+            await delete_all_objects_in_application(weaviate_service)
 
         # Load data
         nodes_data, tech_data = await load_data_files()
