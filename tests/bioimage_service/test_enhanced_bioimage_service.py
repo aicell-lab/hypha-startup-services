@@ -2,12 +2,12 @@
 
 import pytest
 import pytest_asyncio
-from hypha_startup_services.bioimage_service.methods import (
+from hypha_startup_services.mem0_bioimage_service.methods import (
     create_get_entity_details,
     create_get_related_entities,
     create_query,
 )
-from hypha_startup_services.bioimage_service.data_index import (
+from hypha_startup_services.mem0_bioimage_service.data_index import (
     load_external_data,
 )
 from hypha_startup_services.mem0_service.mem0_client import get_mem0

@@ -47,7 +47,9 @@ async def run_local_services(
         startup_function_paths: List of paths to startup functions
     """
     # Join all startup function paths with spaces
-    startup_functions_arg = " ".join(startup_function_paths)
+    startup_functions_arg = [
+        f"--startup-functions={path}" for path in startup_function_paths
+    ]
 
     command = [
         sys.executable,
@@ -55,6 +57,6 @@ async def run_local_services(
         "hypha.server",
         f"--host={server_url}",
         f"--port={port}",
-        f"--startup-functions={startup_functions_arg}",
+        *startup_functions_arg,
     ]
     subprocess.run(command, check=True)

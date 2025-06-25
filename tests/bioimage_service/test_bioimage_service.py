@@ -5,11 +5,11 @@ import pytest
 from dotenv import load_dotenv
 from hypha_rpc import connect_to_server
 from hypha_rpc.rpc import RemoteService
-from hypha_startup_services.bioimage_service.methods import (
+from hypha_startup_services.mem0_bioimage_service.methods import (
     create_get_entity_details,
     create_get_related_entities,
 )
-from hypha_startup_services.bioimage_service.data_index import BioimageIndex
+from hypha_startup_services.mem0_bioimage_service.data_index import BioimageIndex
 
 
 # Sample EBI data - in a real implementation this would be loaded from external sources
@@ -345,7 +345,7 @@ async def test_mem0_bioimage_integration():
     # Get the services
     try:
         mem0_service = await server.get_service("aria-agents/mem0-test")
-        bioimage_service = await server.get_service("aria-agents/bioimage-test")
+        mem0_bioimage_service = await server.get_service("aria-agents/bioimage-test")
     except Exception as e:
         await server.disconnect()
         pytest.skip(f"Services not available: {e}")
@@ -386,7 +386,7 @@ async def test_mem0_bioimage_integration():
 
             # Test bioimage service with known IDs (deterministic)
             # Test with known technology ID
-            tech_result = await bioimage_service.get_nodes_by_technology_id(
+            tech_result = await mem0_bioimage_service.get_nodes_by_technology_id(
                 technology_id="f0acc857-fc72-4094-bf14-c36ac40801c5"  # 3D-CLEM
             )
 
@@ -399,7 +399,7 @@ async def test_mem0_bioimage_integration():
             ), "Expected at least one node for known technology"
 
             # Test with known node ID
-            node_result = await bioimage_service.get_technologies_by_node_id(
+            node_result = await mem0_bioimage_service.get_technologies_by_node_id(
                 node_id="7409a98f-1bdb-47d2-80e7-c89db73efedd"  # Italian node
             )
 
@@ -412,11 +412,11 @@ async def test_mem0_bioimage_integration():
             ), "Expected at least one technology for known node"
 
             # Test service statistics
-            stats_result = await bioimage_service.get_statistics()
+            stats_result = await mem0_bioimage_service.get_statistics()
             assert stats_result is not None
             assert "service" in stats_result
             assert "statistics" in stats_result
-            assert stats_result["service"] == "bioimage_service"
+            assert stats_result["service"] == "mem0_bioimage_service"
 
             print(f"✅ Query '{query}' processed successfully:")
             print(f"   - Found {len(tech_result['nodes'])} nodes for technology lookup")

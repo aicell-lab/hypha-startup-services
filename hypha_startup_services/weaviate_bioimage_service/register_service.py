@@ -4,6 +4,7 @@ import logging
 from hypha_rpc.rpc import RemoteService
 from weaviate import WeaviateAsyncClient
 
+from hypha_startup_services.common.constants import DEFAULT_WEAVIATE_BIOIMAGE_SERVICE_ID
 from hypha_startup_services.weaviate_service.client import instantiate_and_connect
 from hypha_startup_services.weaviate_bioimage_service.methods import (
     create_query,
@@ -12,11 +13,9 @@ from hypha_startup_services.weaviate_bioimage_service.methods import (
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_SERVICE_ID = "weaviate-bioimage-service"
-
 
 async def register_weaviate_bioimage(
-    server: RemoteService, service_id: str = DEFAULT_SERVICE_ID
+    server: RemoteService, service_id: str = DEFAULT_WEAVIATE_BIOIMAGE_SERVICE_ID
 ) -> None:
     """Register the Weaviate BioImage service with the Hypha server.
 
@@ -41,7 +40,7 @@ async def register_weaviate_bioimage(
 async def register_weaviate_bioimage_service(
     server: RemoteService,
     weaviate_client: WeaviateAsyncClient,
-    service_id: str = DEFAULT_SERVICE_ID,
+    service_id: str = DEFAULT_WEAVIATE_BIOIMAGE_SERVICE_ID,
 ) -> None:
     """
     Register the Weaviate BioImage service with the Hypha server.
