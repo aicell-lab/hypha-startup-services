@@ -64,6 +64,9 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--service-id", type=str, help="Custom service ID (for single service only)"
     )
+    parser.add_argument(
+        "--client-id", type=str, help="Client ID for the server connection"
+    )
 
     # Service-specific ID overrides (for multiple services)
     parser.add_argument(
@@ -136,7 +139,7 @@ async def handle_local_services(
 
     try:
         server_url = args.server_url or DEFAULT_LOCAL_EXISTING_HOST
-        server = await get_server(server_url, port)
+        server = await get_server(server_url, port, client_id=args.client_id)
         logger.info("Connected to existing local server at %s:%s", server_url, port)
 
         return server
@@ -182,7 +185,7 @@ async def handle_services(args: Namespace) -> None:
             return
     else:
         server_url = args.server_url or DEFAULT_REMOTE_URL
-        server = await get_server(server_url)
+        server = await get_server(server_url, client_id=args.client_id)
         logger.info("Connected to remote server at %s", server_url)
 
     try:

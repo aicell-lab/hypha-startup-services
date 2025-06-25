@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 async def get_server(
     provided_url: str,
     port: int | None = None,
+    client_id: str | None = None,
 ) -> RemoteService:
     """Get a connection to a remote Hypha server.
 
@@ -26,7 +27,10 @@ async def get_server(
     server_url = provided_url if port is None else f"{provided_url}:{port}"
     token = os.environ.get("HYPHA_TOKEN")
     assert token is not None, "HYPHA_TOKEN environment variable is not set"
-    server = await connect_to_server({"server_url": server_url, "token": token})
+    server_config = {"server_url": server_url, "token": token}
+    if client_id:
+        server_config["client_id"] = client_id
+    server = await connect_to_server(server_config)
 
     if not isinstance(server, RemoteService):
         raise ValueError("Server is not a RemoteService instance.")
