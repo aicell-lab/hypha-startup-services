@@ -69,4 +69,11 @@ async def register_weaviate_bioimage_service(
         }
     )
 
-    logger.info("Weaviate BioImage service registered with ID: %s", service_id)
+    logger.info(
+        "Service %s registered at %s/%s/services/%s:%s",
+        service_id,
+        server.config.public_base_url,
+        server.config.workspace,
+        server.config.client_id,
+        service_id,
+    )

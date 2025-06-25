@@ -100,9 +100,10 @@ async def register_weaviate_service(
     )
 
     logger.info(
-        "Service %s registered at %s/%s/services/%s",
+        "Service %s registered at %s/%s/services/%s:%s",
         service_id,
         server.config.public_base_url,
         server.config.workspace,
+        server.config.client_id,
         service_id,
     )

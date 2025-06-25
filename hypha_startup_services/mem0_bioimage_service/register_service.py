@@ -47,8 +47,10 @@ async def register_mem0_bioimage_service(
     )
 
     logger.info(
-        "BioImage Service registered at %s/%s/services/%s",
+        "Service %s registered at %s/%s/services/%s:%s",
+        service_id,
         server.config.public_base_url,
         server.config.workspace,
+        server.config.client_id,
         service_id,
     )
