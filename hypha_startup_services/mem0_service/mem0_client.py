@@ -1,6 +1,6 @@
 from mem0 import AsyncMemory
 from dotenv import load_dotenv
-from hypha_startup_services.mem0_service.weaviate_patches import apply_all_patches
+from .weaviate_patches import apply_all_patches
 import logging
 
 logger = logging.getLogger(__name__)

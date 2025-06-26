@@ -3,11 +3,11 @@
 import pytest
 import pytest_asyncio
 from hypha_startup_services.mem0_bioimage_service.methods import (
-    create_query,
-    create_get_related_entities,
+    create_search,
 )
-from hypha_startup_services.mem0_bioimage_service.data_index import (
+from hypha_startup_services.common.data_index import (
     load_external_data,
+    create_get_related_entities,
 )
 from hypha_startup_services.mem0_service.mem0_client import get_mem0
 
@@ -28,7 +28,7 @@ async def mem0_memory():
 async def test_query_returns_only_info_issue(bioimage_index, mem0_memory):
     """Test to confirm that query currently only returns 'info' field."""
 
-    query_func = create_query(mem0_memory, bioimage_index)
+    query_func = create_search(mem0_memory, bioimage_index)
     result = await query_func(
         query_text="confocal microscopy",
         include_related=True,
@@ -72,7 +72,7 @@ async def test_query_returns_only_info_issue(bioimage_index, mem0_memory):
 async def test_query_should_include_related_entities(bioimage_index, mem0_memory):
     """Test that query includes related entities when include_related=True."""
 
-    query_func = create_query(mem0_memory, bioimage_index)
+    query_func = create_search(mem0_memory, bioimage_index)
     result = await query_func(
         query_text="electron microscopy",
         include_related=True,
@@ -116,7 +116,7 @@ async def test_query_should_include_related_entities(bioimage_index, mem0_memory
 async def test_query_without_related_entities(bioimage_index, mem0_memory):
     """Test that query doesn't include related entities when include_related=False."""
 
-    query_func = create_query(mem0_memory, bioimage_index)
+    query_func = create_search(mem0_memory, bioimage_index)
     result = await query_func(
         query_text="microscopy",
         include_related=False,

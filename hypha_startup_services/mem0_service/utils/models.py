@@ -1,8 +1,8 @@
 from typing import Any, Literal
 from pydantic import BaseModel, Field
-from hypha_startup_services.mem0_service.utils.constants import ARTIFACT_DELIMITER
 from hypha_startup_services.common.artifacts import BaseArtifactParams
 from hypha_startup_services.common.permissions import BasePermissionParams
+from .constants import ARTIFACT_DELIMITER
 
 
 # Type alias for permission operations

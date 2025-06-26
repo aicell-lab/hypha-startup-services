@@ -9,13 +9,13 @@ from typing import Any
 from weaviate import WeaviateAsyncClient
 from hypha_rpc.rpc import RemoteService
 from hypha_startup_services.common.workspace_utils import ws_from_context
-from hypha_startup_services.weaviate_service.utils.collection_utils import (
-    add_tenant_if_not_exists,
-    get_tenant_collection,
-)
 from hypha_startup_services.common.utils import get_full_collection_name
 from hypha_startup_services.common.permissions import (
     assert_has_application_permission,
+)
+from .collection_utils import (
+    add_tenant_if_not_exists,
+    get_tenant_collection,
 )
 
 

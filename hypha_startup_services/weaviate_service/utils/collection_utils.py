@@ -7,7 +7,7 @@ from weaviate.classes.tenants import Tenant
 from weaviate.classes.query import Filter
 from weaviate.collections.classes.internal import Object, GenerativeObject
 from weaviate.collections.classes.filters import _Filters
-from hypha_startup_services.weaviate_service.utils.format_utils import (
+from .format_utils import (
     get_full_collection_name,
     get_short_name,
 )

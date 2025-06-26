@@ -31,12 +31,12 @@ from typing import Set
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from hypha_startup_services.mem0_bioimage_service.data_index import load_external_data
+from hypha_startup_services.common.data_index import load_external_data
 from hypha_startup_services.mem0_bioimage_service.utils import (
-    _create_node_content,
-    _create_node_metadata,
-    _create_technology_content,
-    _create_technology_metadata,
+    create_node_content,
+    create_node_metadata,
+    create_technology_content,
+    create_technology_metadata,
 )
 from hypha_startup_services.mem0_service.mem0_client import get_mem0
 from dotenv import load_dotenv
@@ -287,7 +287,7 @@ async def initialize_bioimage_database_deduplicated(
     logger.info("Adding %d nodes to mem0...", len(nodes_data))
     for i, node in enumerate(nodes_data, 1):
         try:
-            content = _create_node_content(node)
+            content = create_node_content(node)
             content_cleaned = clean_text(content)
             content_hash = create_content_hash(content_cleaned)
 
@@ -302,7 +302,7 @@ async def initialize_bioimage_database_deduplicated(
             # Add to tracking set
             content_hashes.add(content_hash)
 
-            metadata = _create_node_metadata(node)
+            metadata = create_node_metadata(node)
 
             await memory.add(
                 content_cleaned,
@@ -339,7 +339,7 @@ async def initialize_bioimage_database_deduplicated(
 
     for i, tech in enumerate(technologies_data, 1):
         try:
-            content = _create_technology_content(tech)
+            content = create_technology_content(tech)
             content_cleaned = clean_text(content)
             content_hash = create_content_hash(content_cleaned)
 
@@ -355,7 +355,7 @@ async def initialize_bioimage_database_deduplicated(
             # Add to tracking set
             content_hashes.add(content_hash)
 
-            metadata = _create_technology_metadata(tech)
+            metadata = create_technology_metadata(tech)
 
             await memory.add(
                 content_cleaned,

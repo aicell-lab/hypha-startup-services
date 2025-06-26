@@ -3,12 +3,12 @@
 import pytest
 import pytest_asyncio
 from hypha_startup_services.mem0_bioimage_service.methods import (
-    create_get_entity_details,
     create_get_related_entities,
-    create_query,
+    create_search,
 )
-from hypha_startup_services.mem0_bioimage_service.data_index import (
+from hypha_startup_services.common.data_index import (
     load_external_data,
+    create_get_entity_details,
 )
 from hypha_startup_services.mem0_service.mem0_client import get_mem0
 
@@ -72,7 +72,7 @@ async def test_enhanced_bioimage_find_related_entities_by_node_id(bioimage_index
 async def test_enhanced_bioimage_semantic_query(bioimage_index, mem0_memory):
     """Test semantic query functionality."""
 
-    query_func = create_query(mem0_memory, bioimage_index)
+    query_func = create_search(mem0_memory, bioimage_index)
     result = await query_func(
         query_text="electron microscopy",
         limit=10,
@@ -97,7 +97,7 @@ async def test_enhanced_bioimage_semantic_query_with_context(
 ):
     """Test semantic query with related entity context."""
 
-    query_func = create_query(mem0_memory, bioimage_index)
+    query_func = create_search(mem0_memory, bioimage_index)
     result = await query_func(
         query_text="What techniques are available in Italy?",
         include_related=True,

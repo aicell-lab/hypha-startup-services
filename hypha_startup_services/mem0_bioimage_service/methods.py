@@ -5,100 +5,25 @@ from typing import Any, Callable, Coroutine
 from mem0 import AsyncMemory
 from pydantic import Field
 from hypha_rpc.utils.schema import schema_function
-from hypha_startup_services.mem0_bioimage_service.data_index import BioimageIndex
-from hypha_startup_services.mem0_bioimage_service.utils import (
+from hypha_startup_services.common.data_index import (
+    BioimageIndex,
+    create_get_related_entities,
+)
+from .utils import (
     semantic_bioimage_search,
 )
 
 logger = logging.getLogger(__name__)
 
 
-def create_get_entity_details(
-    bioimage_index: BioimageIndex,
-) -> Callable[..., Coroutine[Any, Any, dict[str, Any]]]:
-    """Create a schema function for getting entity details with dependency injection."""
-
-    @schema_function
-    async def get_entity_details(
-        entity_id: str = Field(
-            description="The ID of the entity (node or technology) to retrieve"
-        ),
-    ) -> dict[str, Any]:
-        """
-        Get details for a specific entity (node or technology).
-        Entity type is inferred if not provided.
-
-        Args:
-            entity_id: The ID of the entity to retrieve.
-
-        Returns:
-            A dictionary containing the entity details.
-
-        Raises:
-            ValueError: If entity is not found.
-        """
-        entity = bioimage_index.get_node_by_id(entity_id)
-        entity_type = "node"
-
-        if not entity:
-            entity = bioimage_index.get_technology_by_id(entity_id)
-            entity_type = "technology"
-
-            if not entity:
-                raise ValueError(f"Entity not found: {entity_id}")
-
-        return {
-            "entity_id": entity_id,
-            "entity_type": entity_type,
-            "entity_details": entity,
-        }
-
-    return get_entity_details
-
-
-def create_get_related_entities(
-    bioimage_index: BioimageIndex,
-) -> Callable[..., Coroutine[Any, Any, list[dict[str, Any]]]]:
-    """Create a schema function for getting related entities with dependency injection."""
-
-    @schema_function
-    async def get_related_entities(
-        entity_id: str = Field(
-            description="The ID of the entity to find relationships for"
-        ),
-    ) -> list[dict[str, Any]]:
-        """
-        Get entities related to a specific entity.
-        Entity type is inferred if not provided.
-
-        Args:
-            entity_id: The ID of the entity to find relationships for.
-
-        Returns:
-            A list of related entities.
-
-        Raises:
-            ValueError: If entity is not found or no related entities exist.
-        """
-        if bioimage_index.get_node_by_id(entity_id):
-            return bioimage_index.get_technologies_by_node_id(entity_id)
-
-        if bioimage_index.get_technology_by_id(entity_id):
-            return bioimage_index.get_nodes_by_technology_id(entity_id)
-
-        raise ValueError(f"Entity not found: {entity_id}")
-
-    return get_related_entities
-
-
-def create_query(
+def create_search(
     memory: AsyncMemory,
     bioimage_index: BioimageIndex,
 ) -> Callable[..., Coroutine[Any, Any, dict[str, Any]]]:
     """Create a schema function for querying bioimage data with dependency injection."""
 
     @schema_function
-    async def query(
+    async def search(
         query_text: str = Field(
             description="Natural language query to search bioimage data"
         ),
@@ -185,4 +110,4 @@ def create_query(
             "total_results": len(enhanced_results),
         }
 
-    return query
+    return search

@@ -5,8 +5,8 @@ Helper functions to register the Weaviate service with proper API endpoints.
 import logging
 from functools import partial
 from hypha_rpc.rpc import RemoteService
-from hypha_startup_services.mem0_service.mem0_client import get_mem0
-from hypha_startup_services.mem0_service.methods import (
+from .mem0_client import get_mem0
+from .methods import (
     mem0_add,
     mem0_search,
     mem0_delete_all,
@@ -14,7 +14,7 @@ from hypha_startup_services.mem0_service.methods import (
     init_run,
     init_agent,
 )
-from hypha_startup_services.mem0_service.utils.constants import DEFAULT_SERVICE_ID
+from .utils.constants import DEFAULT_SERVICE_ID
 
 logger = logging.getLogger(__name__)
 

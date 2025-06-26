@@ -58,24 +58,12 @@ async def load_data_files() -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]
     script_dir = Path(__file__).parent.parent
 
     # Load nodes data
-    nodes_file = (
-        script_dir
-        / "hypha_startup_services"
-        / "mem0_bioimage_service"
-        / "assets"
-        / "ebi-nodes.json"
-    )
+    nodes_file = script_dir / "common" / "assets" / "ebi-nodes.json"
     with open(nodes_file, "r", encoding="utf-8") as f:
         nodes_data = json.load(f)
 
     # Load technologies data
-    tech_file = (
-        script_dir
-        / "hypha_startup_services"
-        / "mem0_bioimage_service"
-        / "assets"
-        / "ebi-tech.json"
-    )
+    tech_file = script_dir / "common" / "assets" / "ebi-tech.json"
     with open(tech_file, "r", encoding="utf-8") as f:
         tech_data = json.load(f)
 
@@ -108,7 +96,7 @@ def prepare_node_objects(nodes_data: List[Dict[str, Any]]) -> List[Dict[str, Any
             "name": node.get("name", ""),
             "description": node.get("description", ""),
             "country": country_name,  # Use only the name, not the full object
-            "ebi_id": node.get("id", ""),  # Changed from entity_id to ebi_id
+            "entity_id": node.get("id", ""),  # Changed from entity_id to ebi_id
             "text": ". ".join(text_parts),
         }
         objects.append(obj)
@@ -241,11 +229,6 @@ async def ensure_collection_exists(
                 "name": "category",
                 "dataType": ["text"],
                 "description": "Category for technologies",
-            },
-            {
-                "name": "ebi_id",
-                "dataType": ["text"],
-                "description": "EBI identifier for the entity",
             },
             {
                 "name": "chunk_index",

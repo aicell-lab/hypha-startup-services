@@ -5,11 +5,11 @@ import pytest
 from dotenv import load_dotenv
 from hypha_rpc import connect_to_server
 from hypha_rpc.rpc import RemoteService
-from hypha_startup_services.mem0_bioimage_service.methods import (
+from hypha_startup_services.common.data_index import (
+    BioimageIndex,
     create_get_entity_details,
     create_get_related_entities,
 )
-from hypha_startup_services.mem0_bioimage_service.data_index import BioimageIndex
 
 
 # Sample EBI data - in a real implementation this would be loaded from external sources

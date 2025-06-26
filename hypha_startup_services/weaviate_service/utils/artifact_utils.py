@@ -8,18 +8,18 @@ from hypha_startup_services.common.artifacts import (
     get_artifact,
 )
 from hypha_startup_services.common.permissions import is_admin_workspace
-from hypha_startup_services.weaviate_service.utils.models import (
+from .models import (
     CollectionArtifactParams,
     ApplicationArtifactParams,
 )
-from hypha_startup_services.weaviate_service.utils.constants import (
-    ADMIN_WORKSPACES,
-)
-from hypha_startup_services.weaviate_service.utils.format_utils import (
-    get_full_collection_name,
-)
 from hypha_startup_services.common.utils import (
     get_application_artifact_name,
+)
+from .constants import (
+    ADMIN_WORKSPACES,
+)
+from .format_utils import (
+    get_full_collection_name,
 )
 
 logger = logging.getLogger(__name__)

@@ -2,7 +2,7 @@
 
 from typing import Any
 from hypha_rpc.utils import ObjectProxy
-from hypha_startup_services.common.constants import (
+from .constants import (
     ARTIFACT_DELIMITER,
     COLLECTION_DELIMITER,
     SHARED_WORKSPACE,

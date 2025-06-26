@@ -10,9 +10,9 @@ import logging
 from abc import ABC, abstractmethod
 from pydantic import BaseModel, Field
 from hypha_rpc.rpc import RemoteService, RemoteException
-from hypha_startup_services.common.constants import ADMIN_WORKSPACES
-from hypha_startup_services.common.artifacts import get_artifact
-from hypha_startup_services.common.utils import (
+from .constants import ADMIN_WORKSPACES
+from .artifacts import get_artifact
+from .utils import (
     get_application_artifact_name,
     get_full_collection_name,
 )

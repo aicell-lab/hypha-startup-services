@@ -6,9 +6,11 @@ from weaviate import WeaviateAsyncClient
 
 from hypha_startup_services.common.constants import DEFAULT_WEAVIATE_BIOIMAGE_SERVICE_ID
 from hypha_startup_services.weaviate_service.client import instantiate_and_connect
-from hypha_startup_services.weaviate_bioimage_service.methods import (
+from hypha_startup_services.common.data_index import load_external_data
+from .methods import (
     create_query,
     create_get_entity,
+    create_search,
 )
 
 logger = logging.getLogger(__name__)
@@ -51,9 +53,12 @@ async def register_weaviate_bioimage_service(
         service_id: Unique identifier for the service
     """
 
+    bioimage_index = load_external_data()
+
     # Create schema functions with dependency injection
     query_func = create_query(weaviate_client, server)
     get_entity_func = create_get_entity(weaviate_client, server)
+    search_func = create_search(weaviate_client, server, bioimage_index)
 
     # Register the service
     await server.register_service(
@@ -66,6 +71,7 @@ async def register_weaviate_bioimage_service(
             },
             "query": query_func,
             "get_entity": get_entity_func,
+            "search": search_func,
         }
     )
 

@@ -10,7 +10,7 @@ from hypha_startup_services.mem0_bioimage_service.register_service import (
 from hypha_startup_services.weaviate_bioimage_service.register_service import (
     register_weaviate_bioimage,
 )
-from hypha_startup_services.common.constants import (
+from .constants import (
     DEFAULT_WEAVIATE_SERVICE_ID,
     DEFAULT_MEM0_SERVICE_ID,
     DEFAULT_MEM0_BIOIMAGE_SERVICE_ID,

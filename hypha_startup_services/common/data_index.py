@@ -1,10 +1,12 @@
 """Data structures and indexing for EBI nodes and technologies."""
 
 import os
-from typing import Dict, List, Any, Set
+from typing import Dict, List, Any, Set, Callable, Coroutine
+from pydantic import Field
 import json
 import logging
 from markdownify import markdownify as md
+from hypha_rpc.rpc import schema_function
 
 logger = logging.getLogger(__name__)
 
@@ -255,3 +257,81 @@ def load_external_data(
     index = BioimageIndex()
     index.load_data(nodes_data, technologies_data)
     return index
+
+
+def create_get_entity_details(
+    bioimage_index: BioimageIndex,
+) -> Callable[..., Coroutine[Any, Any, dict[str, Any]]]:
+    """Create a schema function for getting entity details with dependency injection."""
+
+    @schema_function
+    async def get_entity_details(
+        entity_id: str = Field(
+            description="The ID of the entity (node or technology) to retrieve"
+        ),
+    ) -> dict[str, Any]:
+        """
+        Get details for a specific entity (node or technology).
+        Entity type is inferred if not provided.
+
+        Args:
+            entity_id: The ID of the entity to retrieve.
+
+        Returns:
+            A dictionary containing the entity details.
+
+        Raises:
+            ValueError: If entity is not found.
+        """
+        entity = bioimage_index.get_node_by_id(entity_id)
+        entity_type = "node"
+
+        if not entity:
+            entity = bioimage_index.get_technology_by_id(entity_id)
+            entity_type = "technology"
+
+            if not entity:
+                raise ValueError(f"Entity not found: {entity_id}")
+
+        return {
+            "entity_id": entity_id,
+            "entity_type": entity_type,
+            "entity_details": entity,
+        }
+
+    return get_entity_details
+
+
+def create_get_related_entities(
+    bioimage_index: BioimageIndex,
+) -> Callable[..., Coroutine[Any, Any, list[dict[str, Any]]]]:
+    """Create a schema function for getting related entities with dependency injection."""
+
+    @schema_function
+    async def get_related_entities(
+        entity_id: str = Field(
+            description="The ID of the entity to find relationships for"
+        ),
+    ) -> list[dict[str, Any]]:
+        """
+        Get entities related to a specific entity.
+        Entity type is inferred if not provided.
+
+        Args:
+            entity_id: The ID of the entity to find relationships for.
+
+        Returns:
+            A list of related entities.
+
+        Raises:
+            ValueError: If entity is not found or no related entities exist.
+        """
+        if bioimage_index.get_node_by_id(entity_id):
+            return bioimage_index.get_technologies_by_node_id(entity_id)
+
+        if bioimage_index.get_technology_by_id(entity_id):
+            return bioimage_index.get_nodes_by_technology_id(entity_id)
+
+        raise ValueError(f"Entity not found: {entity_id}")
+
+    return get_related_entities

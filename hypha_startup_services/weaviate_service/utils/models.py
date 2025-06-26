@@ -1,10 +1,10 @@
 from typing import Any, Literal
 from pydantic import BaseModel, Field
 from hypha_startup_services.common.constants import ARTIFACT_DELIMITER
-from hypha_startup_services.weaviate_service.utils.format_utils import (
+from hypha_startup_services.common.artifacts import BaseArtifactParams
+from .format_utils import (
     get_full_collection_name,
 )
-from hypha_startup_services.common.artifacts import BaseArtifactParams
 
 
 # Type alias for permission operations

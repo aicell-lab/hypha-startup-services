@@ -18,10 +18,10 @@ from hypha_startup_services.common.permissions import (
     AgentPermissionParams,
 )
 from hypha_startup_services.common.utils import proxy_to_dict
-from hypha_startup_services.mem0_service.utils.models import AgentArtifactParams
 from hypha_startup_services.common.workspace_utils import ws_from_context
 from hypha_startup_services.common.workspace_utils import validate_workspace
 from hypha_startup_services.common.run_utils import validate_run_id
+from .utils.models import AgentArtifactParams
 
 
 logger = logging.getLogger(__name__)

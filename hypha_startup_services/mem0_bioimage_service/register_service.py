@@ -4,13 +4,15 @@ Helper functions to register the BioImage service with proper API endpoints.
 
 import logging
 from hypha_rpc.rpc import RemoteService
-from hypha_startup_services.mem0_bioimage_service.data_index import load_external_data
-from hypha_startup_services.mem0_bioimage_service.methods import (
+from hypha_startup_services.common.data_index import load_external_data
+from hypha_startup_services.common.data_index import (
     create_get_entity_details,
     create_get_related_entities,
-    create_query,
 )
 from hypha_startup_services.mem0_service.mem0_client import get_mem0
+from .methods import (
+    create_search,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +32,7 @@ async def register_mem0_bioimage_service(
 
     get_entity_details_func = create_get_entity_details(bioimage_index)
     get_related_entities_func = create_get_related_entities(bioimage_index)
-    query_func = create_query(memory, bioimage_index)
+    search_func = create_search(memory, bioimage_index)
 
     await server.register_service(
         {
@@ -42,7 +44,7 @@ async def register_mem0_bioimage_service(
             },
             "get": get_entity_details_func,
             "get_related": get_related_entities_func,
-            "query": query_func,
+            "search": search_func,
         }
     )
 

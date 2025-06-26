@@ -20,28 +20,10 @@ from hypha_startup_services.weaviate_service.utils.collection_utils import (
     get_short_name,
     and_app_filter,
 )
-from hypha_startup_services.weaviate_service.utils.service_utils import (
-    prepare_application_creation,
-    get_permitted_collection,
-    collection_exists,
-)
 from hypha_startup_services.common.utils import (
     get_full_collection_name,
     stringify_keys,
     get_application_artifact_name,
-)
-from hypha_startup_services.weaviate_service.utils.format_utils import (
-    get_full_collection_names,
-    collection_to_config_dict,
-    config_with_short_name,
-    add_app_id,
-    get_settings_full_name,
-)
-from hypha_startup_services.weaviate_service.utils.artifact_utils import (
-    create_collection_artifact,
-    delete_collection_artifacts,
-    create_application_artifact,
-    delete_application_artifact,
 )
 from hypha_startup_services.common.permissions import (
     assert_has_collection_permission,
@@ -50,6 +32,24 @@ from hypha_startup_services.common.permissions import (
 from hypha_startup_services.common.artifacts import (
     get_artifact,
     artifact_exists,
+)
+from .utils.service_utils import (
+    prepare_application_creation,
+    get_permitted_collection,
+    collection_exists,
+)
+from .utils.format_utils import (
+    get_full_collection_names,
+    collection_to_config_dict,
+    config_with_short_name,
+    add_app_id,
+    get_settings_full_name,
+)
+from .utils.artifact_utils import (
+    create_collection_artifact,
+    delete_collection_artifacts,
+    create_application_artifact,
+    delete_application_artifact,
 )
 
 
