@@ -1,5 +1,7 @@
 """Common utility functions shared between services."""
 
+import asyncio
+from functools import partial, wraps
 from typing import Any
 from hypha_rpc.utils import ObjectProxy
 from .constants import (
@@ -58,3 +60,32 @@ def get_full_collection_name(short_name: str) -> str:
 
     workspace_formatted = format_workspace(SHARED_WORKSPACE)
     return f"{workspace_formatted}{COLLECTION_DELIMITER}{short_name}"
+
+
+def create_partial_with_schema(func, **kwargs):
+    """Create a partial function while preserving the __schema__ attribute."""
+    partial_func = partial(func, **kwargs)
+
+    # Check if the function is async
+    if asyncio.iscoroutinefunction(func):
+        # Create async wrapper for async functions
+        @wraps(func)
+        async def async_wrapper(*args, **wrapper_kwargs):
+            return await partial_func(*args, **wrapper_kwargs)
+
+        # Copy the schema if it exists
+        if hasattr(func, "__schema__"):
+            setattr(async_wrapper, "__schema__", func.__schema__)
+
+        return async_wrapper
+
+    # Create sync wrapper for sync functions
+    @wraps(func)
+    def sync_wrapper(*args, **wrapper_kwargs):
+        return partial_func(*args, **wrapper_kwargs)
+
+    # Copy the schema if it exists
+    if hasattr(func, "__schema__"):
+        setattr(sync_wrapper, "__schema__", func.__schema__)
+
+    return sync_wrapper

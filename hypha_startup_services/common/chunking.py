@@ -1,15 +1,15 @@
 """Text chunking utilities."""
 
-from typing import List, Dict, Any, Union
+from typing import Any
 import tiktoken
 
 
 def chunk_text(
-    text: Union[str, None],
+    text: str,
     chunk_size: int = 512,
     chunk_overlap: int = 50,
     encoding_name: str = "cl100k_base",
-) -> List[str]:
+) -> list[str]:
     """
     Chunk text into smaller pieces using tiktoken encoding.
 
@@ -62,11 +62,11 @@ def chunk_text(
 
 
 def chunk_documents(
-    documents: List[Dict[str, Any]],
+    documents: list[dict[str, Any]],
     chunk_size: int = 512,
     chunk_overlap: int = 50,
     encoding_name: str = "cl100k_base",
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Chunk multiple documents and return with metadata.
 

@@ -5,12 +5,16 @@ from hypha_rpc.rpc import RemoteService
 from weaviate import WeaviateAsyncClient
 
 from hypha_startup_services.common.constants import DEFAULT_WEAVIATE_BIOIMAGE_SERVICE_ID
+from hypha_startup_services.common.utils import create_partial_with_schema
 from hypha_startup_services.weaviate_service.client import instantiate_and_connect
-from hypha_startup_services.common.data_index import load_external_data
+from hypha_startup_services.common.data_index import (
+    load_external_data,
+    get_related_entities,
+)
 from .methods import (
-    create_query,
-    create_get_entity,
-    create_search,
+    query,
+    get_entity,
+    search,
 )
 
 logger = logging.getLogger(__name__)
@@ -55,10 +59,18 @@ async def register_weaviate_bioimage_service(
 
     bioimage_index = load_external_data()
 
-    # Create schema functions with dependency injection
-    query_func = create_query(weaviate_client, server)
-    get_entity_func = create_get_entity(weaviate_client, server)
-    search_func = create_search(weaviate_client, server, bioimage_index)
+    query_func = create_partial_with_schema(
+        query, client=weaviate_client, server=server
+    )
+    get_entity_func = create_partial_with_schema(
+        get_entity, client=weaviate_client, server=server
+    )
+    search_func = create_partial_with_schema(
+        search, client=weaviate_client, server=server, bioimage_index=bioimage_index
+    )
+    get_related_func = create_partial_with_schema(
+        get_related_entities, bioimage_index=bioimage_index
+    )
 
     # Register the service
     await server.register_service(
@@ -70,6 +82,7 @@ async def register_weaviate_bioimage_service(
                 "require_context": True,
             },
             "query": query_func,
+            "get_related": get_related_func,
             "get_entity": get_entity_func,
             "search": search_func,
         }

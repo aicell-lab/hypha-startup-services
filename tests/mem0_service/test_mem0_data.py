@@ -71,7 +71,12 @@ async def test_memory_persistence_across_operations(mem0_service):
     )
 
     assert result is not None
-    assert "results" in result
+    assert len(result["results"]) > 0, "Search did not return expected results"
+    first_result = result["results"][0]
+    assert "info" in first_result
+    assert "country" in first_result
+    assert "entity_id" in first_result
+    assert "entity_type" in first_result
 
 
 @pytest.mark.asyncio
@@ -112,6 +117,12 @@ async def test_large_message_content(mem0_service):
     )
 
     assert result is not None
+    assert len(result["results"]) > 0, "Search did not return expected results"
+    first_result = result["results"][0]
+    assert "info" in first_result
+    assert "country" in first_result
+    assert "entity_id" in first_result
+    assert "entity_type" in first_result
 
 
 @pytest.mark.asyncio

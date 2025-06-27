@@ -2,13 +2,15 @@
 
 import os
 import pytest
+import pytest_asyncio
 from dotenv import load_dotenv
+from tests.conftest import get_user_server
 from hypha_rpc import connect_to_server
 from hypha_rpc.rpc import RemoteService
 from hypha_startup_services.common.data_index import (
     BioimageIndex,
-    create_get_entity_details,
-    create_get_related_entities,
+    get_entity_details,
+    get_related_entities,
 )
 
 
@@ -111,8 +113,8 @@ async def test_bioimage_index_basic_functionality(bioimage_index):
 async def test_get_nodes_by_technology_id(bioimage_index):
     """Test getting nodes by technology ID using get_related_entities."""
     # Test with known technology ID - this should find nodes that provide this technology
-    get_related_func = create_get_related_entities(bioimage_index)
-    result = await get_related_func(
+    result = get_related_entities(
+        bioimage_index=bioimage_index,
         entity_id="f0acc857-fc72-4094-bf14-c36ac40801c5",  # 3D-CLEM technology
     )
 
@@ -133,17 +135,18 @@ async def test_get_nodes_by_technology_id(bioimage_index):
 async def test_get_nodes_by_technology_id_not_found(bioimage_index):
     """Test getting nodes for non-existent technology ID."""
     # Should raise ValueError for non-existent technology ID
-    get_related_func = create_get_related_entities(bioimage_index)
     with pytest.raises(ValueError, match="Entity not found"):
-        await get_related_func(entity_id="nonexistent-tech-id")
+        get_related_entities(
+            bioimage_index=bioimage_index, entity_id="nonexistent-tech-id"
+        )
 
 
 @pytest.mark.asyncio
 async def test_get_technologies_by_node_id(bioimage_index):
     """Test getting technologies by node ID using get_related_entities."""
     # Test with known node ID (Italian node) - this should find technologies provided by this node
-    get_related_func = create_get_related_entities(bioimage_index)
-    result = await get_related_func(
+    result = get_related_entities(
+        bioimage_index=bioimage_index,
         entity_id="7409a98f-1bdb-47d2-80e7-c89db73efedd",  # Italian node
     )
 
@@ -162,17 +165,18 @@ async def test_get_technologies_by_node_id(bioimage_index):
 async def test_get_technologies_by_node_id_not_found(bioimage_index):
     """Test getting technologies for non-existent node ID."""
     # Should raise ValueError for non-existent node ID
-    get_related_func = create_get_related_entities(bioimage_index)
     with pytest.raises(ValueError, match="Entity not found"):
-        await get_related_func(entity_id="nonexistent-node-id")
+        get_related_entities(
+            bioimage_index=bioimage_index, entity_id="nonexistent-node-id"
+        )
 
 
 @pytest.mark.asyncio
 async def test_get_node_details(bioimage_index):
     """Test getting node details using get_entity_details."""
     # Test with known node ID
-    get_entity_func = create_get_entity_details(bioimage_index)
-    result = await get_entity_func(
+    result = await get_entity_details(
+        bioimage_index=bioimage_index,
         entity_id="7409a98f-1bdb-47d2-80e7-c89db73efedd",  # Italian node
     )
 
@@ -184,15 +188,17 @@ async def test_get_node_details(bioimage_index):
 
     # Test with non-existent node ID - should raise ValueError
     with pytest.raises(ValueError, match="Entity not found"):
-        await get_entity_func(entity_id="nonexistent-node-id")
+        await get_entity_details(
+            bioimage_index=bioimage_index, entity_id="nonexistent-node-id"
+        )
 
 
 @pytest.mark.asyncio
 async def test_get_technology_details(bioimage_index):
     """Test getting technology details using get_entity_details."""
     # Test with known technology ID
-    get_entity_func = create_get_entity_details(bioimage_index)
-    result = await get_entity_func(
+    result = await get_entity_details(
+        bioimage_index=bioimage_index,
         entity_id="f0acc857-fc72-4094-bf14-c36ac40801c5",  # 3D-CLEM technology
     )
 
@@ -207,7 +213,9 @@ async def test_get_technology_details(bioimage_index):
 
     # Test with non-existent technology ID - should raise ValueError
     with pytest.raises(ValueError, match="Entity not found"):
-        await get_entity_func(entity_id="nonexistent-tech-id")
+        await get_entity_details(
+            bioimage_index=bioimage_index, entity_id="nonexistent-tech-id"
+        )
 
 
 @pytest.mark.asyncio
@@ -320,122 +328,157 @@ async def test_synthetic_technology_handling(bioimage_index):
 
 
 @pytest.mark.asyncio
-async def test_mem0_bioimage_integration():
+async def test_mem0_bioimage_integration(mem0_bioimage_live_service, mem0_live_service):
     """Test integration between mem0 search and bioimage service."""
+    # Test queries
+    queries = [
+        "Which bioimage nodes are in sweden?",
+        "I want to use an advanced microscope. which bioimage node should i go to?",
+    ]
 
-    load_dotenv()
+    for query in queries:
+        print(f"\nTesting query: {query}")
 
-    # Get the HYPHA_TOKEN from environment
-    token = os.environ.get("HYPHA_TOKEN")
-    if not token:
-        pytest.skip("HYPHA_TOKEN not available - skipping integration test")
-
-    # Connect to Hypha server
-    server = await connect_to_server(
-        {
-            "server_url": "https://hypha.aicell.io",
-            "token": token,
-        }
-    )
-
-    # Ensure we have the correct server type
-    if not isinstance(server, RemoteService):
-        raise TypeError("connect_to_server did not return a RemoteService instance")
-
-    # Get the services
-    try:
-        mem0_service = await server.get_service("aria-agents/mem0-test")
-        mem0_bioimage_service = await server.get_service(
-            "aria-agents/mem0-bioimage-test"
+        await mem0_live_service.init_agent(
+            agent_id="ebi_file_loader",
+            description="Test agent for EBI file loading",
         )
-    except Exception as e:
-        await server.disconnect()
-        pytest.skip(f"Services not available: {e}")
 
-    try:
-        # Test queries
-        queries = [
-            "Which bioimage nodes are in sweden?",
-            "I want to use an advanced microscope. which bioimage node should i go to?",
-        ]
+        # Search in mem0 with the specified agent_id and workspace
+        search_result = await mem0_bioimage_live_service.search(
+            query=query,
+            agent_id="ebi_file_loader",
+            workspace="aria-agents",
+            limit=3,  # Get top 3 results
+        )
 
-        for query in queries:
-            print(f"\nTesting query: {query}")
+        # Validate mem0 search results
+        assert search_result is not None, f"No search results for query: {query}"
+        assert "results" in search_result, "Search result missing 'results' key"
+        results = search_result["results"]
 
-            await mem0_service.init_agent(
-                agent_id="ebi_file_loader",
-                description="Test agent for EBI file loading",
-            )
+        # If no results found, skip this query (remote service may not have data loaded)
+        if len(results) == 0:
+            print(f"No search results found for query: {query} - skipping")
+            continue
 
-            # Search in mem0 with the specified agent_id and workspace
-            search_result = await mem0_service.search(
-                query=query,
-                agent_id="ebi_file_loader",
-                workspace="aria-agents",
-                limit=3,  # Get top 3 results
-            )
+        assert (
+            len(results) <= 3
+        ), f"Too many results returned (expected max 3): {len(results)}"
 
-            # Validate mem0 search results
-            assert search_result is not None, f"No search results for query: {query}"
-            assert "results" in search_result, "Search result missing 'results' key"
-            results = search_result["results"]
+        print(f"Found {len(results)} mem0 results")
 
-            # If no results found, skip this query (remote service may not have data loaded)
-            if len(results) == 0:
-                print(f"No search results found for query: {query} - skipping")
-                continue
+        # Test bioimage service with known IDs (deterministic)
+        # Test with known technology ID
+        tech_result = await mem0_bioimage_live_service.get_nodes_by_technology_id(
+            technology_id="f0acc857-fc72-4094-bf14-c36ac40801c5"  # 3D-CLEM
+        )
 
-            assert (
-                len(results) <= 3
-            ), f"Too many results returned (expected max 3): {len(results)}"
+        # Validate bioimage service technology lookup
+        assert tech_result is not None
+        assert "nodes" in tech_result
+        assert "technology" in tech_result
+        assert (
+            len(tech_result["nodes"]) >= 1
+        ), "Expected at least one node for known technology"
 
-            print(f"Found {len(results)} mem0 results")
+        # Test with known node ID
+        node_result = await mem0_bioimage_live_service.get_technologies_by_node_id(
+            node_id="7409a98f-1bdb-47d2-80e7-c89db73efedd"  # Italian node
+        )
 
-            # Test bioimage service with known IDs (deterministic)
-            # Test with known technology ID
-            tech_result = await mem0_bioimage_service.get_nodes_by_technology_id(
-                technology_id="f0acc857-fc72-4094-bf14-c36ac40801c5"  # 3D-CLEM
-            )
+        # Validate bioimage service node lookup
+        assert node_result is not None
+        assert "technologies" in node_result
+        assert "node" in node_result
+        assert (
+            len(node_result["technologies"]) >= 1
+        ), "Expected at least one technology for known node"
 
-            # Validate bioimage service technology lookup
-            assert tech_result is not None
-            assert "nodes" in tech_result
-            assert "technology" in tech_result
-            assert (
-                len(tech_result["nodes"]) >= 1
-            ), "Expected at least one node for known technology"
+        # Test service statistics
+        stats_result = await mem0_bioimage_live_service.get_statistics()
+        assert stats_result is not None
+        assert "service" in stats_result
+        assert "statistics" in stats_result
+        assert stats_result["service"] == "mem0_bioimage_service"
 
-            # Test with known node ID
-            node_result = await mem0_bioimage_service.get_technologies_by_node_id(
-                node_id="7409a98f-1bdb-47d2-80e7-c89db73efedd"  # Italian node
-            )
+        print(f"✅ Query '{query}' processed successfully:")
+        print(f"   - Found {len(tech_result['nodes'])} nodes for technology lookup")
+        print(
+            f"   - Found {len(node_result['technologies'])} technologies for node lookup"
+        )
+        print(
+            f"   - Service statistics: {stats_result['statistics']['total_nodes']} nodes, {stats_result['statistics']['total_technologies']} technologies"
+        )
 
-            # Validate bioimage service node lookup
-            assert node_result is not None
-            assert "technologies" in node_result
-            assert "node" in node_result
-            assert (
-                len(node_result["technologies"]) >= 1
-            ), "Expected at least one technology for known node"
 
-            # Test service statistics
-            stats_result = await mem0_bioimage_service.get_statistics()
-            assert stats_result is not None
-            assert "service" in stats_result
-            assert "statistics" in stats_result
-            assert stats_result["service"] == "mem0_bioimage_service"
+# Fixtures for test and live/prod mem0_bioimage services (mirroring test_bioimage_service_unit.py)
+@pytest_asyncio.fixture
+async def mem0_bioimage_test_service():
+    """Mem0 BioImage service fixture for test instance."""
 
-            print(f"✅ Query '{query}' processed successfully:")
-            print(f"   - Found {len(tech_result['nodes'])} nodes for technology lookup")
-            print(
-                f"   - Found {len(node_result['technologies'])} technologies for node lookup"
-            )
-            print(
-                f"   - Service statistics: {stats_result['statistics']['total_nodes']} nodes, {stats_result['statistics']['total_technologies']} technologies"
-            )
+    server = await get_user_server("PERSONAL_TOKEN")
+    service = await server.get_service("aria-agents/mem0-bioimage-test")
+    yield service
+    await server.disconnect()
 
-    except Exception as e:
-        print(f"Test failed with error: {e}")
-        raise
-    finally:
-        await server.disconnect()
+
+@pytest_asyncio.fixture
+async def mem0_bioimage_live_service():
+    """Mem0 BioImage service fixture for live/prod instance."""
+    server = await get_user_server("PERSONAL_TOKEN")
+    service = await server.get_service("aria-agents/mem0-bioimage")
+    yield service
+    await server.disconnect()
+
+
+# Add search method tests for mem0_bioimage
+@pytest.mark.asyncio
+async def test_mem0_bioimage_search_test_service(mem0_bioimage_test_service):
+    # Use a query that should return results
+    query = "microscopy"
+    result = await mem0_bioimage_test_service.search(query_text=query, limit=3)
+    assert result is not None, "Search result should not be None"
+    assert isinstance(result, dict), "Search result should be a dict"
+    assert "results" in result, "Search result missing 'results' key"
+    assert isinstance(result["results"], list), "'results' should be a list"
+    assert len(result["results"]) > 0, "Search should return at least one result"
+    for item in result["results"]:
+        assert (
+            "info" in item and "exists_in_nodes" in item
+        ), "Each result should have an id or name"
+
+
+@pytest.mark.asyncio
+async def test_mem0_bioimage_search_live_service(mem0_bioimage_live_service):
+    # Use a query that should return results
+    query = "microscopy"
+    result = await mem0_bioimage_live_service.search(query=query, limit=3)
+    assert result is not None, "Search result should not be None"
+    assert isinstance(result, dict), "Search result should be a dict"
+    assert "results" in result, "Search result missing 'results' key"
+    assert isinstance(result["results"], list), "'results' should be a list"
+    assert len(result["results"]) > 0, "Search should return at least one result"
+    for item in result["results"]:
+        assert "id" in item or "name" in item, "Each result should have an id or name"
+
+
+# If there is a query method, add a test for it as well
+@pytest.mark.asyncio
+async def test_mem0_bioimage_query_test_service(mem0_bioimage_test_service):
+    result = await mem0_bioimage_test_service.search(query_text="microscopy")
+    assert result is not None
+    assert isinstance(result, dict)
+    assert "results" in result
+    assert isinstance(result["results"], list)
+    assert len(result["results"]) > 0
+
+
+@pytest.mark.asyncio
+async def test_mem0_bioimage_query_live_service(mem0_bioimage_live_service):
+    result = await mem0_bioimage_live_service.search(query_text="microscopy")
+    assert result is not None
+    assert isinstance(result, dict)
+    assert "results" in result
+    assert isinstance(result["results"], list)
+    assert len(result["results"]) > 0

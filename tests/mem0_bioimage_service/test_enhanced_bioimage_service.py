@@ -3,12 +3,12 @@
 import pytest
 import pytest_asyncio
 from hypha_startup_services.mem0_bioimage_service.methods import (
-    create_search,
+    search,
 )
 from hypha_startup_services.common.data_index import (
     load_external_data,
-    create_get_entity_details,
-    create_get_related_entities,
+    get_entity_details,
+    get_related_entities,
 )
 from hypha_startup_services.mem0_service.mem0_client import get_mem0
 
@@ -32,8 +32,7 @@ async def test_enhanced_bioimage_find_related_entities_by_technology_id(bioimage
     # Find entities related to 4Pi technology (should automatically infer it's a technology)
     tech_id = "68a3b6c4-9c19-4446-9617-22e7d37e0f2c"
 
-    get_related_func = create_get_related_entities(bioimage_index)
-    result = await get_related_func(entity_id=tech_id)
+    result = get_related_entities(bioimage_index, entity_id=tech_id)
 
     assert result is not None
     assert isinstance(result, list)
@@ -53,8 +52,7 @@ async def test_enhanced_bioimage_find_related_entities_by_node_id(bioimage_index
     # Find entities related to Italian ALM Node (should automatically infer it's a node)
     node_id = "7409a98f-1bdb-47d2-80e7-c89db73efedd"
 
-    get_related_func = create_get_related_entities(bioimage_index)
-    result = await get_related_func(entity_id=node_id)
+    result = get_related_entities(bioimage_index, entity_id=node_id)
 
     assert result is not None
     assert isinstance(result, list)
@@ -72,8 +70,9 @@ async def test_enhanced_bioimage_find_related_entities_by_node_id(bioimage_index
 async def test_enhanced_bioimage_semantic_query(bioimage_index, mem0_memory):
     """Test semantic query functionality."""
 
-    query_func = create_search(mem0_memory, bioimage_index)
-    result = await query_func(
+    result = await search(
+        memory=mem0_memory,
+        bioimage_index=bioimage_index,
         query_text="electron microscopy",
         limit=10,
     )
@@ -97,8 +96,9 @@ async def test_enhanced_bioimage_semantic_query_with_context(
 ):
     """Test semantic query with related entity context."""
 
-    query_func = create_search(mem0_memory, bioimage_index)
-    result = await query_func(
+    result = await search(
+        memory=mem0_memory,
+        bioimage_index=bioimage_index,
         query_text="What techniques are available in Italy?",
         include_related=True,
         limit=3,
@@ -133,8 +133,7 @@ async def test_enhanced_bioimage_traditional_methods_still_work(
     # Test getting nodes by technology ID
     tech_id = "68a3b6c4-9c19-4446-9617-22e7d37e0f2c"
 
-    get_related_func = create_get_related_entities(bioimage_index)
-    result = await get_related_func(entity_id=tech_id)
+    result = get_related_entities(bioimage_index, entity_id=tech_id)
 
     assert result is not None
     assert isinstance(result, list)
@@ -153,9 +152,8 @@ async def test_enhanced_bioimage_error_handling_invalid_entity(
 ):
     """Test error handling for invalid entity ID."""
     # The function should raise an exception for invalid entity IDs
-    get_related_func = create_get_related_entities(bioimage_index)
     with pytest.raises(ValueError, match="Entity not found"):
-        await get_related_func(entity_id="invalid-entity-id-12345")
+        get_related_entities(bioimage_index, entity_id="invalid-entity-id-12345")
 
 
 @pytest.mark.asyncio
@@ -164,8 +162,7 @@ async def test_enhanced_bioimage_entity_agnostic_functions(bioimage_index, mem0_
 
     # Test get_entity_details for a node
     node_id = "7409a98f-1bdb-47d2-80e7-c89db73efedd"
-    get_entity_func = create_get_entity_details(bioimage_index)
-    result = await get_entity_func(entity_id=node_id)
+    result = await get_entity_details(bioimage_index, entity_id=node_id)
 
     assert result is not None
     assert result["entity_id"] == node_id
@@ -175,7 +172,7 @@ async def test_enhanced_bioimage_entity_agnostic_functions(bioimage_index, mem0_
 
     # Test get_entity_details for a technology
     tech_id = "68a3b6c4-9c19-4446-9617-22e7d37e0f2c"
-    result = await get_entity_func(entity_id=tech_id)
+    result = await get_entity_details(bioimage_index, entity_id=tech_id)
 
     assert result is not None
     assert result["entity_id"] == tech_id
@@ -184,8 +181,7 @@ async def test_enhanced_bioimage_entity_agnostic_functions(bioimage_index, mem0_
     assert result["entity_details"]["name"] == "4Pi microscopy"
 
     # Test get_related_entities for a node
-    get_related_func = create_get_related_entities(bioimage_index)
-    result = await get_related_func(entity_id=node_id)
+    result = get_related_entities(bioimage_index, entity_id=node_id)
 
     assert result is not None
     assert isinstance(result, list)
@@ -193,7 +189,7 @@ async def test_enhanced_bioimage_entity_agnostic_functions(bioimage_index, mem0_
     assert len(result) > 0
 
     # Test get_related_entities for a technology
-    result = await get_related_func(entity_id=tech_id)
+    result = get_related_entities(bioimage_index, entity_id=tech_id)
 
     assert result is not None
     assert isinstance(result, list)

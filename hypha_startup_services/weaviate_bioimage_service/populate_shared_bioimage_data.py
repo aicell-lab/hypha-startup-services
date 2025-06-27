@@ -22,7 +22,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 from hypha_rpc import connect_to_server
 from hypha_rpc.rpc import RemoteService
@@ -53,7 +53,7 @@ async def delete_all_objects_in_application(weaviate_service):
     logger.info("Delete result: %s", result)
 
 
-async def load_data_files() -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+async def load_data_files() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Load nodes and technologies data from JSON files."""
     script_dir = Path(__file__).parent.parent
 
@@ -71,7 +71,7 @@ async def load_data_files() -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]
     return nodes_data, tech_data
 
 
-def prepare_node_objects(nodes_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def prepare_node_objects(nodes_data: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Prepare node objects for insertion into Weaviate."""
     objects = []
 
@@ -104,7 +104,7 @@ def prepare_node_objects(nodes_data: List[Dict[str, Any]]) -> List[Dict[str, Any
     return objects
 
 
-def prepare_technology_objects(tech_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def prepare_technology_objects(tech_data: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Prepare technology objects for insertion into Weaviate."""
     objects = []
 
@@ -311,7 +311,7 @@ async def ensure_application_exists(weaviate_service) -> None:
 
 async def insert_data_in_batches(
     weaviate_service,
-    objects: List[Dict[str, Any]],
+    objects: list[dict[str, Any]],
     data_type: str,
     batch_size: int = 10,
 ):

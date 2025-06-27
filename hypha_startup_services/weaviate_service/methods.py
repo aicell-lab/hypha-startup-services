@@ -429,7 +429,7 @@ async def data_insert_many(
         chunked_objects = []
         for obj in objects:
             if text_field in obj and obj[text_field]:
-                text_content = obj[text_field]
+                text_content: str = obj[text_field]
                 chunks = chunk_text(text_content, chunk_size, chunk_overlap)
 
                 for chunk_idx, chunk in enumerate(chunks):

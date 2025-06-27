@@ -9,6 +9,15 @@ from tests.mem0_service.utils import (
 
 
 @pytest_asyncio.fixture
+async def mem0_live_service():
+    """Mem0 BioImage service fixture for live (admin) environment."""
+    server = await get_user_server("HYPHA_TOKEN")
+    service = await server.get_service("aria-agents/mem0")
+    yield service
+    await server.disconnect()
+
+
+@pytest_asyncio.fixture
 async def mem0_service():
     """Mem0 service fixture for user 1."""
     server = await get_user_server("PERSONAL_TOKEN")

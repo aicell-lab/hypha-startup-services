@@ -5,8 +5,8 @@ import pytest
 from weaviate.collections.classes.filters import _FilterValue, _Operator
 
 from hypha_startup_services.weaviate_bioimage_service.methods import (
-    create_query,
-    create_get_entity,
+    query,
+    get_entity,
     BIOIMAGE_COLLECTION,
 )
 from hypha_startup_services.weaviate_bioimage_service.methods import (
@@ -38,10 +38,9 @@ class TestQueryMethods:
 
         mock_generate.return_value = {"results": []}
 
-        # Create the query function using the factory
-        query = create_query(mock_client, mock_server)
-
         await query(
+            client=mock_client,
+            server=mock_server,
             query_text="test query",
             limit=5,
             context=mock_context,
@@ -71,9 +70,9 @@ class TestQueryMethods:
         mock_fetch.return_value = {"results": []}
 
         # Create the get_entity function using the factory
-        get_entity = create_get_entity(mock_client, mock_server)
-
         await get_entity(
+            mock_client,
+            mock_server,
             entity_id="test_entity_123",
             context=mock_context,
         )
