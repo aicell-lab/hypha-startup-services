@@ -88,6 +88,9 @@ async def test_enhanced_bioimage_semantic_query(bioimage_index, mem0_memory):
     if result["results"]:
         first_result = result["results"][0]
         assert "info" in first_result
+        assert "country" in first_result
+        assert "entity_id" in first_result
+        assert "entity_type" in first_result
 
 
 @pytest.mark.asyncio
@@ -116,13 +119,16 @@ async def test_enhanced_bioimage_semantic_query_with_context(
     if result["results"]:
         for enhanced_result in result["results"]:
             assert "info" in enhanced_result
+            assert "country" in enhanced_result
+            assert "entity_id" in enhanced_result
+            assert "entity_type" in enhanced_result
             # Should have either has_technologies or exists_in_nodes when include_related=True
             # Note: Only assert if we actually found related entities
             has_relations = (
                 "has_technologies" in enhanced_result
                 or "exists_in_nodes" in enhanced_result
             )
-            # The enhanced result may or may not have relations based on the data
+            assert has_relations
 
 
 @pytest.mark.asyncio

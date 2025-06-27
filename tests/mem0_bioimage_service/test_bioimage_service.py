@@ -1,12 +1,8 @@
 """Tests for the BioImage service."""
 
-import os
 import pytest
 import pytest_asyncio
-from dotenv import load_dotenv
 from tests.conftest import get_user_server
-from hypha_rpc import connect_to_server
-from hypha_rpc.rpc import RemoteService
 from hypha_startup_services.common.data_index import (
     BioimageIndex,
     get_entity_details,
