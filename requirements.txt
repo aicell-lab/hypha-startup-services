@@ -3,9 +3,9 @@ pydantic
 weaviate-client>=4.14.0
 setuptools==70.0.0
 hypha==0.20.54.post8
-hypha-rpc==0.20.55
+hypha-rpc==0.20.56
 python-dotenv==1.1.0
-redis==5.2.0
+redis==6.2.0
 markdownify==0.12.1
 ollama>=0.4.5
 tiktoken>=0.8.0
