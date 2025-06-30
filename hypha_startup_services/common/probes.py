@@ -22,8 +22,10 @@ async def add_probes(
 
     async def is_service_available(service_id: str) -> bool:
         """Check if a specific service is available."""
+        client_id = server.config.client_id
+        full_service_id = f"{client_id}:{service_id}"
         try:
-            svc = await server.get_service(service_id)
+            svc = await server.get_service(full_service_id)
             return svc is not None
         except RemoteException as e:
             logger.warning("Service %s is not available: %s", service_id, e)
