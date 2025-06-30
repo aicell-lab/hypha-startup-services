@@ -64,18 +64,34 @@ def get_full_collection_name(short_name: str) -> str:
 
 def create_partial_with_schema(func, **kwargs):
     """Create a partial function while preserving the __schema__ attribute."""
+    import inspect
+    from inspect import Signature
+
+    # Get the original function signature
+    original_sig = inspect.signature(func)
+
+    # Create a new signature without the pre-filled parameters
+    new_params = []
+    for name, param in original_sig.parameters.items():
+        if name not in kwargs:
+            new_params.append(param)
+
+    new_signature = Signature(new_params)
 
     # Check if the function is async
     if asyncio.iscoroutinefunction(func):
         # Create async wrapper for async functions
         @wraps(func)
         async def async_wrapper(*args, **wrapper_kwargs):
-            # Merge kwargs, giving priority to the original kwargs
+            # Filter out parameters that are already provided by the partial
             filtered_wrapper_kwargs = {
                 k: v for k, v in wrapper_kwargs.items() if k not in kwargs
             }
             merged_kwargs = {**filtered_wrapper_kwargs, **kwargs}
             return await func(*args, **merged_kwargs)
+
+        # Apply the new signature
+        setattr(async_wrapper, "__signature__", new_signature)
 
         # Copy the schema if it exists
         if hasattr(func, "__schema__"):
@@ -86,12 +102,15 @@ def create_partial_with_schema(func, **kwargs):
     # Create sync wrapper for sync functions
     @wraps(func)
     def sync_wrapper(*args, **wrapper_kwargs):
-        # Merge kwargs, giving priority to the original kwargs
+        # Filter out parameters that are already provided by the partial
         filtered_wrapper_kwargs = {
             k: v for k, v in wrapper_kwargs.items() if k not in kwargs
         }
         merged_kwargs = {**filtered_wrapper_kwargs, **kwargs}
         return func(*args, **merged_kwargs)
+
+    # Apply the new signature
+    setattr(sync_wrapper, "__signature__", new_signature)
 
     # Copy the schema if it exists
     if hasattr(func, "__schema__"):
