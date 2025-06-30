@@ -1,14 +1,11 @@
 """Service methods for the Weaviate BioImage service."""
 
 import logging
-import os
 from typing import Any
 
 from weaviate import WeaviateAsyncClient
 from weaviate.classes.query import Filter
 
-from hypha_rpc import connect_to_server
-from hypha_rpc.rpc import RemoteService
 from hypha_rpc.utils.schema import schema_function
 from pydantic import Field
 
@@ -17,6 +14,8 @@ from hypha_startup_services.weaviate_service.methods import (
     generate_near_text,
     query_fetch_objects,
     query_hybrid,
+    applications_exists,
+    applications_create,
 )
 from hypha_startup_services.common.data_index import (
     BioimageIndex,
@@ -31,42 +30,33 @@ SHARED_APPLICATION_ID = "eurobioimaging-shared"
 SHARED_APPLICATION_DESCRIPTION = "Shared EuroBioImaging nodes and technologies database"
 
 
-async def ensure_shared_application_exists() -> None:
-    """Ensure the shared bioimage application exists."""
-    token = os.getenv("HYPHA_TOKEN")
-
-    admin_server: RemoteService = await connect_to_server(
-        {  # type: ignore
-            "server_url": "https://hypha.aicell.io",
-            "token": token,
-        }
-    )
-
-    weaviate_service = await admin_server.get_service("aria-agents/weaviate")
-
-    exists = await weaviate_service.applications.exists(
+async def ensure_shared_application_exists(
+    client: WeaviateAsyncClient, context: dict[str, Any]
+) -> None:
+    exists = await applications_exists(
         collection_name=BIOIMAGE_COLLECTION,
         application_id=SHARED_APPLICATION_ID,
+        context=context,
     )
 
     if not exists:
         logger.info("Creating shared application: %s", SHARED_APPLICATION_ID)
-        await weaviate_service.applications.create(
+        await applications_create(
+            client=client,
             collection_name=BIOIMAGE_COLLECTION,
             application_id=SHARED_APPLICATION_ID,
             description=SHARED_APPLICATION_DESCRIPTION,
+            context=context,
         )
         logger.info("Shared application created successfully")
     else:
         logger.debug("Shared application already exists")
 
-    await admin_server.disconnect()
-
 
 @schema_function(arbitrary_types_allowed=True)
 async def query(
     client: WeaviateAsyncClient,
-    server: RemoteService,
+    context: dict[str, Any],
     query_text: str = Field(
         description="Natural language query to search bioimage data"
     ),
@@ -75,13 +65,11 @@ async def query(
         description="Filter by entity types: 'node', 'technology', or both. Defaults to both if not specified.",
     ),
     limit: int = Field(default=10, description="Maximum number of results to return"),
-    context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Query bioimage data using natural language.
 
     Args:
         client: Weaviate client instance
-        server: Remote service instance
         query_text: Natural language query
         entity_types: Filter by entity types ('node', 'technology', or both)
         limit: Maximum number of results
@@ -91,7 +79,7 @@ async def query(
         Dictionary with query results and generated response
     """
     # Ensure the shared application exists before querying
-    await ensure_shared_application_exists()
+    await ensure_shared_application_exists(client=client, context=context)
 
     # Validate entity_types if provided
     if entity_types:
@@ -111,7 +99,6 @@ async def query(
 
     return await generate_near_text(
         client=client,
-        server=server,
         collection_name=BIOIMAGE_COLLECTION,
         application_id=SHARED_APPLICATION_ID,
         query=query_text,
@@ -131,8 +118,8 @@ async def query(
 @schema_function(arbitrary_types_allowed=True)
 async def search(
     client: WeaviateAsyncClient,
-    server: RemoteService,
     bioimage_index: BioimageIndex,
+    context: dict[str, Any],
     query_text: str = Field(
         description="Natural language query to search bioimage data"
     ),
@@ -145,13 +132,11 @@ async def search(
         description="Whether to include related entities in the search",
     ),
     limit: int = Field(default=10, description="Maximum number of results to return"),
-    context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Search bioimage data using natural language.
 
     Args:
         client: Weaviate client instance
-        server: Remote service instance
         bioimage_index: Bioimage index for related entities
         query_text: Natural language query
         entity_types: Filter by entity types ('node', 'technology', or both)
@@ -162,7 +147,7 @@ async def search(
         Dictionary with search results and generated response
     """
     # Ensure the shared application exists before querying
-    await ensure_shared_application_exists()
+    await ensure_shared_application_exists(client=client, context=context)
 
     # Validate entity_types if provided
     if entity_types:
@@ -182,12 +167,12 @@ async def search(
 
     semantic_results = await query_hybrid(
         client=client,
-        server=server,
         collection_name=BIOIMAGE_COLLECTION,
         application_id=SHARED_APPLICATION_ID,
         query=query_text,
         filters=where_filter,
         limit=limit,
+        target_vector="text_vector",
         context=context,
     )
 
@@ -207,15 +192,13 @@ async def search(
 @schema_function(arbitrary_types_allowed=True)
 async def get_entity(
     client: WeaviateAsyncClient,
-    server: RemoteService,
+    context: dict[str, Any],
     entity_id: str = Field(description="ID of the entity to retrieve"),
-    context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Get a specific entity by ID.
 
     Args:
         client: Weaviate client instance
-        server: Remote service instance
         entity_id: ID of the entity to retrieve
         context: Context containing caller information
 
@@ -223,11 +206,10 @@ async def get_entity(
         Dictionary with entity details
     """
     # Ensure the shared application exists before querying
-    await ensure_shared_application_exists()
+    await ensure_shared_application_exists(client=client, context=context)
 
     return await query_fetch_objects(
         client=client,
-        server=server,
         collection_name=BIOIMAGE_COLLECTION,
         application_id=SHARED_APPLICATION_ID,
         filters=Filter.by_property("entity_id").equal(entity_id),

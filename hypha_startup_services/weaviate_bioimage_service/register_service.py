@@ -59,14 +59,10 @@ async def register_weaviate_bioimage_service(
 
     bioimage_index = load_external_data()
 
-    query_func = create_partial_with_schema(
-        query, client=weaviate_client, server=server
-    )
-    get_entity_func = create_partial_with_schema(
-        get_entity, client=weaviate_client, server=server
-    )
+    query_func = create_partial_with_schema(query, client=weaviate_client)
+    get_entity_func = create_partial_with_schema(get_entity, client=weaviate_client)
     search_func = create_partial_with_schema(
-        search, client=weaviate_client, server=server, bioimage_index=bioimage_index
+        search, client=weaviate_client, bioimage_index=bioimage_index
     )
     get_related_func = create_partial_with_schema(
         get_related_entities, bioimage_index=bioimage_index

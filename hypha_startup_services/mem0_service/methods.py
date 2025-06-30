@@ -1,6 +1,5 @@
 from typing import Any
 import logging
-from hypha_rpc.rpc import RemoteService
 
 # Apply patches before importing AsyncMemory to ensure they take effect
 from hypha_startup_services.mem0_service.weaviate_patches import apply_all_patches
@@ -32,7 +31,6 @@ async def init_agent(
     *,
     description: str | None = None,
     metadata: dict[str, Any] | None = None,
-    server: RemoteService,
     context: dict[str, Any],
 ) -> None:
     """
@@ -44,7 +42,6 @@ async def init_agent(
         agent_id: ID of the agent
         description: Optional description for the artifact
         metadata: Optional metadata for the artifact
-        server: The Hypha server instance
         context: Context from Hypha-rpc for permissions
     """
     accessor_ws = ws_from_context(context)
@@ -59,7 +56,6 @@ async def init_agent(
     )
 
     await create_artifact(
-        server=server,
         artifact_params=agent_artifact_params,
     )
 
@@ -71,7 +67,6 @@ async def init_run(
     *,
     description: str | None = None,
     metadata: dict[str, Any] | None = None,
-    server: RemoteService,
     context: dict[str, Any],
 ) -> None:
     """
@@ -86,7 +81,6 @@ async def init_run(
         run_id: ID of the run
         description: Optional description for the artifacts
         metadata: Optional metadata for the artifacts
-        server: The Hypha server instance
         memory: The AsyncMemory instance (currently unused)
         context: Context from Hypha-rpc for permissions
     """
@@ -109,12 +103,10 @@ async def init_run(
 
     parent_id = agent_artifact_params.artifact_id
     assert parent_id is not None and await artifact_exists(
-        server=server,
         artifact_id=parent_id,
     ), "Please call init_agent() before initializing workspace agent."
 
     await create_artifact(
-        server=server,
         artifact_params=workspace_artifact_params,
     )
 
@@ -122,7 +114,6 @@ async def init_run(
         validate_run_id(run_id)
         run_artifact_params = workspace_artifact_params.for_run(run_id)
         await create_artifact(
-            server=server,
             artifact_params=run_artifact_params,
         )
 
@@ -132,7 +123,6 @@ async def mem0_add(
     agent_id: str,
     workspace: str | None = None,
     *,
-    server: RemoteService,
     memory: AsyncMemory,
     context: dict[str, Any] | ObjectProxy,
     run_id: str | None = None,
@@ -145,7 +135,6 @@ async def mem0_add(
         messages: The item to add, typically a list of messages or a single message.
         agent_id: ID of the agent adding the item.
         workspace: Workspace of the user adding the item.
-        server: The Hypha server instance.
         memory: The AsyncMemory instance to add the item to.
         context: Context from Hypha-rpc for permissions.
         run_id: ID of the run to associate with the item. Defaults to None.
@@ -175,11 +164,10 @@ async def mem0_add(
     )
 
     assert await artifact_exists(
-        server=server,
         artifact_id=permission_params.artifact_id,
     ), "Please call init_agent() and init() before adding memories."
 
-    await require_permission(server, permission_params)
+    await require_permission(permission_params)
 
     converted_messages = proxy_to_dict(messages)
     converted_kwargs = proxy_to_dict(kwargs)
@@ -196,7 +184,6 @@ async def mem0_search(
     agent_id: str,
     workspace: str | None = None,
     *,
-    server: RemoteService,
     memory: AsyncMemory,
     context: dict[str, Any],
     run_id: str | None = None,
@@ -209,7 +196,6 @@ async def mem0_search(
         query: Query to search for.
         agent_id: ID of the agent to search for.
         workspace: Workspace of the user to search for.
-        server: The Hypha server instance.
         memory: The AsyncMemory instance to perform the search on.
         context: Context from Hypha-rpc for permissions.
         run_id: ID of the run to search for. Defaults to None.
@@ -244,11 +230,10 @@ async def mem0_search(
     )
 
     assert await artifact_exists(
-        server=server,
         artifact_id=permission_params.artifact_id,
     ), "Please call init() before adding memories."
 
-    await require_permission(server, permission_params)
+    await require_permission(permission_params)
 
     results = await memory.search(
         query,
@@ -265,7 +250,6 @@ async def mem0_delete_all(
     agent_id: str,
     workspace: str | None = None,
     *,
-    server: RemoteService,
     memory: AsyncMemory,
     context: dict[str, Any],
     run_id: str | None = None,
@@ -277,7 +261,6 @@ async def mem0_delete_all(
     Args:
         agent_id: ID of the agent whose memories to delete.
         workspace: Workspace of the user whose memories to delete.
-        server: The Hypha server instance.
         memory: The AsyncMemory instance to delete memories from.
         context: Context from Hypha-rpc for permissions.
         run_id: ID of the run whose memories to delete. Defaults to None.
@@ -304,11 +287,10 @@ async def mem0_delete_all(
     )
 
     assert await artifact_exists(
-        server=server,
         artifact_id=permission_params.artifact_id,
     ), "Please call init() before deleting memories."
 
-    await require_permission(server, permission_params)
+    await require_permission(permission_params)
 
     if run_id:
         logger.warning(
@@ -329,7 +311,6 @@ async def mem0_get_all(
     agent_id: str,
     workspace: str | None = None,
     *,
-    server: RemoteService,
     memory: AsyncMemory,
     context: dict[str, Any],
     run_id: str | None = None,
@@ -341,7 +322,6 @@ async def mem0_get_all(
     Args:
         agent_id: ID of the agent whose memories to get.
         workspace: Workspace of the user whose memories to get.
-        server: The Hypha server instance.
         memory: The AsyncMemory instance to get memories from.
         context: Context from Hypha-rpc for permissions.
         run_id: ID of the run whose memories to get. Defaults to None.
@@ -364,11 +344,10 @@ async def mem0_get_all(
     )
 
     assert await artifact_exists(
-        server=server,
         artifact_id=permission_params.artifact_id,
     ), "Please call init() before getting memories."
 
-    await require_permission(server, permission_params)
+    await require_permission(permission_params)
     # Use the memory.get_all method if available
     get_all_result = await memory.get_all(agent_id=agent_id, **kwargs)
     logger.info("Retrieved all memories for agent %s", agent_id)

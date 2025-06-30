@@ -133,6 +133,17 @@ async def test_admin_only_collection_deletion(weaviate_service, weaviate_service
 @pytest.mark.asyncio
 async def test_admin_only_collection_list(weaviate_service, weaviate_service2):
     """Test that only admin users can list all collections."""
+    # Clean up any existing collections first
+    try:
+        await weaviate_service.collections.delete("Movie")
+    except (RemoteException, ValueError, RuntimeError):
+        pass  # Collection might not exist
+
+    try:
+        await weaviate_service.collections.delete("TestCollection2")
+    except (RemoteException, ValueError, RuntimeError):
+        pass  # Collection might not exist
+
     # Create two collections with admin
     await create_test_collection(weaviate_service)
 

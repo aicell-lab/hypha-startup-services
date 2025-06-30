@@ -3,7 +3,6 @@ Helper functions to register the BioImage service with proper API endpoints.
 """
 
 import logging
-from functools import partial, wraps
 from hypha_rpc.rpc import RemoteService
 from hypha_startup_services.common.utils import create_partial_with_schema
 from hypha_startup_services.common.data_index import (

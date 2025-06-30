@@ -329,6 +329,53 @@ def get_related_entities(
     raise ValueError(f"Entity not found: {entity_id}")
 
 
+def _extract_object_properties(result_obj: Any) -> dict[str, Any]:
+    """Extract properties from a result object, handling both dict and Weaviate Object structures.
+
+    Args:
+        result_obj: The result object from a query (could be dict or Weaviate Object)
+
+    Returns:
+        A dictionary with extracted properties (entity_id, entity_type, text, country)
+    """
+    if hasattr(result_obj, "properties") and hasattr(result_obj, "uuid"):
+        # Weaviate Object structure
+        properties = getattr(result_obj, "properties", {})
+        return {
+            "entity_id": str(getattr(result_obj, "uuid", ""))
+            or properties.get("entity_id"),
+            "entity_type": properties.get("entity_type"),
+            "text": properties.get("text", ""),
+            "country": properties.get("country", ""),
+        }
+    elif isinstance(result_obj, dict):
+        # Dict-like structure
+        return {
+            "entity_id": result_obj.get("entity_id"),
+            "entity_type": result_obj.get("entity_type"),
+            "text": result_obj.get("text", ""),
+            "country": result_obj.get("country", ""),
+        }
+    else:
+        # Fallback: try to convert to dict
+        try:
+            obj_dict = dict(result_obj) if hasattr(result_obj, "__iter__") else {}
+            return {
+                "entity_id": obj_dict.get("entity_id"),
+                "entity_type": obj_dict.get("entity_type"),
+                "text": obj_dict.get("text", ""),
+                "country": obj_dict.get("country", ""),
+            }
+        except (TypeError, ValueError):
+            # Return empty dict for objects we can't process
+            return {
+                "entity_id": None,
+                "entity_type": None,
+                "text": "",
+                "country": "",
+            }
+
+
 def add_related_entities(
     bioimage_index: BioimageIndex, objects: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
@@ -343,25 +390,35 @@ def add_related_entities(
     """
     enhanced_results = []
     for result_obj in objects:
+        # Extract properties using the helper function
+        props = _extract_object_properties(result_obj)
 
-        # Extract entity_id and entity_type from flattened metadata structure
-        entity_id = result_obj.get("entity_id")
-        entity_type = result_obj.get("entity_type")
+        # Skip objects we couldn't process
+        if props["entity_id"] is None:
+            continue
+
         enhanced_result = {
-            "entity_id": entity_id,
-            "info": result_obj.get("text", ""),
-            "country": result_obj.get("country", ""),
-            "entity_type": entity_type,
+            "entity_id": props["entity_id"],
+            "info": props["text"],
+            "country": props["country"],
+            "entity_type": props["entity_type"],
         }
         relation_type = (
-            "exists_in_nodes" if entity_type == "technology" else "has_technologies"
+            "exists_in_nodes"
+            if props["entity_type"] == "technology"
+            else "has_technologies"
         )
 
         # Create the related entities function and call it
-        if entity_id:
-            related_entities = get_related_entities(
-                bioimage_index=bioimage_index, entity_id=entity_id
-            )
+        if props["entity_id"]:
+            try:
+                related_entities = get_related_entities(
+                    bioimage_index=bioimage_index, entity_id=props["entity_id"]
+                )
+            except ValueError:
+                # Entity not found in bioimage index - this is okay for entities
+                # that were added directly to Weaviate but not in the index
+                related_entities = []
         else:
             related_entities = []
         related_entities_names = [

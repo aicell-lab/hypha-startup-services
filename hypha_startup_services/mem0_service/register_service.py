@@ -37,12 +37,12 @@ async def register_mem0_service(
                 "visibility": "public",
                 "require_context": True,
             },
-            "init_agent": partial(init_agent, server=server),
-            "init": partial(init_run, server=server),
-            "add": partial(mem0_add, server=server, memory=mem0),
-            "search": partial(mem0_search, server=server, memory=mem0),
-            "delete_all": partial(mem0_delete_all, server=server, memory=mem0),
-            "get_all": partial(mem0_get_all, server=server, memory=mem0),
+            "init_agent": partial(init_agent),
+            "init": partial(init_run),
+            "add": partial(mem0_add, memory=mem0),
+            "search": partial(mem0_search, memory=mem0),
+            "delete_all": partial(mem0_delete_all, memory=mem0),
+            "get_all": partial(mem0_get_all, memory=mem0),
         }
     )
 

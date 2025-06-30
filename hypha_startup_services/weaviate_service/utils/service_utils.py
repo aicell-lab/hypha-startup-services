@@ -7,7 +7,6 @@ that need to be shared across different parts of the service.
 
 from typing import Any
 from weaviate import WeaviateAsyncClient
-from hypha_rpc.rpc import RemoteService
 from hypha_startup_services.common.workspace_utils import ws_from_context
 from hypha_startup_services.common.utils import get_full_collection_name
 from hypha_startup_services.common.permissions import (
@@ -50,7 +49,6 @@ async def prepare_application_creation(
 
 async def get_permitted_collection(
     client: WeaviateAsyncClient,
-    server: RemoteService,
     collection_name: str,
     application_id: str,
     user_ws: str | None = None,
@@ -75,7 +73,7 @@ async def get_permitted_collection(
     caller_ws = ws_from_context(context) if context else ""
     if user_ws is not None:
         await assert_has_application_permission(
-            server, collection_name, application_id, caller_ws, user_ws
+            collection_name, application_id, caller_ws, user_ws
         )
         return get_tenant_collection(client, collection_name, user_ws)
 

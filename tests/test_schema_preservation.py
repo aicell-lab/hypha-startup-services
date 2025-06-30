@@ -76,9 +76,7 @@ class TestSchemaPreservation:
         # Create partial with our helper (using mock objects for testing)
         from unittest.mock import Mock
 
-        partial_func = create_partial_with_schema(
-            original_func, client=Mock(), server=Mock()
-        )
+        partial_func = create_partial_with_schema(original_func, client=Mock())
 
         # Check that schema is preserved
         assert hasattr(
@@ -101,7 +99,7 @@ class TestSchemaPreservation:
         # Create regular partial (using mock objects for testing)
         from unittest.mock import Mock
 
-        regular_partial = partial(original_func, client=Mock(), server=Mock())
+        regular_partial = partial(original_func, client=Mock())
 
         # Check that schema is lost
         assert not hasattr(

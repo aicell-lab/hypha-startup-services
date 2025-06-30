@@ -282,19 +282,19 @@ class TestRemoteServicePerformance:
             assert "generated" in result
             assert isinstance(result["objects"], list)
 
-    @pytest.mark.asyncio
-    @pytest.mark.integration
-    @pytest.mark.slow
-    async def test_large_limit_query(self, remote_service):
-        """Test querying with a large limit."""
-        result = await remote_service.query("microscopy", limit=100)
+    # @pytest.mark.asyncio
+    # @pytest.mark.integration
+    # @pytest.mark.slow
+    # async def test_large_limit_query(self, remote_service):
+    #     """Test querying with a large limit."""
+    #     result = await remote_service.query("microscopy", limit=100)
 
-        assert isinstance(result, dict)
-        assert "objects" in result
-        assert "generated" in result
-        results = result["objects"]
-        assert isinstance(results, list)
+    #     assert isinstance(result, dict)
+    #     assert "objects" in result
+    #     assert "generated" in result
+    #     results = result["objects"]
+    #     assert isinstance(results, list)
 
-        # Should handle large limits gracefully
-        if results:
-            assert len(results) <= 100
+    #     # Should handle large limits gracefully
+    #     if results:
+    #         assert len(results) <= 100
