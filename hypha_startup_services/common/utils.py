@@ -71,7 +71,10 @@ def create_partial_with_schema(func, **kwargs):
         @wraps(func)
         async def async_wrapper(*args, **wrapper_kwargs):
             # Merge kwargs, giving priority to the original kwargs
-            merged_kwargs = {**wrapper_kwargs, **kwargs}
+            filtered_wrapper_kwargs = {
+                k: v for k, v in wrapper_kwargs.items() if k not in kwargs
+            }
+            merged_kwargs = {**filtered_wrapper_kwargs, **kwargs}
             return await func(*args, **merged_kwargs)
 
         # Copy the schema if it exists
@@ -84,7 +87,10 @@ def create_partial_with_schema(func, **kwargs):
     @wraps(func)
     def sync_wrapper(*args, **wrapper_kwargs):
         # Merge kwargs, giving priority to the original kwargs
-        merged_kwargs = {**wrapper_kwargs, **kwargs}
+        filtered_wrapper_kwargs = {
+            k: v for k, v in wrapper_kwargs.items() if k not in kwargs
+        }
+        merged_kwargs = {**filtered_wrapper_kwargs, **kwargs}
         return func(*args, **merged_kwargs)
 
     # Copy the schema if it exists
