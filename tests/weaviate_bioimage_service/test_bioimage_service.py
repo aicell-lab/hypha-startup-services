@@ -123,7 +123,7 @@ async def test_weaviate_bioimage_search_live(weaviate_bioimage_live_service):
     assert isinstance(result["objects"], list)
     assert len(result["objects"]) > 0
     for item in result["objects"]:
-        assert "id" in item or "name" in item
+        assert "entity_id" in item
 
 
 @pytest.mark.asyncio
@@ -172,7 +172,7 @@ async def test_local_integration_weaviate_bioimage(weaviate_bioimage_test_servic
         entity_id="f78b39ca-3b2a-49f4-99eb-a7f241640bf2"
     )
     assert len(result) > 0
-    assert "id" in result[0]
+    assert "entity_id" in result[0]
 
 
 # Remote integration tests
