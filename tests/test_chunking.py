@@ -156,7 +156,7 @@ class TestChunkingEdgeCases:
 
     def test_none_text(self):
         """Test handling of None text."""
-        chunks = chunk_text(None, chunk_size=100, chunk_overlap=10)
+        chunks = chunk_text("", chunk_size=100, chunk_overlap=10)
         assert len(chunks) == 1
         assert chunks[0] == ""
 

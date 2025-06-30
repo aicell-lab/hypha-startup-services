@@ -55,7 +55,6 @@ from .utils.artifact_utils import (
 
 async def collections_exists(
     client: WeaviateAsyncClient,
-    server: RemoteService,
     collection_name: str,
     context: dict[str, Any] | None = None,  # pylint: disable=W0613
 ) -> bool:
@@ -76,14 +75,12 @@ async def collections_exists(
         client=client,
         collection_name=collection_name,
     ) and await artifact_exists(
-        server=server,
         artifact_id=get_full_collection_name(collection_name),
     )
 
 
 async def collections_create(
     client: WeaviateAsyncClient,
-    server: RemoteService,
     settings: dict[str, Any],
     context: dict[str, Any],
 ) -> dict[str, Any]:
@@ -95,7 +92,6 @@ async def collections_create(
 
     Args:
         client: WeaviateAsyncClient instance
-        server: RemoteService instance for artifact creation
         settings: Collection configuration settings
         context: Context containing caller information
 
@@ -106,7 +102,7 @@ async def collections_create(
     caller_ws = ws_from_context(context)
     assert_is_admin_ws(caller_ws)
 
-    await create_collection_artifact(server, settings)
+    await create_collection_artifact(settings)
 
     settings_full_name = get_settings_full_name(settings)
     collection = await client.collections.create_from_dict(
@@ -143,7 +139,6 @@ async def collections_list_all(
 
 async def collections_get(
     client: WeaviateAsyncClient,
-    server: RemoteService,
     name: str,
     context: dict[str, Any],
 ) -> dict[str, Any]:
@@ -156,7 +151,7 @@ async def collections_get(
         The collection configuration with its short collection name.
     """
     caller_ws = ws_from_context(context)
-    await assert_has_collection_permission(server, caller_ws, name)
+    await assert_has_collection_permission(caller_ws, name)
 
     collection = acquire_collection(client, name)
     return await collection_to_config_dict(collection)
@@ -164,7 +159,6 @@ async def collections_get(
 
 async def collections_delete(
     client: WeaviateAsyncClient,
-    server: RemoteService,
     name: str | list[str],
     context: dict[str, Any],
 ) -> dict | None:
@@ -176,7 +170,6 @@ async def collections_delete(
 
     Args:
         client: WeaviateAsyncClient instance
-        server: RemoteService instance for artifact deletion
         name: Collection name(s) to delete
         context: Context containing caller information
 
@@ -187,16 +180,15 @@ async def collections_delete(
 
     short_names = [name] if isinstance(name, str) else name
     for coll_name in short_names:
-        await assert_has_collection_permission(server, caller_ws, coll_name)
+        await assert_has_collection_permission(caller_ws, coll_name)
 
     full_names = get_full_collection_names(short_names)
     await client.collections.delete(full_names)
-    await delete_collection_artifacts(server, short_names)
+    await delete_collection_artifacts(short_names)
 
 
 async def applications_create(
     client: WeaviateAsyncClient,
-    server: RemoteService,
     collection_name: str,
     application_id: str,
     description: str,
@@ -209,7 +201,6 @@ async def applications_create(
 
     Args:
         client: WeaviateAsyncClient instance
-        server: RemoteService instance for artifact operations
         collection_name: Name of the collection for the application
         application_id: ID for the new application
         description: Description of the application
@@ -225,7 +216,6 @@ async def applications_create(
         return prep_error
 
     result = await create_application_artifact(
-        server,
         collection_name,
         application_id,
         description,
@@ -244,7 +234,6 @@ async def applications_create(
 
 async def applications_delete(
     client: WeaviateAsyncClient,
-    server: RemoteService,
     collection_name: str,
     application_id: str,
     user_ws: str | None = None,
@@ -256,7 +245,6 @@ async def applications_delete(
 
     Args:
         client: WeaviateAsyncClient instance
-        server: RemoteService instance for artifact operations
         collection_name: Name of the collection containing the application
         application_id: ID of the application to delete
         context: Context containing user information
@@ -268,7 +256,6 @@ async def applications_delete(
 
     result = await data_delete_many(
         client,
-        server,
         collection_name,
         application_id,
         user_ws=user_ws,
@@ -278,15 +265,12 @@ async def applications_delete(
 
     full_collection_name = get_full_collection_name(collection_name)
     caller_ws = ws_from_context(context)
-    await delete_application_artifact(
-        server, full_collection_name, application_id, caller_ws
-    )
+    await delete_application_artifact(full_collection_name, application_id, caller_ws)
 
     return result
 
 
 async def applications_get(
-    server: RemoteService,
     collection_name: str,
     application_id: str,
     context: dict[str, Any],
@@ -296,7 +280,6 @@ async def applications_get(
     Retrieves the application artifact using the caller's ID and application ID.
 
     Args:
-        server: RemoteService instance for artifact retrieval (Note: This is actually WeaviateAsyncClient, param name is incorrect)
         collection_name: Name of the collection containing the application
         application_id: ID of the application to retrieve
         context: Context containing caller information
@@ -310,11 +293,10 @@ async def applications_get(
         full_collection_name, caller_ws, application_id
     )
 
-    return await get_artifact(server, artifact_name)
+    return await get_artifact(artifact_name)
 
 
 async def ws_app_exists(
-    server: RemoteService,
     collection_name: str,
     application_id: str,
     workspace: str | None = None,
@@ -323,7 +305,6 @@ async def ws_app_exists(
     """Check if an application exists for a specific user workspace.
 
     Args:
-        server: RemoteService instance for artifact checking (Note: This is actually WeaviateAsyncClient, param name is incorrect)
         collection_name: Name of the collection to check
         application_id: ID of the application to check
         user_ws: User workspace to check against
@@ -344,11 +325,10 @@ async def ws_app_exists(
     artifact_name = get_application_artifact_name(
         full_collection_name, target_ws, application_id
     )
-    return await artifact_exists(server, artifact_name)
+    return await artifact_exists(artifact_name)
 
 
 async def applications_exists(
-    server: RemoteService,
     collection_name: str,
     application_id: str,
     context: dict[str, Any],
@@ -356,7 +336,6 @@ async def applications_exists(
     """Check if an application exists by checking if its artifact exists.
 
     Args:
-        server: RemoteService instance for artifact checking (Note: This is actually WeaviateAsyncClient, param name is incorrect)
         collection_name: Name of the collection to check
         application_id: ID of the application to check
         context: Context containing caller information
@@ -365,7 +344,6 @@ async def applications_exists(
         Boolean indicating whether the application exists
     """
     return await ws_app_exists(
-        server,
         collection_name,
         application_id,
         context=context,
@@ -374,7 +352,6 @@ async def applications_exists(
 
 async def data_insert_many(
     client: WeaviateAsyncClient,
-    server: RemoteService,
     collection_name: str,
     application_id: str,
     objects: list[dict[str, Any]],
@@ -393,7 +370,6 @@ async def data_insert_many(
 
     Args:
         client: WeaviateAsyncClient instance
-        server: RemoteService instance for permission checking
         collection_name: Name of the collection to insert into
         application_id: ID of the application the objects belong to
         objects: List of objects to insert
@@ -408,7 +384,6 @@ async def data_insert_many(
         Dictionary with insertion results including UUIDs and any errors
     """
     assert await ws_app_exists(
-        server,
         collection_name,
         application_id,
         workspace=user_ws,
@@ -417,7 +392,6 @@ async def data_insert_many(
 
     tenant_collection = await get_permitted_collection(
         client,
-        server,
         collection_name,
         application_id,
         user_ws=user_ws,
@@ -429,7 +403,7 @@ async def data_insert_many(
         chunked_objects = []
         for obj in objects:
             if text_field in obj and obj[text_field]:
-                text_content = obj[text_field]
+                text_content: str = obj[text_field]
                 chunks = chunk_text(text_content, chunk_size, chunk_overlap)
 
                 for chunk_idx, chunk in enumerate(chunks):
@@ -459,7 +433,6 @@ async def data_insert_many(
 
 async def data_insert(
     client: WeaviateAsyncClient,
-    server: RemoteService,
     collection_name: str,
     application_id: str,
     properties: dict[str, Any],
@@ -480,7 +453,6 @@ async def data_insert(
 
     Args:
         client: WeaviateAsyncClient instance
-        server: RemoteService instance for permission checking
         collection_name: Name of the collection to insert into
         application_id: ID of the application the object belongs to
         properties: Object properties to insert
@@ -496,7 +468,6 @@ async def data_insert(
         UUID of the inserted object (or first chunk if chunking enabled)
     """
     assert await ws_app_exists(
-        server,
         collection_name,
         application_id,
         workspace=user_ws,
@@ -507,7 +478,6 @@ async def data_insert(
         # For single insert with chunking, use data_insert_many and return first UUID
         result = await data_insert_many(
             client=client,
-            server=server,
             collection_name=collection_name,
             application_id=application_id,
             objects=[properties],
@@ -526,7 +496,6 @@ async def data_insert(
 
     tenant_collection = await get_permitted_collection(
         client,
-        server,
         collection_name,
         application_id,
         user_ws=user_ws,
@@ -540,7 +509,6 @@ async def data_insert(
 
 async def query_near_vector(
     client: WeaviateAsyncClient,
-    server: RemoteService,
     collection_name: str,
     application_id: str,
     user_ws: str | None = None,
@@ -555,7 +523,6 @@ async def query_near_vector(
 
     Args:
         client: WeaviateAsyncClient instance
-        server: RemoteService instance for permission checking
         collection_name: Name of the collection to query
         application_id: ID of the application to filter results by
         user_ws: Optional user workspace to use as tenant (if different from caller)
@@ -566,7 +533,6 @@ async def query_near_vector(
         Dictionary containing objects with shortened collection names
     """
     assert await ws_app_exists(
-        server,
         collection_name,
         application_id,
         workspace=user_ws,
@@ -575,7 +541,6 @@ async def query_near_vector(
 
     tenant_collection = await get_permitted_collection(
         client,
-        server,
         collection_name,
         application_id,
         user_ws=user_ws,
@@ -593,7 +558,6 @@ async def query_near_vector(
 
 async def query_fetch_objects(
     client: WeaviateAsyncClient,
-    server: RemoteService,
     collection_name: str,
     application_id: str,
     user_ws: str | None = None,
@@ -608,7 +572,6 @@ async def query_fetch_objects(
 
     Args:
         client: WeaviateAsyncClient instance
-        server: RemoteService instance for permission checking
         collection_name: Name of the collection to query
         application_id: ID of the application to filter results by (optional)
         user_ws: Optional user workspace to use as tenant (if different from caller)
@@ -621,7 +584,6 @@ async def query_fetch_objects(
 
     tenant_collection = await get_permitted_collection(
         client,
-        server,
         collection_name,
         application_id,
         user_ws=user_ws,
@@ -638,7 +600,6 @@ async def query_fetch_objects(
 
 async def query_hybrid(
     client: WeaviateAsyncClient,
-    server: RemoteService,
     collection_name: str,
     application_id: str,
     user_ws: str | None = None,
@@ -653,7 +614,6 @@ async def query_hybrid(
 
     Args:
         client: WeaviateAsyncClient instance
-        server: RemoteService instance for permission checking
         collection_name: Name of the collection to query
         application_id: ID of the application to filter results by (optional)
         user_ws: Optional user workspace to use as tenant (if different from caller)
@@ -664,7 +624,6 @@ async def query_hybrid(
         Dictionary containing objects with shortened collection names
     """
     assert await ws_app_exists(
-        server,
         collection_name,
         application_id,
         workspace=user_ws,
@@ -673,7 +632,6 @@ async def query_hybrid(
 
     tenant_collection = await get_permitted_collection(
         client,
-        server,
         collection_name,
         application_id,
         user_ws=user_ws,
@@ -690,7 +648,6 @@ async def query_hybrid(
 
 async def generate_near_text(
     client: WeaviateAsyncClient,
-    server: RemoteService,
     collection_name: str,
     application_id: str,
     user_ws: str | None = None,
@@ -705,7 +662,6 @@ async def generate_near_text(
 
     Args:
         client: WeaviateAsyncClient instance
-        server: RemoteService instance for permission checking
         collection_name: Name of the collection to search
         application_id: ID of the application to filter results by
         user_ws: Optional user workspace to use as tenant (if different from caller)
@@ -716,7 +672,6 @@ async def generate_near_text(
         Dictionary containing objects with shortened collection names and generated content
     """
     assert await ws_app_exists(
-        server,
         collection_name,
         application_id,
         workspace=user_ws,
@@ -725,7 +680,6 @@ async def generate_near_text(
 
     tenant_collection = await get_permitted_collection(
         client,
-        server,
         collection_name,
         application_id,
         user_ws=user_ws,
@@ -743,7 +697,6 @@ async def generate_near_text(
 
 async def data_update(
     client: WeaviateAsyncClient,
-    server: RemoteService,
     collection_name: str,
     application_id: str,
     user_ws: str | None = None,
@@ -757,7 +710,6 @@ async def data_update(
 
     Args:
         client: WeaviateAsyncClient instance
-        server: RemoteService instance for permission checking
         collection_name: Name of the collection containing the object
         application_id: ID of the application the object belongs to
         user_ws: Optional user workspace to use as tenant (if different from caller)
@@ -768,7 +720,6 @@ async def data_update(
         None
     """
     assert await ws_app_exists(
-        server,
         collection_name,
         application_id,
         workspace=user_ws,
@@ -777,7 +728,6 @@ async def data_update(
 
     tenant_collection = await get_permitted_collection(
         client,
-        server,
         collection_name,
         application_id,
         user_ws=user_ws,
@@ -788,7 +738,6 @@ async def data_update(
 
 async def data_delete_by_id(
     client: WeaviateAsyncClient,
-    server: RemoteService,
     collection_name: str,
     application_id: str,
     uuid: uuid_class.UUID,
@@ -802,7 +751,6 @@ async def data_delete_by_id(
 
     Args:
         client: WeaviateAsyncClient instance
-        server: RemoteService instance for permission checking
         collection_name: Name of the collection containing the object
         application_id: ID of the application the object belongs to
         uuid: UUID of the object to delete
@@ -814,7 +762,6 @@ async def data_delete_by_id(
     """
     tenant_collection = await get_permitted_collection(
         client,
-        server,
         collection_name,
         application_id,
         user_ws=user_ws,
@@ -825,7 +772,6 @@ async def data_delete_by_id(
 
 async def data_delete_many(
     client: WeaviateAsyncClient,
-    server: RemoteService,
     collection_name: str,
     application_id: str,
     user_ws: str | None = None,
@@ -840,7 +786,6 @@ async def data_delete_many(
 
     Args:
         client: WeaviateAsyncClient instance
-        server: RemoteService instance for permission checking
         collection_name: Name of the collection containing the objects
         application_id: ID of the application to filter objects by
         user_ws: Optional user workspace to use as tenant (if different from caller)
@@ -852,7 +797,6 @@ async def data_delete_many(
     """
     tenant_collection = await get_permitted_collection(
         client,
-        server,
         collection_name,
         application_id,
         user_ws=user_ws,
@@ -873,7 +817,6 @@ async def data_delete_many(
 
 async def data_exists(
     client: WeaviateAsyncClient,
-    server: RemoteService,
     collection_name: str,
     application_id: str,
     uuid: uuid_class.UUID,
@@ -886,7 +829,6 @@ async def data_exists(
 
     Args:
         client: WeaviateAsyncClient instance
-        server: RemoteService instance for permission checking
         collection_name: Name of the collection to check
         application_id: ID of the application the object belongs to
         uuid: UUID of the object to check
@@ -898,7 +840,6 @@ async def data_exists(
     """
     tenant_collection = await get_permitted_collection(
         client,
-        server,
         collection_name,
         application_id,
         user_ws=user_ws,

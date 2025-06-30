@@ -2,7 +2,9 @@ from typing import Any
 from abc import ABC, abstractmethod
 import logging
 from hypha_rpc.rpc import RemoteException, RemoteService
+from hypha_startup_services.common.server_utils import get_server
 
+# from .server_utils import get_server
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +43,6 @@ class BaseArtifactParams(ABC):
 
 
 async def get_artifact(
-    server: RemoteService,
     artifact_id: str,
 ) -> dict[str, Any]:
     """
@@ -57,21 +58,21 @@ async def get_artifact(
     Raises:
         RemoteException: If there's a server communication error
     """
+    server = await get_server("https://hypha.aicell.io")
     artifact_manager = await server.get_service("public/artifact-manager")
     artifact = await artifact_manager.read(artifact_id=artifact_id)
     return artifact
 
 
 async def create_artifact(
-    server: RemoteService,
     artifact_params: BaseArtifactParams,
 ) -> dict[str, Any] | None:
     """Create a new artifact using the model-based approach."""
 
+    server: RemoteService = await get_server("https://hypha.aicell.io")
     artifact_manager = await server.get_service("public/artifact-manager")
 
     if await artifact_exists(
-        server=server,
         artifact_id=artifact_params.artifact_id,
     ):
         logger.warning(
@@ -93,10 +94,10 @@ async def create_artifact(
 
 
 async def delete_artifact(
-    server: RemoteService,
     artifact_id: str,
 ) -> None:
     """Delete an artifact."""
+    server = await get_server("https://hypha.aicell.io")
     artifact_manager = await server.get_service("public/artifact-manager")
     try:
         await artifact_manager.delete(artifact_id=artifact_id, delete_files=True)
@@ -106,13 +107,11 @@ async def delete_artifact(
 
 
 async def artifact_exists(
-    server: RemoteService,
     artifact_id: str,
 ) -> bool:
     """Check if an artifact exists."""
     try:
         await get_artifact(
-            server=server,
             artifact_id=artifact_id,
         )
         return True

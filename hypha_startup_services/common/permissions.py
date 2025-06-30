@@ -9,7 +9,7 @@ from typing import Any, Literal
 import logging
 from abc import ABC, abstractmethod
 from pydantic import BaseModel, Field
-from hypha_rpc.rpc import RemoteService, RemoteException
+from hypha_rpc.rpc import RemoteException
 from .constants import ADMIN_WORKSPACES
 from .artifacts import get_artifact
 from .utils import (
@@ -165,20 +165,19 @@ def is_admin_workspace(workspace: str) -> bool:
 
 
 async def get_user_permissions(
-    server: RemoteService, permission_params: BasePermissionParams
+    permission_params: BasePermissionParams,
 ) -> dict[str, Any] | str:
     """
     Get user permissions for a specific artifact.
 
     Args:
-        server: The RemoteService instance
         permission_params: The permission parameters
 
     Returns:
         A dictionary or string containing the user's permissions for the artifact
     """
     try:
-        artifact = await get_artifact(server, permission_params.artifact_id)
+        artifact = await get_artifact(permission_params.artifact_id)
     except RemoteException as e:
         logger.error(
             "Failed to retrieve artifact %s: %s", permission_params.artifact_id, e
@@ -190,19 +189,18 @@ async def get_user_permissions(
 
 
 async def user_has_operation_permission(
-    server: RemoteService, permission_params: BasePermissionParams
+    permission_params: BasePermissionParams,
 ) -> bool:
     """
     Check if the user has the requested permissions for a specific artifact.
 
     Args:
-        server: The RemoteService instance
         permission_params: The permission parameters
 
     Returns:
         True if the user has the requested permissions, False otherwise
     """
-    user_permissions = await get_user_permissions(server, permission_params)
+    user_permissions = await get_user_permissions(permission_params)
 
     if user_permissions == "*":
         return True
@@ -215,7 +213,6 @@ async def user_has_operation_permission(
 
 
 async def has_permission(
-    server: RemoteService,
     permission_params: BasePermissionParams,
 ) -> bool:
     """
@@ -224,7 +221,6 @@ async def has_permission(
     First checks if the user is in admin workspaces, then checks artifact-specific permissions.
 
     Args:
-        server: The RemoteService instance
         permission_params: The permission parameters
 
     Returns:
@@ -246,7 +242,7 @@ async def has_permission(
                 operation=permission_params.operation,
                 collection_names=[collection_name],
             )
-            if not await user_has_operation_permission(server, collection_params):
+            if not await user_has_operation_permission(collection_params):
                 logger.info(
                     "Permission denied for workspace %s, operation %s on collection %s",
                     permission_params.accessor_workspace,
@@ -257,7 +253,7 @@ async def has_permission(
         return True
 
     # Check artifact-specific permissions
-    if await user_has_operation_permission(server, permission_params):
+    if await user_has_operation_permission(permission_params):
         logger.debug(
             "Granting permission to workspace %s for operation %s on %s",
             permission_params.accessor_workspace,
@@ -276,7 +272,6 @@ async def has_permission(
 
 
 async def require_permission(
-    server: RemoteService,
     permission_params: BasePermissionParams,
 ) -> None:
     """
@@ -285,7 +280,7 @@ async def require_permission(
     Raises:
         HyphaPermissionError: If the user doesn't have the required permission
     """
-    if not await has_permission(server, permission_params):
+    if not await has_permission(permission_params):
         raise HyphaPermissionError(
             f"Permission denied for {permission_params.operation} operation "
             f"on {permission_params.resource_description}",
@@ -335,7 +330,6 @@ def assert_is_admin_ws(user_ws: str) -> None:
 
 
 async def assert_has_artifact_permission(
-    server: RemoteService,
     user_ws: str,
     artifact_name: str,
     operation: PermissionOperation = "r",
@@ -346,11 +340,10 @@ async def assert_has_artifact_permission(
         artifact_name=artifact_name,
         operation=operation,
     )
-    await require_permission(server, params)
+    await require_permission(params)
 
 
 async def assert_has_collection_permission(
-    server: RemoteService,
     user_ws: str,
     collection_names: str | list[str],
     operation: PermissionOperation = "r",
@@ -364,11 +357,10 @@ async def assert_has_collection_permission(
         collection_names=collection_names,
         operation=operation,
     )
-    await require_permission(server, params)
+    await require_permission(params)
 
 
 async def assert_has_application_permission(
-    server: RemoteService,
     collection_name: str,
     application_id: str,
     accessor_ws: str,
@@ -383,4 +375,4 @@ async def assert_has_application_permission(
         application_workspace=application_workspace,
         operation=operation,
     )
-    await require_permission(server, params)
+    await require_permission(params)

@@ -1,7 +1,7 @@
 """Health probes for hypha startup services."""
 
 import logging
-from typing import Dict, List, Any
+from typing import Dict, Any
 from hypha_rpc.rpc import RemoteService, RemoteException
 
 logger = logging.getLogger(__name__)
@@ -9,21 +9,23 @@ logger = logging.getLogger(__name__)
 
 async def add_probes(
     server: RemoteService,
-    service_ids: List[str],
+    service_ids: list[str],
     probes_service_id: str | None = None,
 ) -> None:
     """Add health probes to monitor all registered services.
 
     Args:
         server (RemoteService): The server instance to register the probes with.
-        service_ids (List[str]): List of service IDs to monitor.
+        service_ids (list[str]): List of service IDs to monitor.
         probes_service_id (str | None): ID for the probes service itself.
     """
 
     async def is_service_available(service_id: str) -> bool:
         """Check if a specific service is available."""
+        client_id = server.config.client_id
+        full_service_id = f"{client_id}:{service_id}"
         try:
-            svc = await server.get_service(service_id)
+            svc = await server.get_service(full_service_id)
             return svc is not None
         except RemoteException as e:
             logger.warning("Service %s is not available: %s", service_id, e)

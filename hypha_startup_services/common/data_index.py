@@ -1,7 +1,7 @@
 """Data structures and indexing for EBI nodes and technologies."""
 
 import os
-from typing import Dict, List, Any, Set, Callable, Coroutine
+from typing import Any, Set, Callable, Coroutine
 from pydantic import Field
 import json
 import logging
@@ -26,7 +26,7 @@ def html_to_markdown(html_text: str) -> str:
     return markdown_text
 
 
-def process_node_data(node: Dict[str, Any]) -> Dict[str, Any]:
+def process_node_data(node: dict[str, Any]) -> dict[str, Any]:
     """Process node data to convert HTML descriptions to markdown."""
     processed_node = node.copy()
 
@@ -43,7 +43,7 @@ def process_node_data(node: Dict[str, Any]) -> Dict[str, Any]:
     return processed_node
 
 
-def process_technology_data(tech: Dict[str, Any]) -> Dict[str, Any]:
+def process_technology_data(tech: dict[str, Any]) -> dict[str, Any]:
     """Process technology data to convert HTML descriptions to markdown."""
     processed_tech = tech.copy()
 
@@ -64,17 +64,17 @@ class BioimageIndex:
     """Index for fast lookup of EBI nodes and technologies relationships."""
 
     def __init__(self):
-        self.nodes: Dict[str, Dict[str, Any]] = {}
-        self.technologies: Dict[str, Dict[str, Any]] = {}
-        self.node_to_technologies: Dict[str, Set[str]] = {}
-        self.technology_to_nodes: Dict[str, Set[str]] = {}
-        self.technology_name_to_id: Dict[str, str] = {}
-        self.node_name_to_id: Dict[str, str] = {}
+        self.nodes: dict[str, dict[str, Any]] = {}
+        self.technologies: dict[str, dict[str, Any]] = {}
+        self.node_to_technologies: dict[str, Set[str]] = {}
+        self.technology_to_nodes: dict[str, Set[str]] = {}
+        self.technology_name_to_id: dict[str, str] = {}
+        self.node_name_to_id: dict[str, str] = {}
 
     def load_data(
         self,
-        nodes_data: List[Dict[str, Any]],
-        technologies_data: List[Dict[str, Any]],
+        nodes_data: list[dict[str, Any]],
+        technologies_data: list[dict[str, Any]],
     ):
         """Load and index the EBI data."""
 
@@ -152,12 +152,12 @@ class BioimageIndex:
             }
         return synthetic_id
 
-    def get_nodes_by_technology_id(self, technology_id: str) -> List[Dict[str, Any]]:
+    def get_nodes_by_technology_id(self, technology_id: str) -> list[dict[str, Any]]:
         """Get all nodes that provide a specific technology."""
         node_ids = self.technology_to_nodes.get(technology_id, set())
         return [self.nodes[node_id] for node_id in node_ids if node_id in self.nodes]
 
-    def get_technologies_by_node_id(self, node_id: str) -> List[Dict[str, Any]]:
+    def get_technologies_by_node_id(self, node_id: str) -> list[dict[str, Any]]:
         """Get all technologies provided by a specific node."""
         tech_ids = self.node_to_technologies.get(node_id, set())
         return [
@@ -166,15 +166,15 @@ class BioimageIndex:
             if tech_id in self.technologies
         ]
 
-    def get_node_by_id(self, node_id: str) -> Dict[str, Any] | None:
+    def get_node_by_id(self, node_id: str) -> dict[str, Any] | None:
         """Get a specific node by ID."""
         return self.nodes.get(node_id)
 
-    def get_technology_by_id(self, technology_id: str) -> Dict[str, Any] | None:
+    def get_technology_by_id(self, technology_id: str) -> dict[str, Any] | None:
         """Get a specific technology by ID."""
         return self.technologies.get(technology_id)
 
-    def search_nodes_by_name(self, name: str) -> List[Dict[str, Any]]:
+    def search_nodes_by_name(self, name: str) -> list[dict[str, Any]]:
         """Search nodes by name (case-insensitive partial match)."""
         name_lower = name.lower()
         results = []
@@ -183,7 +183,7 @@ class BioimageIndex:
                 results.append(node)
         return results
 
-    def search_technologies_by_name(self, name: str) -> List[Dict[str, Any]]:
+    def search_technologies_by_name(self, name: str) -> list[dict[str, Any]]:
         """Search technologies by name (case-insensitive partial match)."""
         name_lower = name.lower()
         results = []
@@ -192,15 +192,15 @@ class BioimageIndex:
                 results.append(tech)
         return results
 
-    def get_all_nodes(self) -> List[Dict[str, Any]]:
+    def get_all_nodes(self) -> list[dict[str, Any]]:
         """Get all nodes."""
         return list(self.nodes.values())
 
-    def get_all_technologies(self) -> List[Dict[str, Any]]:
+    def get_all_technologies(self) -> list[dict[str, Any]]:
         """Get all technologies."""
         return list(self.technologies.values())
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Get index statistics."""
         return {
             "total_nodes": len(self.nodes),
@@ -259,79 +259,177 @@ def load_external_data(
     return index
 
 
-def create_get_entity_details(
+@schema_function(arbitrary_types_allowed=True)
+async def get_entity_details(
     bioimage_index: BioimageIndex,
-) -> Callable[..., Coroutine[Any, Any, dict[str, Any]]]:
-    """Create a schema function for getting entity details with dependency injection."""
+    entity_id: str = Field(
+        description="The ID of the entity (node or technology) to retrieve"
+    ),
+    context: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """
+    Get details for a specific entity (node or technology).
+    Entity type is inferred if not provided.
 
-    @schema_function
-    async def get_entity_details(
-        entity_id: str = Field(
-            description="The ID of the entity (node or technology) to retrieve"
-        ),
-    ) -> dict[str, Any]:
-        """
-        Get details for a specific entity (node or technology).
-        Entity type is inferred if not provided.
+    Args:
+        bioimage_index: The bioimage index containing entity data
+        entity_id: The ID of the entity to retrieve.
 
-        Args:
-            entity_id: The ID of the entity to retrieve.
+    Returns:
+        A dictionary containing the entity details.
 
-        Returns:
-            A dictionary containing the entity details.
+    Raises:
+        ValueError: If entity is not found.
+    """
+    entity = bioimage_index.get_node_by_id(entity_id)
+    entity_type = "node"
 
-        Raises:
-            ValueError: If entity is not found.
-        """
-        entity = bioimage_index.get_node_by_id(entity_id)
-        entity_type = "node"
+    if not entity:
+        entity = bioimage_index.get_technology_by_id(entity_id)
+        entity_type = "technology"
 
         if not entity:
-            entity = bioimage_index.get_technology_by_id(entity_id)
-            entity_type = "technology"
+            raise ValueError(f"Entity not found: {entity_id}")
 
-            if not entity:
-                raise ValueError(f"Entity not found: {entity_id}")
-
-        return {
-            "entity_id": entity_id,
-            "entity_type": entity_type,
-            "entity_details": entity,
-        }
-
-    return get_entity_details
+    return {
+        "entity_id": entity_id,
+        "entity_type": entity_type,
+        "entity_details": entity,
+    }
 
 
-def create_get_related_entities(
+@schema_function(arbitrary_types_allowed=True)
+def get_related_entities(
     bioimage_index: BioimageIndex,
-) -> Callable[..., Coroutine[Any, Any, list[dict[str, Any]]]]:
-    """Create a schema function for getting related entities with dependency injection."""
+    entity_id: str = Field(
+        description="The ID of the entity to find relationships for"
+    ),
+    context: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    """
+    Get entities related to a specific entity.
+    Entity type is inferred if not provided.
 
-    @schema_function
-    async def get_related_entities(
-        entity_id: str = Field(
-            description="The ID of the entity to find relationships for"
-        ),
-    ) -> list[dict[str, Any]]:
-        """
-        Get entities related to a specific entity.
-        Entity type is inferred if not provided.
+    Args:
+        bioimage_index: The bioimage index containing relationship data
+        entity_id: The ID of the entity to find relationships for.
 
-        Args:
-            entity_id: The ID of the entity to find relationships for.
+    Returns:
+        A list of related entities.
 
-        Returns:
-            A list of related entities.
+    Raises:
+        ValueError: If entity is not found or no related entities exist.
+    """
+    if bioimage_index.get_node_by_id(entity_id):
+        return bioimage_index.get_technologies_by_node_id(entity_id)
 
-        Raises:
-            ValueError: If entity is not found or no related entities exist.
-        """
-        if bioimage_index.get_node_by_id(entity_id):
-            return bioimage_index.get_technologies_by_node_id(entity_id)
+    if bioimage_index.get_technology_by_id(entity_id):
+        return bioimage_index.get_nodes_by_technology_id(entity_id)
 
-        if bioimage_index.get_technology_by_id(entity_id):
-            return bioimage_index.get_nodes_by_technology_id(entity_id)
+    raise ValueError(f"Entity not found: {entity_id}")
 
-        raise ValueError(f"Entity not found: {entity_id}")
 
-    return get_related_entities
+def _extract_object_properties(result_obj: Any) -> dict[str, Any]:
+    """Extract properties from a result object, handling both dict and Weaviate Object structures.
+
+    Args:
+        result_obj: The result object from a query (could be dict or Weaviate Object)
+
+    Returns:
+        A dictionary with extracted properties (entity_id, entity_type, text, country)
+    """
+    if hasattr(result_obj, "properties") and hasattr(result_obj, "uuid"):
+        # Weaviate Object structure
+        properties = getattr(result_obj, "properties", {})
+        return {
+            "entity_id": str(getattr(result_obj, "uuid", ""))
+            or properties.get("entity_id"),
+            "entity_type": properties.get("entity_type"),
+            "text": properties.get("text", ""),
+            "country": properties.get("country", ""),
+        }
+    elif isinstance(result_obj, dict):
+        # Dict-like structure
+        return {
+            "entity_id": result_obj.get("entity_id"),
+            "entity_type": result_obj.get("entity_type"),
+            "text": result_obj.get("text", ""),
+            "country": result_obj.get("country", ""),
+        }
+    else:
+        # Fallback: try to convert to dict
+        try:
+            obj_dict = dict(result_obj) if hasattr(result_obj, "__iter__") else {}
+            return {
+                "entity_id": obj_dict.get("entity_id"),
+                "entity_type": obj_dict.get("entity_type"),
+                "text": obj_dict.get("text", ""),
+                "country": obj_dict.get("country", ""),
+            }
+        except (TypeError, ValueError):
+            # Return empty dict for objects we can't process
+            return {
+                "entity_id": None,
+                "entity_type": None,
+                "text": "",
+                "country": "",
+            }
+
+
+def add_related_entities(
+    bioimage_index: BioimageIndex, objects: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Get related entities for a list of bioimage objects.
+
+    Args:
+        bioimage_index (BioimageIndex): The bioimage index to use for lookups.
+        objects (list[dict[str, Any]]): The list of bioimage objects to find related entities for.
+
+    Returns:
+        list[dict[str, Any]]: A list of enhanced bioimage objects with related entities.
+    """
+    enhanced_results = []
+    for result_obj in objects:
+        # Extract properties using the helper function
+        props = _extract_object_properties(result_obj)
+
+        # Skip objects we couldn't process
+        if props["entity_id"] is None:
+            continue
+
+        enhanced_result = {
+            "entity_id": props["entity_id"],
+            "info": props["text"],
+            "country": props["country"],
+            "entity_type": props["entity_type"],
+        }
+        relation_type = (
+            "exists_in_nodes"
+            if props["entity_type"] == "technology"
+            else "has_technologies"
+        )
+
+        # Create the related entities function and call it
+        if props["entity_id"]:
+            try:
+                related_entities = get_related_entities(
+                    bioimage_index=bioimage_index, entity_id=props["entity_id"]
+                )
+            except ValueError:
+                # Entity not found in bioimage index - this is okay for entities
+                # that were added directly to Weaviate but not in the index
+                related_entities = []
+        else:
+            related_entities = []
+        related_entities_names = [
+            {
+                "entity_id": entity.get("entity_id", "Unknown"),
+                "name": entity.get("name", entity.get("entity_id", "Unknown")),
+            }
+            for entity in related_entities
+        ]
+        enhanced_result[relation_type] = related_entities_names
+
+        enhanced_results.append(enhanced_result)
+
+    return enhanced_results

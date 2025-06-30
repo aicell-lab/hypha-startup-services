@@ -19,13 +19,36 @@ from tests.conftest import USER1_WS, USER2_WS
 from tests.mem0_service.utils import TEST_AGENT_ID
 
 
+@pytest.fixture(autouse=True)
+def init_agents():
+    """Override the autouse fixture to do nothing for unit tests."""
+    pass
+
+
+@pytest.fixture
+def mock_server_setup():
+    """Create a mock server with artifact manager."""
+    mock_server = AsyncMock()
+    mock_artifact_manager = AsyncMock()
+    mock_server.get_service.return_value = mock_artifact_manager
+    return mock_server, mock_artifact_manager
+
+
+@pytest.fixture
+def patch_get_artifact():
+    """Patch get_artifact for permissions module."""
+    with patch(
+        "hypha_startup_services.common.permissions.get_artifact"
+    ) as mock_get_artifact:
+        yield mock_get_artifact
+
+
 class TestGetUserPermissions:
     """Test cases for get_user_permissions function."""
 
     @pytest.mark.asyncio
-    async def test_get_user_permissions_success(self):
+    async def test_get_user_permissions_success(self, patch_get_artifact):
         """Test successful retrieval of user permissions."""
-        mock_server = AsyncMock()
         permission_params = PermissionParams(
             accessor_workspace=USER1_WS,
             agent_id=TEST_AGENT_ID,
@@ -42,20 +65,16 @@ class TestGetUserPermissions:
             }
         }
 
-        with patch(
-            "hypha_startup_services.common.permissions.get_artifact"
-        ) as mock_get:
-            mock_get.return_value = mock_artifact
+        patch_get_artifact.return_value = mock_artifact
 
-            result = await get_user_permissions(mock_server, permission_params)
+        result = await get_user_permissions(permission_params)
 
-            assert result == ["r", "rw"]
-            mock_get.assert_called_once_with(mock_server, permission_params.artifact_id)
+        assert result == ["r", "rw"]
+        patch_get_artifact.assert_called_once_with(permission_params.artifact_id)
 
     @pytest.mark.asyncio
-    async def test_get_user_permissions_no_permissions(self):
+    async def test_get_user_permissions_no_permissions(self, patch_get_artifact):
         """Test user permissions when user has no permissions."""
-        mock_server = AsyncMock()
         permission_params = PermissionParams(
             accessor_workspace="ws-unknown-user",
             agent_id=TEST_AGENT_ID,
@@ -72,20 +91,16 @@ class TestGetUserPermissions:
             }
         }
 
-        with patch(
-            "hypha_startup_services.common.permissions.get_artifact"
-        ) as mock_get:
-            mock_get.return_value = mock_artifact
+        patch_get_artifact.return_value = mock_artifact
 
-            result = await get_user_permissions(mock_server, permission_params)
+        result = await get_user_permissions(permission_params)
 
-            assert result == {}  # Unknown user should have no permissions
-            mock_get.assert_called_once_with(mock_server, permission_params.artifact_id)
+        assert result == {}  # Unknown user should have no permissions
+        patch_get_artifact.assert_called_once_with(permission_params.artifact_id)
 
     @pytest.mark.asyncio
-    async def test_get_user_permissions_artifact_error(self):
+    async def test_get_user_permissions_artifact_error(self, patch_get_artifact):
         """Test user permissions when artifact retrieval fails."""
-        mock_server = AsyncMock()
         permission_params = PermissionParams(
             accessor_workspace=USER1_WS,
             agent_id=TEST_AGENT_ID,
@@ -93,28 +108,22 @@ class TestGetUserPermissions:
             operation="r",
         )
 
-        with patch(
-            "hypha_startup_services.common.permissions.get_artifact"
-        ) as mock_get:
-            error = RemoteException("Artifact not found")
-            mock_get.side_effect = error
+        error = RemoteException("Artifact not found")
+        patch_get_artifact.side_effect = error
 
-            with patch(
-                "hypha_startup_services.common.permissions.logger"
-            ) as mock_logger:
-                result = await get_user_permissions(mock_server, permission_params)
+        with patch("hypha_startup_services.common.permissions.logger") as mock_logger:
+            result = await get_user_permissions(permission_params)
 
-                assert result == {}
-                mock_logger.error.assert_called_once_with(
-                    "Failed to retrieve artifact %s: %s",
-                    permission_params.artifact_id,
-                    error,
-                )
+            assert result == {}
+            mock_logger.error.assert_called_once_with(
+                "Failed to retrieve artifact %s: %s",
+                permission_params.artifact_id,
+                error,
+            )
 
     @pytest.mark.asyncio
-    async def test_get_user_permissions_no_config(self):
+    async def test_get_user_permissions_no_config(self, patch_get_artifact):
         """Test user permissions when artifact has no config."""
-        mock_server = AsyncMock()
         permission_params = PermissionParams(
             accessor_workspace=USER1_WS,
             agent_id=TEST_AGENT_ID,
@@ -124,14 +133,11 @@ class TestGetUserPermissions:
 
         mock_artifact = {"id": "test", "name": "Test Artifact"}
 
-        with patch(
-            "hypha_startup_services.common.permissions.get_artifact"
-        ) as mock_get:
-            mock_get.return_value = mock_artifact
+        patch_get_artifact.return_value = mock_artifact
 
-            result = await get_user_permissions(mock_server, permission_params)
+        result = await get_user_permissions(permission_params)
 
-            assert result == {}
+        assert result == {}
 
 
 class TestUserHasOperationPermission:
@@ -140,7 +146,6 @@ class TestUserHasOperationPermission:
     @pytest.mark.asyncio
     async def test_user_has_operation_permission_true(self):
         """Test user has the requested operation permission."""
-        mock_server = AsyncMock()
         permission_params = PermissionParams(
             accessor_workspace=USER1_WS,
             agent_id=TEST_AGENT_ID,
@@ -153,15 +158,14 @@ class TestUserHasOperationPermission:
         ) as mock_get:
             mock_get.return_value = ["r", "rw"]
 
-            result = await user_has_operation_permission(mock_server, permission_params)
+            result = await user_has_operation_permission(permission_params)
 
             assert result is True
-            mock_get.assert_called_once_with(mock_server, permission_params)
+            mock_get.assert_called_once_with(permission_params)
 
     @pytest.mark.asyncio
     async def test_user_has_operation_permission_false(self):
         """Test user doesn't have the requested operation permission."""
-        mock_server = AsyncMock()
         permission_params = PermissionParams(
             accessor_workspace=USER1_WS,
             agent_id=TEST_AGENT_ID,
@@ -174,14 +178,13 @@ class TestUserHasOperationPermission:
         ) as mock_get:
             mock_get.return_value = ["r"]
 
-            result = await user_has_operation_permission(mock_server, permission_params)
+            result = await user_has_operation_permission(permission_params)
 
             assert result is False
 
     @pytest.mark.asyncio
     async def test_user_has_operation_permission_wildcard(self):
         """Test user has wildcard permission."""
-        mock_server = AsyncMock()
         permission_params = PermissionParams(
             accessor_workspace=USER1_WS,
             agent_id=TEST_AGENT_ID,
@@ -194,14 +197,13 @@ class TestUserHasOperationPermission:
         ) as mock_get:
             mock_get.return_value = "*"
 
-            result = await user_has_operation_permission(mock_server, permission_params)
+            result = await user_has_operation_permission(permission_params)
 
             assert result is True
 
     @pytest.mark.asyncio
     async def test_user_has_operation_permission_empty(self):
         """Test user has no permissions."""
-        mock_server = AsyncMock()
         permission_params = PermissionParams(
             accessor_workspace=USER1_WS,
             agent_id=TEST_AGENT_ID,
@@ -214,7 +216,7 @@ class TestUserHasOperationPermission:
         ) as mock_get:
             mock_get.return_value = {}
 
-            result = await user_has_operation_permission(mock_server, permission_params)
+            result = await user_has_operation_permission(permission_params)
 
             assert result is False
 
@@ -225,7 +227,6 @@ class TestHasPermission:
     @pytest.mark.asyncio
     async def test_has_permission_admin_workspace(self):
         """Test permission check for admin workspace."""
-        mock_server = AsyncMock()
 
         # Test with admin workspace from constants
         with patch(
@@ -239,14 +240,13 @@ class TestHasPermission:
                 operation="rw",
             )
 
-            result = await has_permission(mock_server, permission_params)
+            result = await has_permission(permission_params)
 
             assert result is True
 
     @pytest.mark.asyncio
     async def test_has_permission_user_permission_granted(self):
         """Test permission check for regular user with valid permissions."""
-        mock_server = AsyncMock()
         permission_params = PermissionParams(
             accessor_workspace=USER1_WS,
             agent_id=TEST_AGENT_ID,
@@ -263,7 +263,7 @@ class TestHasPermission:
                 with patch(
                     "hypha_startup_services.common.permissions.logger"
                 ) as mock_logger:
-                    result = await has_permission(mock_server, permission_params)
+                    result = await has_permission(permission_params)
 
                     assert result is True
                     mock_logger.debug.assert_called_once_with(
@@ -276,7 +276,6 @@ class TestHasPermission:
     @pytest.mark.asyncio
     async def test_has_permission_user_permission_denied(self):
         """Test permission check for regular user without valid permissions."""
-        mock_server = AsyncMock()
         permission_params = PermissionParams(
             accessor_workspace=USER1_WS,
             agent_id=TEST_AGENT_ID,
@@ -293,7 +292,7 @@ class TestHasPermission:
                 with patch(
                     "hypha_startup_services.common.permissions.logger"
                 ) as mock_logger:
-                    result = await has_permission(mock_server, permission_params)
+                    result = await has_permission(permission_params)
 
                     assert result is False
                     mock_logger.info.assert_called_once_with(
@@ -310,7 +309,6 @@ class TestRequirePermission:
     @pytest.mark.asyncio
     async def test_require_permission_success(self):
         """Test require_permission when user has permission."""
-        mock_server = AsyncMock()
         permission_params = PermissionParams(
             accessor_workspace=USER1_WS,
             agent_id=TEST_AGENT_ID,
@@ -324,14 +322,13 @@ class TestRequirePermission:
             mock_has.return_value = True
 
             # Should not raise an exception
-            await require_permission(mock_server, permission_params)
+            await require_permission(permission_params)
 
-            mock_has.assert_called_once_with(mock_server, permission_params)
+            mock_has.assert_called_once_with(permission_params)
 
     @pytest.mark.asyncio
     async def test_require_permission_denied(self):
         """Test require_permission when user doesn't have permission."""
-        mock_server = AsyncMock()
         permission_params = PermissionParams(
             accessor_workspace=USER1_WS,
             agent_id=TEST_AGENT_ID,
@@ -345,7 +342,7 @@ class TestRequirePermission:
             mock_has.return_value = False
 
             with pytest.raises(HyphaPermissionError) as exc_info:
-                await require_permission(mock_server, permission_params)
+                await require_permission(permission_params)
 
             error = exc_info.value
             assert "Permission denied for rw operation" in str(error)
@@ -360,7 +357,6 @@ class TestIntegration:
     @pytest.mark.asyncio
     async def test_permission_workflow_admin_user(self):
         """Test complete permission workflow for admin user."""
-        mock_server = AsyncMock()
 
         with patch(
             "hypha_startup_services.common.permissions.ADMIN_WORKSPACES",
@@ -374,16 +370,15 @@ class TestIntegration:
             )
 
             # Admin should have permission
-            has_perm = await has_permission(mock_server, permission_params)
+            has_perm = await has_permission(permission_params)
             assert has_perm is True
 
             # Should not raise exception
-            await require_permission(mock_server, permission_params)
+            await require_permission(permission_params)
 
     @pytest.mark.asyncio
-    async def test_permission_workflow_regular_user_success(self):
+    async def test_permission_workflow_regular_user_success(self, patch_get_artifact):
         """Test complete permission workflow for regular user with valid permissions."""
-        mock_server = AsyncMock()
         permission_params = PermissionParams(
             accessor_workspace=USER1_WS,
             agent_id=TEST_AGENT_ID,
@@ -400,22 +395,18 @@ class TestIntegration:
         }
 
         with patch("hypha_startup_services.common.permissions.ADMIN_WORKSPACES", []):
-            with patch(
-                "hypha_startup_services.common.permissions.get_artifact"
-            ) as mock_get:
-                mock_get.return_value = mock_artifact
+            patch_get_artifact.return_value = mock_artifact
 
-                # User should have permission
-                has_perm = await has_permission(mock_server, permission_params)
-                assert has_perm is True
+            # User should have permission
+            has_perm = await has_permission(permission_params)
+            assert has_perm is True
 
-                # Should not raise exception
-                await require_permission(mock_server, permission_params)
+            # Should not raise exception
+            await require_permission(permission_params)
 
     @pytest.mark.asyncio
-    async def test_permission_workflow_regular_user_denied(self):
+    async def test_permission_workflow_regular_user_denied(self, patch_get_artifact):
         """Test complete permission workflow for regular user without valid permissions."""
-        mock_server = AsyncMock()
         permission_params = PermissionParams(
             accessor_workspace=USER1_WS,
             agent_id=TEST_AGENT_ID,
@@ -432,15 +423,12 @@ class TestIntegration:
         }
 
         with patch("hypha_startup_services.common.permissions.ADMIN_WORKSPACES", []):
-            with patch(
-                "hypha_startup_services.common.permissions.get_artifact"
-            ) as mock_get:
-                mock_get.return_value = mock_artifact
+            patch_get_artifact.return_value = mock_artifact
 
-                # User should not have permission
-                has_perm = await has_permission(mock_server, permission_params)
-                assert has_perm is False
+            # User should not have permission
+            has_perm = await has_permission(permission_params)
+            assert has_perm is False
 
-                # Should raise exception
-                with pytest.raises(HyphaPermissionError):
-                    await require_permission(mock_server, permission_params)
+            # Should raise exception
+            with pytest.raises(HyphaPermissionError):
+                await require_permission(permission_params)

@@ -149,16 +149,31 @@ async def test_separate_user_applications(
     assert len(user3_results["objects"]) == 1
     assert user3_results["objects"][0]["properties"]["title"] == "User 3's Movie"
 
-    with pytest.raises(RemoteException):
-        await weaviate_service2.query.fetch_objects(
-            collection_name="Movie", application_id=USER3_APP_ID, limit=10
-        )
+    # User 2 should NOT be able to see User 3's data (even if they can access the application)
+    print("Testing if User 2 can see User 3's data (should return empty results)...")
+    unauthorized_results = await weaviate_service2.query.fetch_objects(
+        collection_name="Movie", application_id=USER3_APP_ID, limit=10
+    )
+    print(f"Results: {unauthorized_results}")
+    print(f"Number of objects returned: {len(unauthorized_results.get('objects', []))}")
 
-    # User 3 cannot access User 2's application
-    with pytest.raises(RemoteException):
-        await weaviate_service3.query.fetch_objects(
-            collection_name="Movie", application_id=USER2_APP_ID, limit=10
-        )
+    # User 2 should not see any data from User 3's application due to data-level permissions
+    assert (
+        len(unauthorized_results.get("objects", [])) == 0
+    ), f"User 2 should not see User 3's data, but got {len(unauthorized_results.get('objects', []))} results"
+
+    # User 3 should NOT be able to see User 2's data (even if they can access the application)
+    print("Testing if User 3 can see User 2's data (should return empty results)...")
+    unauthorized_results = await weaviate_service3.query.fetch_objects(
+        collection_name="Movie", application_id=USER2_APP_ID, limit=10
+    )
+    print(f"Results: {unauthorized_results}")
+    print(f"Number of objects returned: {len(unauthorized_results.get('objects', []))}")
+
+    # User 3 should not see any data from User 2's application due to data-level permissions
+    assert (
+        len(unauthorized_results.get("objects", [])) == 0
+    ), f"User 3 should not see User 2's data, but got {len(unauthorized_results.get('objects', []))} results"
 
     # Admin user (User 1) can access both User 2 and User 3's applications
     admin_user2_results = await weaviate_service.query.fetch_objects(

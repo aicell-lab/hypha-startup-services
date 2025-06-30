@@ -1,5 +1,5 @@
-# Use an image with Python 3.11
-FROM python:3.11-slim
+# Use an image with Python 3.13
+FROM python:3.13-slim
 
 # Install git and other system dependencies
 RUN apt-get update && apt-get install -y \
