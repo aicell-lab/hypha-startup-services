@@ -2,9 +2,9 @@
 Helper functions to register the BioImage service with proper API endpoints.
 """
 
+from functools import partial
 import logging
 from hypha_rpc.rpc import RemoteService
-from hypha_startup_services.common.utils import create_partial_with_schema
 from hypha_startup_services.common.data_index import (
     load_external_data,
     get_entity_details,
@@ -30,15 +30,11 @@ async def register_mem0_bioimage_service(
     memory = await get_mem0()
 
     # Create partial functions with dependency injection while preserving schemas
-    get_entity_details_func = create_partial_with_schema(
-        get_entity_details, bioimage_index=bioimage_index
-    )
-    get_related_entities_func = create_partial_with_schema(
+    get_entity_details_func = partial(get_entity_details, bioimage_index=bioimage_index)
+    get_related_entities_func = partial(
         get_related_entities, bioimage_index=bioimage_index
     )
-    search_func = create_partial_with_schema(
-        search, memory=memory, bioimage_index=bioimage_index
-    )
+    search_func = partial(search, memory=memory, bioimage_index=bioimage_index)
 
     await server.register_service(
         {

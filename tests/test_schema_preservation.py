@@ -1,7 +1,6 @@
 """Test that schema information is preserved when using partial functions."""
 
 from functools import partial
-from hypha_startup_services.common.utils import create_partial_with_schema
 from hypha_startup_services.weaviate_bioimage_service.methods import (
     query,
     search,
@@ -66,7 +65,7 @@ class TestSchemaPreservation:
         ), "get_entity_details schema should not be None"
 
     def test_partial_preserves_schema(self):
-        """Test that create_partial_with_schema preserves and updates the __schema__ attribute."""
+        """Test that partial preserves and updates the __schema__ attribute."""
         # Test with a function that has a schema
         original_func = query
         assert hasattr(
@@ -79,7 +78,7 @@ class TestSchemaPreservation:
         # Create partial with our helper (using mock objects for testing)
         from unittest.mock import Mock
 
-        partial_func = create_partial_with_schema(original_func, client=Mock())
+        partial_func = partial(original_func, client=Mock())
 
         # Check that schema is preserved
         assert hasattr(
