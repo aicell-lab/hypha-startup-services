@@ -31,7 +31,7 @@ SHARED_APPLICATION_DESCRIPTION = "Shared EuroBioImaging nodes and technologies d
 
 
 async def ensure_shared_application_exists(
-    client: WeaviateAsyncClient, context: dict[str, Any]
+    client: WeaviateAsyncClient, context: dict[str, Any] | None = None
 ) -> None:
     exists = await applications_exists(
         collection_name=BIOIMAGE_COLLECTION,
@@ -56,7 +56,6 @@ async def ensure_shared_application_exists(
 @schema_function(arbitrary_types_allowed=True)
 async def query(
     client: WeaviateAsyncClient,
-    context: dict[str, Any],
     query_text: str = Field(
         description="Natural language query to search bioimage data"
     ),
@@ -65,6 +64,7 @@ async def query(
         description="Filter by entity types: 'node', 'technology', or both. Defaults to both if not specified.",
     ),
     limit: int = Field(default=10, description="Maximum number of results to return"),
+    context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Query bioimage data using natural language.
 
@@ -119,7 +119,6 @@ async def query(
 async def search(
     client: WeaviateAsyncClient,
     bioimage_index: BioimageIndex,
-    context: dict[str, Any],
     query_text: str = Field(
         description="Natural language query to search bioimage data"
     ),
@@ -132,6 +131,7 @@ async def search(
         description="Whether to include related entities in the search",
     ),
     limit: int = Field(default=10, description="Maximum number of results to return"),
+    context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Search bioimage data using natural language.
 
@@ -192,8 +192,8 @@ async def search(
 @schema_function(arbitrary_types_allowed=True)
 async def get_entity(
     client: WeaviateAsyncClient,
-    context: dict[str, Any],
     entity_id: str = Field(description="ID of the entity to retrieve"),
+    context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Get a specific entity by ID.
 

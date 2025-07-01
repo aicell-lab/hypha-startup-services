@@ -82,7 +82,7 @@ async def collections_exists(
 async def collections_create(
     client: WeaviateAsyncClient,
     settings: dict[str, Any],
-    context: dict[str, Any],
+    context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Create a new collection.
 
@@ -98,7 +98,9 @@ async def collections_create(
     Returns:
         The collection configuration with the short collection name
     """
-
+    assert (
+        context is not None
+    ), "Context must be provided to determine the tenant workspace"
     caller_ws = ws_from_context(context)
     assert_is_admin_ws(caller_ws)
 
@@ -113,7 +115,7 @@ async def collections_create(
 
 
 async def collections_list_all(
-    client: WeaviateAsyncClient, context: dict[str, Any]
+    client: WeaviateAsyncClient, context: dict[str, Any] | None = None
 ) -> dict[str, dict[str, Any]]:
     """List all collections in the database.
 
@@ -127,6 +129,9 @@ async def collections_list_all(
     Returns:
         Dictionary mapping short collection names to their configuration
     """
+    assert (
+        context is not None
+    ), "Context must be provided to determine the tenant workspace"
     caller_ws = ws_from_context(context)
     assert_is_admin_ws(caller_ws)
 
@@ -140,7 +145,7 @@ async def collections_list_all(
 async def collections_get(
     client: WeaviateAsyncClient,
     name: str,
-    context: dict[str, Any],
+    context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Get a collection's configuration by name.
 
@@ -150,6 +155,9 @@ async def collections_get(
     Returns:
         The collection configuration with its short collection name.
     """
+    assert (
+        context is not None
+    ), "Context must be provided to determine the tenant workspace"
     caller_ws = ws_from_context(context)
     await assert_has_collection_permission(caller_ws, name)
 
@@ -160,7 +168,7 @@ async def collections_get(
 async def collections_delete(
     client: WeaviateAsyncClient,
     name: str | list[str],
-    context: dict[str, Any],
+    context: dict[str, Any] | None = None,
 ) -> dict | None:
     """Delete one or multiple collections by name.
 
@@ -176,6 +184,9 @@ async def collections_delete(
     Returns:
         Success dictionary or None if operation fails
     """
+    assert (
+        context is not None
+    ), "Context must be provided to determine the tenant workspace"
     caller_ws = ws_from_context(context)
 
     short_names = [name] if isinstance(name, str) else name
@@ -192,7 +203,7 @@ async def applications_create(
     collection_name: str,
     application_id: str,
     description: str,
-    context: dict[str, Any],
+    context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Create a new application.
 
@@ -209,6 +220,9 @@ async def applications_create(
     Returns:
         Dictionary with application details and artifact information
     """
+    assert (
+        context is not None
+    ), "Context must be provided to determine the tenant workspace"
     caller_ws = ws_from_context(context)
 
     prep_error = await prepare_application_creation(client, collection_name, caller_ws)
@@ -331,7 +345,7 @@ async def ws_app_exists(
 async def applications_exists(
     collection_name: str,
     application_id: str,
-    context: dict[str, Any],
+    context: dict[str, Any] | None = None,
 ) -> bool:
     """Check if an application exists by checking if its artifact exists.
 
@@ -356,11 +370,11 @@ async def data_insert_many(
     application_id: str,
     objects: list[dict[str, Any]],
     user_ws: str | None = None,
-    context: dict[str, Any] | None = None,
     enable_chunking: bool = False,
     chunk_size: int = 512,
     chunk_overlap: int = 50,
     text_field: str = "text",
+    context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Insert multiple objects into the collection.
 
@@ -383,6 +397,9 @@ async def data_insert_many(
     Returns:
         Dictionary with insertion results including UUIDs and any errors
     """
+    assert (
+        context is not None
+    ), "Context must be provided to determine the tenant workspace"
     assert await ws_app_exists(
         collection_name,
         application_id,
@@ -437,11 +454,11 @@ async def data_insert(
     application_id: str,
     properties: dict[str, Any],
     user_ws: str | None = None,
-    context: dict[str, Any] | None = None,
     enable_chunking: bool = False,
     chunk_size: int = 512,
     chunk_overlap: int = 50,
     text_field: str = "text",
+    context: dict[str, Any] | None = None,
     **kwargs,
 ) -> uuid_class.UUID:
     """Insert a single object into the collection.
@@ -532,6 +549,10 @@ async def query_near_vector(
     Returns:
         Dictionary containing objects with shortened collection names
     """
+    assert (
+        context is not None
+    ), "Context must be provided to determine the tenant workspace"
+
     assert await ws_app_exists(
         collection_name,
         application_id,
@@ -820,8 +841,8 @@ async def data_exists(
     collection_name: str,
     application_id: str,
     uuid: uuid_class.UUID,
-    context: dict[str, Any],
     user_ws: str | None = None,
+    context: dict[str, Any] | None = None,
 ) -> bool:
     """Check if an object with the specified UUID exists in the collection.
 
