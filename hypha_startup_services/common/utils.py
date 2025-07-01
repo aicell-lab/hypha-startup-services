@@ -8,6 +8,7 @@ from .constants import (
     COLLECTION_DELIMITER,
     SHARED_WORKSPACE,
 )
+import copy
 
 
 def proxy_to_dict(proxy: dict[str, Any] | ObjectProxy) -> Any:
@@ -62,11 +63,29 @@ def get_full_collection_name(short_name: str) -> str:
 
 
 def create_partial_with_schema(func, **kwargs):
-    """Create a partial function while preserving the __schema__ attribute."""
+    """Create a partial function while preserving and updating the __schema__ attribute."""
     partial_func = partial(func, **kwargs)
 
-    # Copy schema if it exists
+    # Copy and update schema if it exists
     if hasattr(func, "__schema__"):
-        setattr(partial_func, "__schema__", func.__schema__)
+        original_schema = func.__schema__
+        updated_schema = copy.deepcopy(original_schema)
+
+        # Remove pre-filled parameters from the schema
+        if "parameters" in updated_schema:
+            parameters = updated_schema["parameters"]
+            if "properties" in parameters:
+                # Remove properties for pre-filled parameters
+                for param_name in kwargs:
+                    if param_name in parameters["properties"]:
+                        del parameters["properties"][param_name]
+
+            if "required" in parameters:
+                # Remove pre-filled parameters from required list
+                parameters["required"] = [
+                    param for param in parameters["required"] if param not in kwargs
+                ]
+
+        setattr(partial_func, "__schema__", updated_schema)
 
     return partial_func

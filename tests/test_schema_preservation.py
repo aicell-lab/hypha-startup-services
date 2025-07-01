@@ -66,12 +66,15 @@ class TestSchemaPreservation:
         ), "get_entity_details schema should not be None"
 
     def test_partial_preserves_schema(self):
-        """Test that create_partial_with_schema preserves the __schema__ attribute."""
+        """Test that create_partial_with_schema preserves and updates the __schema__ attribute."""
         # Test with a function that has a schema
         original_func = query
         assert hasattr(
             original_func, "__schema__"
         ), "Original function should have schema"
+
+        # Get original schema for comparison
+        original_schema = getattr(original_func, "__schema__")
 
         # Create partial with our helper (using mock objects for testing)
         from unittest.mock import Mock
@@ -85,9 +88,45 @@ class TestSchemaPreservation:
         assert (
             getattr(partial_func, "__schema__") is not None
         ), "Partial function schema should not be None"
-        assert getattr(partial_func, "__schema__") == getattr(
-            original_func, "__schema__"
-        ), "Schemas should be identical"
+
+        # Get the updated schema
+        partial_schema = getattr(partial_func, "__schema__")
+
+        # The schemas should NOT be identical - the partial should have updated schema
+        assert (
+            partial_schema != original_schema
+        ), "Schemas should be different (partial should be updated)"
+
+        # Check that the pre-filled parameter (client) is removed from the partial schema
+        original_properties = original_schema["parameters"]["properties"]
+        partial_properties = partial_schema["parameters"]["properties"]
+
+        assert (
+            "client" in original_properties
+        ), "Original schema should have 'client' parameter"
+        assert (
+            "client" not in partial_properties
+        ), "Partial schema should NOT have 'client' parameter"
+
+        # Check that required parameters are updated
+        original_required = original_schema["parameters"]["required"]
+        partial_required = partial_schema["parameters"]["required"]
+
+        assert "client" in original_required, "Original schema should require 'client'"
+        assert (
+            "client" not in partial_required
+        ), "Partial schema should NOT require 'client'"
+
+        # Check that other parameters are preserved
+        assert (
+            "context" in partial_properties
+        ), "Partial schema should still have 'context'"
+        assert (
+            "query_text" in partial_properties
+        ), "Partial schema should still have 'query_text'"
+        assert (
+            "context" in partial_required
+        ), "Partial schema should still require 'context'"
 
     def test_regular_partial_loses_schema(self):
         """Test that regular partial() loses the __schema__ attribute."""
