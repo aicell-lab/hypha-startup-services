@@ -6,7 +6,9 @@ from weaviate import WeaviateAsyncClient
 
 from hypha_startup_services.common.constants import DEFAULT_WEAVIATE_BIOIMAGE_SERVICE_ID
 from hypha_startup_services.common.utils import create_partial_with_schema
-from hypha_startup_services.common.schema_monkey_patch import apply_schema_monkey_patch
+from hypha_startup_services.common.improved_schema_monkey_patch import (
+    apply_improved_schema_monkey_patch,
+)
 from hypha_startup_services.weaviate_service.client import instantiate_and_connect
 from hypha_startup_services.common.data_index import (
     load_external_data,
@@ -58,7 +60,7 @@ async def register_weaviate_bioimage_service(
         service_id: Unique identifier for the service
     """
     logger.info("Applying schema monkey patch for partial function support")
-    apply_schema_monkey_patch()
+    apply_improved_schema_monkey_patch()
 
     bioimage_index = load_external_data()
 
