@@ -97,6 +97,9 @@ def create_partial_with_schema(func, **kwargs):
                 context = wrapper_kwargs.pop("context", None)
                 remaining_args = args
 
+            # Remove context from wrapper_kwargs if it exists there too
+            wrapper_kwargs.pop("context", None)
+
             # Bind the remaining arguments to parameter names
             wrapper_bound = new_signature.bind(*remaining_args, **wrapper_kwargs)
             wrapper_bound.apply_defaults()
@@ -123,6 +126,9 @@ def create_partial_with_schema(func, **kwargs):
             else:
                 context = wrapper_kwargs.pop("context", None)
                 remaining_args = args
+
+            # Remove context from wrapper_kwargs if it exists there too
+            wrapper_kwargs.pop("context", None)
 
             # Bind the remaining arguments to parameter names
             wrapper_bound = new_signature.bind(*remaining_args, **wrapper_kwargs)

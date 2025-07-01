@@ -117,16 +117,13 @@ class TestSchemaPreservation:
             "client" not in partial_required
         ), "Partial schema should NOT require 'client'"
 
-        # Check that other parameters are preserved
-        assert (
-            "context" in partial_properties
-        ), "Partial schema should still have 'context'"
+        # Check that other parameters are preserved (but context is automatically handled by hypha-RPC)
         assert (
             "query_text" in partial_properties
         ), "Partial schema should still have 'query_text'"
         assert (
-            "context" in partial_required
-        ), "Partial schema should still require 'context'"
+            "query_text" in partial_required
+        ), "Partial schema should still require 'query_text'"
 
     def test_regular_partial_loses_schema(self):
         """Test that regular partial() loses the __schema__ attribute."""
