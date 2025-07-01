@@ -69,10 +69,12 @@ def create_partial_with_schema(func, **kwargs):
     # Get the original function signature
     original_sig = inspect.signature(func)
 
-    # Create new parameters list without pre-filled ones
+    # Create new parameters list without pre-filled ones and context
     new_params = []
     for name, param in original_sig.parameters.items():
-        if name not in kwargs:
+        if (
+            name not in kwargs and name != "context"
+        ):  # Exclude context - hypha-RPC injects it
             new_params.append(param)
 
     # Create new signature
@@ -86,12 +88,21 @@ def create_partial_with_schema(func, **kwargs):
             # Get the underlying function if it's wrapped by schema_function
             underlying_func = getattr(func, "__original__", func)
 
-            # Bind the wrapper arguments to parameter names
-            wrapper_bound = new_signature.bind(*args, **wrapper_kwargs)
+            # hypha-RPC passes context as the first positional argument
+            # Extract it and bind the remaining arguments to the wrapper signature
+            if args:
+                context = args[0]
+                remaining_args = args[1:]
+            else:
+                context = wrapper_kwargs.pop("context", None)
+                remaining_args = args
+
+            # Bind the remaining arguments to parameter names
+            wrapper_bound = new_signature.bind(*remaining_args, **wrapper_kwargs)
             wrapper_bound.apply_defaults()
 
-            # Create final kwargs by merging wrapper args with pre-filled
-            final_kwargs = {**kwargs, **wrapper_bound.arguments}
+            # Create final kwargs by merging pre-filled kwargs, context, and wrapper args
+            final_kwargs = {**kwargs, "context": context, **wrapper_bound.arguments}
 
             # Call underlying function with keyword arguments only
             return await underlying_func(**final_kwargs)
@@ -104,12 +115,21 @@ def create_partial_with_schema(func, **kwargs):
             # Get the underlying function if it's wrapped by schema_function
             underlying_func = getattr(func, "__original__", func)
 
-            # Bind the wrapper arguments to parameter names
-            wrapper_bound = new_signature.bind(*args, **wrapper_kwargs)
+            # hypha-RPC passes context as the first positional argument
+            # Extract it and bind the remaining arguments to the wrapper signature
+            if args:
+                context = args[0]
+                remaining_args = args[1:]
+            else:
+                context = wrapper_kwargs.pop("context", None)
+                remaining_args = args
+
+            # Bind the remaining arguments to parameter names
+            wrapper_bound = new_signature.bind(*remaining_args, **wrapper_kwargs)
             wrapper_bound.apply_defaults()
 
-            # Create final kwargs by merging wrapper args with pre-filled
-            final_kwargs = {**kwargs, **wrapper_bound.arguments}
+            # Create final kwargs by merging pre-filled kwargs, context, and wrapper args
+            final_kwargs = {**kwargs, "context": context, **wrapper_bound.arguments}
 
             # Call underlying function with keyword arguments only
             return underlying_func(**final_kwargs)
@@ -124,19 +144,21 @@ def create_partial_with_schema(func, **kwargs):
         original_schema = func.__schema__
         updated_schema = copy.deepcopy(original_schema)
 
-        # Remove pre-filled parameters from the schema
+        # Remove pre-filled parameters and context from the schema
         if "parameters" in updated_schema:
             parameters = updated_schema["parameters"]
             if "properties" in parameters:
-                # Remove properties for pre-filled parameters
-                for param_name in kwargs:
+                # Remove properties for pre-filled parameters and context
+                for param_name in list(kwargs.keys()) + ["context"]:
                     if param_name in parameters["properties"]:
                         del parameters["properties"][param_name]
 
             if "required" in parameters:
-                # Remove pre-filled parameters from required list
+                # Remove pre-filled parameters and context from required list
                 parameters["required"] = [
-                    param for param in parameters["required"] if param not in kwargs
+                    param
+                    for param in parameters["required"]
+                    if param not in kwargs and param != "context"
                 ]
 
         setattr(wrapper, "__schema__", updated_schema)
