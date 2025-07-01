@@ -1,6 +1,9 @@
 """Common utility functions shared between services."""
 
-from functools import partial
+import asyncio
+import copy
+import inspect
+from functools import wraps
 from typing import Any
 from hypha_rpc.utils import ObjectProxy
 from .constants import (
@@ -8,7 +11,6 @@ from .constants import (
     COLLECTION_DELIMITER,
     SHARED_WORKSPACE,
 )
-import copy
 
 
 def proxy_to_dict(proxy: dict[str, Any] | ObjectProxy) -> Any:
@@ -64,9 +66,60 @@ def get_full_collection_name(short_name: str) -> str:
 
 def create_partial_with_schema(func, **kwargs):
     """Create a partial function while preserving and updating the __schema__ attribute."""
-    partial_func = partial(func, **kwargs)
+    # Get the original function signature
+    original_sig = inspect.signature(func)
 
-    # Copy and update schema if it exists
+    # Create new parameters list without pre-filled ones
+    new_params = []
+    for name, param in original_sig.parameters.items():
+        if name not in kwargs:
+            new_params.append(param)
+
+    # Create new signature
+    new_signature = inspect.Signature(new_params)
+
+    # Check if the function is async
+    if asyncio.iscoroutinefunction(func):
+
+        @wraps(func)
+        async def async_wrapper(*args, **wrapper_kwargs):
+            # Get the underlying function if it's wrapped by schema_function
+            underlying_func = getattr(func, "__original__", func)
+
+            # Bind the wrapper arguments to parameter names
+            wrapper_bound = new_signature.bind(*args, **wrapper_kwargs)
+            wrapper_bound.apply_defaults()
+
+            # Create final kwargs by merging wrapper args with pre-filled
+            final_kwargs = {**kwargs, **wrapper_bound.arguments}
+
+            # Call underlying function with keyword arguments only
+            return await underlying_func(**final_kwargs)
+
+        wrapper = async_wrapper
+    else:
+
+        @wraps(func)
+        def sync_wrapper(*args, **wrapper_kwargs):
+            # Get the underlying function if it's wrapped by schema_function
+            underlying_func = getattr(func, "__original__", func)
+
+            # Bind the wrapper arguments to parameter names
+            wrapper_bound = new_signature.bind(*args, **wrapper_kwargs)
+            wrapper_bound.apply_defaults()
+
+            # Create final kwargs by merging wrapper args with pre-filled
+            final_kwargs = {**kwargs, **wrapper_bound.arguments}
+
+            # Call underlying function with keyword arguments only
+            return underlying_func(**final_kwargs)
+
+        wrapper = sync_wrapper
+
+    # Set the correct signature
+    setattr(wrapper, "__signature__", new_signature)
+
+    # Handle schema if it exists
     if hasattr(func, "__schema__"):
         original_schema = func.__schema__
         updated_schema = copy.deepcopy(original_schema)
@@ -86,6 +139,6 @@ def create_partial_with_schema(func, **kwargs):
                     param for param in parameters["required"] if param not in kwargs
                 ]
 
-        setattr(partial_func, "__schema__", updated_schema)
+        setattr(wrapper, "__schema__", updated_schema)
 
-    return partial_func
+    return wrapper
