@@ -9,6 +9,7 @@ from hypha_startup_services.common.data_index import (
     BioimageIndex,
     get_related_entities,
 )
+from hypha_startup_services.common.data_index import get_entity_details
 from .utils import (
     semantic_bioimage_search,
 )
@@ -16,22 +17,14 @@ from .utils import (
 logger = logging.getLogger(__name__)
 
 
-@schema_function(arbitrary_types_allowed=True)
 async def search(
     memory: AsyncMemory,
     bioimage_index: BioimageIndex,
-    query_text: str = Field(
-        description="Natural language query to search bioimage data"
-    ),
-    entity_types: list[str] | None = Field(
-        default=None,
-        description="Filter by entity types: 'node', 'technology', or both. Defaults to both if not specified.",
-    ),
-    include_related: bool = Field(
-        default=True,
-        description="Whether to include related entities for each result",
-    ),
-    limit: int = Field(default=10, description="Maximum number of results to return"),
+    query_text: str,
+    entity_types: list[str] | None = None,
+    include_related: bool = True,
+    limit: int = 10,
+    context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """
     Unified query method that combines semantic search with related entity lookup.
@@ -44,6 +37,7 @@ async def search(
         entity_types: Filter by entity types ('node', 'technology', or both)
         include_related: Whether to include related entities for each result
         limit: Maximum number of results
+        context: Context containing caller information
 
     Returns:
         Dictionary with semantic search results and related entities
@@ -114,3 +108,68 @@ async def search(
         "results": enhanced_results,
         "total_results": len(enhanced_results),
     }
+
+
+def create_search(memory: AsyncMemory, bioimage_index: BioimageIndex):
+    """Create a search function with injected dependencies."""
+
+    @schema_function
+    async def search_func(
+        query_text: str = Field(
+            description="Natural language query to search bioimage data"
+        ),
+        entity_types: list[str] | None = Field(
+            default=None,
+            description="Filter by entity types: 'node', 'technology', or both. Defaults to both if not specified.",
+        ),
+        include_related: bool = Field(
+            default=True,
+            description="Whether to include related entities for each result",
+        ),
+        limit: int = Field(
+            default=10, description="Maximum number of results to return"
+        ),
+        context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Unified query method that combines semantic search with related entity lookup."""
+        return await search(
+            memory,
+            bioimage_index,
+            query_text,
+            entity_types,
+            include_related,
+            limit,
+            context,
+        )
+
+    return search_func
+
+
+def create_get_entity_details(bioimage_index: BioimageIndex):
+    """Create a get_entity_details function with injected bioimage index."""
+
+    @schema_function
+    async def get_entity_details_func(
+        entity_id: str = Field(description="ID of the entity to retrieve details for"),
+        context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Get detailed information about a specific entity."""
+        return await get_entity_details(bioimage_index, entity_id, context)
+
+    return get_entity_details_func
+
+
+def create_get_related_entities(bioimage_index: BioimageIndex):
+    """Create a get_related_entities function with injected bioimage index."""
+
+    @schema_function
+    async def get_related_entities_func(
+        entity_id: str = Field(
+            description="ID of the entity to find related entities for"
+        ),
+        context: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Get entities related to the specified entity."""
+        return get_related_entities(bioimage_index, entity_id, context)
+
+    return get_related_entities_func

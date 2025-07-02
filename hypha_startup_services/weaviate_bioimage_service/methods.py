@@ -9,7 +9,7 @@ from weaviate.classes.query import Filter
 from hypha_rpc.utils.schema import schema_function
 from pydantic import Field
 
-
+from hypha_startup_services.common.data_index import get_related_entities
 from hypha_startup_services.weaviate_service.methods import (
     generate_near_text,
     query_fetch_objects,
@@ -53,17 +53,11 @@ async def ensure_shared_application_exists(
         logger.debug("Shared application already exists")
 
 
-@schema_function(arbitrary_types_allowed=True)
 async def query(
     client: WeaviateAsyncClient,
-    query_text: str = Field(
-        description="Natural language query to search bioimage data"
-    ),
-    entity_types: list[str] | None = Field(
-        default=None,
-        description="Filter by entity types: 'node', 'technology', or both. Defaults to both if not specified.",
-    ),
-    limit: int = Field(default=10, description="Maximum number of results to return"),
+    query_text: str,
+    entity_types: list[str] | None = None,
+    limit: int = 10,
     context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Query bioimage data using natural language.
@@ -115,22 +109,13 @@ async def query(
     )
 
 
-@schema_function(arbitrary_types_allowed=True)
 async def search(
     client: WeaviateAsyncClient,
     bioimage_index: BioimageIndex,
-    query_text: str = Field(
-        description="Natural language query to search bioimage data"
-    ),
-    entity_types: list[str] | None = Field(
-        default=None,
-        description="Filter by entity types: 'node', 'technology', or both. Defaults to both if not specified.",
-    ),
-    include_related: bool = Field(
-        default=True,
-        description="Whether to include related entities in the search",
-    ),
-    limit: int = Field(default=10, description="Maximum number of results to return"),
+    query_text: str,
+    entity_types: list[str] | None = None,
+    include_related: bool = True,
+    limit: int = 10,
     context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Search bioimage data using natural language.
@@ -189,10 +174,9 @@ async def search(
     }
 
 
-@schema_function(arbitrary_types_allowed=True)
 async def get_entity(
     client: WeaviateAsyncClient,
-    entity_id: str = Field(description="ID of the entity to retrieve"),
+    entity_id: str,
     context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Get a specific entity by ID.
@@ -216,3 +200,88 @@ async def get_entity(
         limit=10,
         context=context,
     )
+
+
+def create_query(client: WeaviateAsyncClient):
+    """Create a query function with injected Weaviate client."""
+
+    @schema_function
+    async def query_func(
+        query_text: str = Field(
+            description="Natural language query to search bioimage data"
+        ),
+        entity_types: list[str] | None = Field(
+            default=None,
+            description="Filter by entity types: 'node', 'technology', or both. Defaults to both if not specified.",
+        ),
+        limit: int = Field(
+            default=10, description="Maximum number of results to return"
+        ),
+        context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Query bioimage data using natural language."""
+        return await query(client, query_text, entity_types, limit, context)
+
+    return query_func
+
+
+def create_get_entity(client: WeaviateAsyncClient):
+    """Create a get_entity function with injected Weaviate client."""
+
+    @schema_function
+    async def get_entity_func(
+        entity_id: str = Field(description="ID of the entity to retrieve"),
+        context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Get a specific entity by ID."""
+        return await get_entity(client, entity_id, context)
+
+    return get_entity_func
+
+
+def create_search(client: WeaviateAsyncClient, bioimage_index: BioimageIndex):
+    """Create a search function with injected dependencies."""
+
+    @schema_function
+    async def search_func(
+        query_text: str = Field(description="Search query for bioimage data"),
+        entity_types: list[str] | None = Field(
+            default=None,
+            description="Filter by entity types: 'node', 'technology', or both. Defaults to both if not specified.",
+        ),
+        include_related: bool = Field(
+            default=True, description="Include related entities in results"
+        ),
+        limit: int = Field(
+            default=10, description="Maximum number of results to return"
+        ),
+        context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Search bioimage data with optional related entities."""
+        return await search(
+            client,
+            bioimage_index,
+            query_text,
+            entity_types,
+            include_related,
+            limit,
+            context,
+        )
+
+    return search_func
+
+
+def create_get_related(bioimage_index: BioimageIndex):
+    """Create a get_related function with injected bioimage index."""
+
+    @schema_function
+    async def get_related_func(
+        entity_id: str = Field(
+            description="ID of the entity to find related entities for"
+        ),
+        context: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Get entities related to the specified entity."""
+        return get_related_entities(bioimage_index, entity_id, context)
+
+    return get_related_func
