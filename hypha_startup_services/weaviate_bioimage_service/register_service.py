@@ -1,6 +1,7 @@
 """Service registration for the Weaviate BioImage service."""
 
-from functools import partial
+import asyncio
+from functools import partial, wraps
 import logging
 from hypha_rpc.rpc import RemoteService
 from weaviate import WeaviateAsyncClient
@@ -11,9 +12,10 @@ from hypha_startup_services.common.data_index import (
     load_external_data,
     get_related_entities,
 )
-from hypha_startup_services.common.hypha_rpc_partial_fix import (
-    apply_hypha_rpc_partial_fix,
-)
+
+# from hypha_startup_services.common.hypha_rpc_partial_fix_v2 import (
+#     apply_hypha_rpc_partial_fix,
+# )
 from .methods import (
     query,
     get_entity,
@@ -21,6 +23,35 @@ from .methods import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def create_partial_with_schema(func, **kwargs):
+    """Create a partial function while preserving the __schema__ attribute."""
+
+    partial_func = partial(func, **kwargs)
+
+    # Check if the function is async
+    if asyncio.iscoroutinefunction(func):
+        # Create async wrapper for async functions
+        @wraps(func)
+        async def async_wrapper(*args, **wrapper_kwargs):
+            return await partial_func(*args, **wrapper_kwargs)
+
+        # Copy the schema if it exists
+        if hasattr(func, "__schema__"):
+            setattr(async_wrapper, "__schema__", func.__schema__)
+
+        return async_wrapper
+
+    # Create sync wrapper for sync functions
+    @wraps(func)
+    def sync_wrapper(*args, **wrapper_kwargs):
+        return partial_func(*args, **wrapper_kwargs)
+
+    if hasattr(func, "__schema__"):
+        setattr(sync_wrapper, "__schema__", func.__schema__)
+
+    return sync_wrapper
 
 
 async def register_weaviate_bioimage(
@@ -60,8 +91,6 @@ async def register_weaviate_bioimage_service(
         service_id: Unique identifier for the service
     """
     logger.info("Applying hypha-RPC partial function fix")
-
-    apply_hypha_rpc_partial_fix()
 
     bioimage_index = load_external_data()
 
