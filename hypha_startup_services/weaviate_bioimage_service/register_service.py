@@ -11,6 +11,9 @@ from hypha_startup_services.common.data_index import (
     load_external_data,
     get_related_entities,
 )
+from hypha_startup_services.common.hypha_rpc_partial_fix import (
+    apply_hypha_rpc_partial_fix,
+)
 from .methods import (
     query,
     get_entity,
@@ -56,9 +59,9 @@ async def register_weaviate_bioimage_service(
         weaviate_client: Weaviate client instance
         service_id: Unique identifier for the service
     """
-    logger.info("Applying schema monkey patch for partial function support")
-    logger.info("Applying schema monkey patch for partial function support")
-    # No longer needed - using proper wrapper approach
+    logger.info("Applying hypha-RPC partial function fix")
+
+    apply_hypha_rpc_partial_fix()
 
     bioimage_index = load_external_data()
 
