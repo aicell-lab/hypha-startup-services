@@ -5,18 +5,17 @@ This module provides functionality to interface with Weaviate vector database,
 handling collections, data operations, and query functionality with user isolation.
 """
 
+import logging
 import uuid as uuid_class
 from typing import Any
 from weaviate import WeaviateAsyncClient
 from weaviate.collections.classes.internal import QueryReturn, GenerativeReturn
 from weaviate.collections.classes.batch import DeleteManyReturn
-from hypha_rpc.rpc import RemoteService
 from hypha_startup_services.common.workspace_utils import ws_from_context
 from hypha_startup_services.common.chunking import chunk_text
 from hypha_startup_services.weaviate_service.utils.collection_utils import (
     acquire_collection,
     objects_part_coll_name,
-    create_application_filter,
     get_short_name,
     and_app_filter,
 )
@@ -37,6 +36,8 @@ from .utils.service_utils import (
     prepare_application_creation,
     get_permitted_collection,
     collection_exists,
+    prepare_tenant_collection,
+    ws_app_exists,
 )
 from .utils.format_utils import (
     get_full_collection_names,
@@ -51,6 +52,8 @@ from .utils.artifact_utils import (
     create_application_artifact,
     delete_application_artifact,
 )
+
+logger = logging.getLogger(__name__)
 
 
 async def collections_exists(
@@ -196,6 +199,29 @@ async def collections_delete(
     full_names = get_full_collection_names(short_names)
     await client.collections.delete(full_names)
     await delete_collection_artifacts(short_names)
+    # TODO: implement await delete_collection_applications()
+
+
+async def collections_get_artifact(
+    client: WeaviateAsyncClient,
+    collection_name: str,
+    context: dict[str, Any] | None = None,
+) -> str:
+    """Get the artifact for a collection.
+
+    Retrieves the collection artifact using the caller's workspace and collection name.
+
+    Args:
+        collection_name: Name of the collection to retrieve the artifact for
+        context: Context containing caller information
+
+    Returns:
+        Dictionary with collection artifact information
+    """
+    assert await collections_exists(
+        client, collection_name, context=context
+    ), f"Collection '{collection_name}' does not exist."
+    return get_full_collection_name(collection_name)
 
 
 async def applications_create(
@@ -203,6 +229,7 @@ async def applications_create(
     collection_name: str,
     application_id: str,
     description: str,
+    user_ws: str | None = None,
     context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Create a new application.
@@ -223,17 +250,15 @@ async def applications_create(
     assert (
         context is not None
     ), "Context must be provided to determine the tenant workspace"
-    caller_ws = ws_from_context(context)
 
-    prep_error = await prepare_application_creation(client, collection_name, caller_ws)
-    if prep_error:
-        return prep_error
+    caller_ws = ws_from_context(context)
+    if user_ws is None:
+        user_ws = caller_ws
+
+    await prepare_application_creation(client, collection_name, user_ws)
 
     result = await create_application_artifact(
-        collection_name,
-        application_id,
-        description,
-        caller_ws,
+        collection_name, application_id, description, user_ws, caller_ws=caller_ws
     )
 
     return {
@@ -266,7 +291,13 @@ async def applications_delete(
     Returns:
         Dictionary with deletion operation results
     """
-    context = context or {}
+    await prepare_tenant_collection(
+        client,
+        collection_name,
+        application_id,
+        user_ws=user_ws,
+        context=context,
+    )
 
     result = await data_delete_many(
         client,
@@ -274,8 +305,11 @@ async def applications_delete(
         application_id,
         user_ws=user_ws,
         context=context,
-        where=create_application_filter(application_id),
     )
+
+    assert (
+        context is not None
+    ), "Context must be provided to determine the tenant workspace"
 
     full_collection_name = get_full_collection_name(collection_name)
     caller_ws = ws_from_context(context)
@@ -285,9 +319,11 @@ async def applications_delete(
 
 
 async def applications_get(
+    client: WeaviateAsyncClient,
     collection_name: str,
     application_id: str,
-    context: dict[str, Any],
+    user_ws: str | None = None,
+    context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Get application metadata by retrieving its artifact.
 
@@ -301,50 +337,22 @@ async def applications_get(
     Returns:
         Dictionary with application artifact information
     """
-    full_collection_name = get_full_collection_name(collection_name)
-    caller_ws = ws_from_context(context)
-    artifact_name = get_application_artifact_name(
-        full_collection_name, caller_ws, application_id
+    artifact_name = await applications_get_artifact(
+        client,
+        collection_name,
+        application_id,
+        user_ws=user_ws,
+        context=context,
     )
 
     return await get_artifact(artifact_name)
 
 
-async def ws_app_exists(
-    collection_name: str,
-    application_id: str,
-    workspace: str | None = None,
-    context: dict[str, Any] | None = None,
-):
-    """Check if an application exists for a specific user workspace.
-
-    Args:
-        collection_name: Name of the collection to check
-        application_id: ID of the application to check
-        user_ws: User workspace to check against
-
-    Returns:
-        Boolean indicating whether the application exists for the user workspace
-    """
-    if workspace is not None:
-        target_ws = workspace
-    elif context is not None:
-        target_ws = ws_from_context(context)
-    else:
-        raise ValueError(
-            "Either user_ws or context must be provided to determine the tenant workspace"
-        )
-
-    full_collection_name = get_full_collection_name(collection_name)
-    artifact_name = get_application_artifact_name(
-        full_collection_name, target_ws, application_id
-    )
-    return await artifact_exists(artifact_name)
-
-
 async def applications_exists(
+    client: WeaviateAsyncClient,
     collection_name: str,
     application_id: str,
+    user_ws: str | None = None,
     context: dict[str, Any] | None = None,
 ) -> bool:
     """Check if an application exists by checking if its artifact exists.
@@ -357,11 +365,67 @@ async def applications_exists(
     Returns:
         Boolean indicating whether the application exists
     """
+    assert (
+        context is not None
+    ), "Context must be provided to determine the tenant workspace"
+
+    caller_ws = ws_from_context(context)
+
+    if user_ws is None:
+        user_ws = caller_ws
+
+    await get_permitted_collection(
+        client,
+        collection_name,
+        application_id,
+        user_ws=user_ws,
+        caller_ws=caller_ws,
+    )
+
     return await ws_app_exists(
         collection_name,
         application_id,
+        workspace=user_ws,
+    )
+
+
+async def applications_get_artifact(
+    client: WeaviateAsyncClient,
+    collection_name: str,
+    application_id: str,
+    user_ws: str | None = None,
+    context: dict[str, Any] | None = None,
+) -> str:
+    """Get the artifact for an application.
+    Retrieves the application artifact using the caller's ID and application ID.
+    Args:
+        collection_name: Name of the collection containing the application
+        application_id: ID of the application to retrieve
+        user_ws: Optional user workspace to use as tenant (if different from caller)
+        context: Context containing caller information
+    Returns:
+        Dictionary with application artifact information
+    """
+    if user_ws is None:
+        assert (
+            context is not None
+        ), "Context must be provided to determine the tenant workspace"
+        user_ws = ws_from_context(context)
+
+    await prepare_tenant_collection(
+        client,
+        collection_name,
+        application_id,
+        user_ws=user_ws,
         context=context,
     )
+
+    full_collection_name = get_full_collection_name(collection_name)
+    artifact_name = get_application_artifact_name(
+        full_collection_name, user_ws, application_id
+    )
+
+    return artifact_name
 
 
 async def data_insert_many(
@@ -397,17 +461,7 @@ async def data_insert_many(
     Returns:
         Dictionary with insertion results including UUIDs and any errors
     """
-    assert (
-        context is not None
-    ), "Context must be provided to determine the tenant workspace"
-    assert await ws_app_exists(
-        collection_name,
-        application_id,
-        workspace=user_ws,
-        context=context,
-    ), f"Application {application_id} does not exist in collection {collection_name}"
-
-    tenant_collection = await get_permitted_collection(
+    tenant_collection = await prepare_tenant_collection(
         client,
         collection_name,
         application_id,
@@ -484,12 +538,13 @@ async def data_insert(
     Returns:
         UUID of the inserted object (or first chunk if chunking enabled)
     """
-    assert await ws_app_exists(
+    tenant_collection = await prepare_tenant_collection(
+        client,
         collection_name,
         application_id,
-        workspace=user_ws,
+        user_ws=user_ws,
         context=context,
-    ), f"Application {application_id} does not exist in collection {collection_name}"
+    )
 
     if enable_chunking and text_field in properties and properties[text_field]:
         # For single insert with chunking, use data_insert_many and return first UUID
@@ -511,13 +566,6 @@ async def data_insert(
         else:
             raise RuntimeError("No UUIDs returned from chunked insert")
 
-    tenant_collection = await get_permitted_collection(
-        client,
-        collection_name,
-        application_id,
-        user_ws=user_ws,
-        context=context,
-    )
     app_properties = properties.copy()
     app_properties["application_id"] = application_id
 
@@ -549,18 +597,7 @@ async def query_near_vector(
     Returns:
         Dictionary containing objects with shortened collection names
     """
-    assert (
-        context is not None
-    ), "Context must be provided to determine the tenant workspace"
-
-    assert await ws_app_exists(
-        collection_name,
-        application_id,
-        workspace=user_ws,
-        context=context,
-    ), f"Application {application_id} does not exist in collection {collection_name}"
-
-    tenant_collection = await get_permitted_collection(
+    tenant_collection = await prepare_tenant_collection(
         client,
         collection_name,
         application_id,
@@ -602,14 +639,14 @@ async def query_fetch_objects(
     Returns:
         Dictionary containing objects with shortened collection names
     """
-
-    tenant_collection = await get_permitted_collection(
+    tenant_collection = await prepare_tenant_collection(
         client,
         collection_name,
         application_id,
         user_ws=user_ws,
         context=context,
     )
+
     kwargs["filters"] = and_app_filter(application_id, kwargs.get("filters"))
 
     response: QueryReturn = await tenant_collection.query.fetch_objects(**kwargs)
@@ -644,20 +681,14 @@ async def query_hybrid(
     Returns:
         Dictionary containing objects with shortened collection names
     """
-    assert await ws_app_exists(
-        collection_name,
-        application_id,
-        workspace=user_ws,
-        context=context,
-    ), f"Application {application_id} does not exist in collection {collection_name}"
-
-    tenant_collection = await get_permitted_collection(
+    tenant_collection = await prepare_tenant_collection(
         client,
         collection_name,
         application_id,
         user_ws=user_ws,
         context=context,
     )
+
     kwargs["filters"] = and_app_filter(application_id, kwargs.get("filters"))
 
     response: QueryReturn = await tenant_collection.query.hybrid(**kwargs)
@@ -692,20 +723,14 @@ async def generate_near_text(
     Returns:
         Dictionary containing objects with shortened collection names and generated content
     """
-    assert await ws_app_exists(
-        collection_name,
-        application_id,
-        workspace=user_ws,
-        context=context,
-    ), f"Application {application_id} does not exist in collection {collection_name}"
-
-    tenant_collection = await get_permitted_collection(
+    tenant_collection = await prepare_tenant_collection(
         client,
         collection_name,
         application_id,
         user_ws=user_ws,
         context=context,
     )
+
     kwargs["filters"] = and_app_filter(application_id, kwargs.get("filters"))
 
     response: GenerativeReturn = await tenant_collection.generate.near_text(**kwargs)
@@ -740,20 +765,14 @@ async def data_update(
     Returns:
         None
     """
-    assert await ws_app_exists(
-        collection_name,
-        application_id,
-        workspace=user_ws,
-        context=context,
-    ), f"Application {application_id} does not exist in collection {collection_name}"
-
-    tenant_collection = await get_permitted_collection(
+    tenant_collection = await prepare_tenant_collection(
         client,
         collection_name,
         application_id,
         user_ws=user_ws,
         context=context,
     )
+
     await tenant_collection.data.update(**kwargs)
 
 
@@ -781,13 +800,14 @@ async def data_delete_by_id(
     Returns:
         True if deletion was successful (implicitly, as no error is raised)
     """
-    tenant_collection = await get_permitted_collection(
+    tenant_collection = await prepare_tenant_collection(
         client,
         collection_name,
         application_id,
         user_ws=user_ws,
         context=context,
     )
+
     await tenant_collection.data.delete_by_id(uuid=uuid)
 
 
@@ -802,7 +822,8 @@ async def data_delete_many(
     """Delete many objects from the collection based on filter criteria.
 
     Gets a tenant-specific collection after verifying permissions.
-    Automatically adds application_id filter to limit deletion to objects in the specified application.
+    Automatically adds application_id filter to limit deletion to objects in the specified
+    application.
     Forwards all kwargs to collection.data.delete_many().
 
     Args:
@@ -816,13 +837,14 @@ async def data_delete_many(
     Returns:
         Dictionary with deletion operation results including match counts
     """
-    tenant_collection = await get_permitted_collection(
+    tenant_collection = await prepare_tenant_collection(
         client,
         collection_name,
         application_id,
         user_ws=user_ws,
         context=context,
     )
+
     kwargs["where"] = and_app_filter(application_id, kwargs.get("where"))
     response: DeleteManyReturn = await tenant_collection.data.delete_many(**kwargs)
 
@@ -859,11 +881,12 @@ async def data_exists(
     Returns:
         Boolean indicating whether the object exists
     """
-    tenant_collection = await get_permitted_collection(
+    tenant_collection = await prepare_tenant_collection(
         client,
         collection_name,
         application_id,
         user_ws=user_ws,
         context=context,
     )
+
     return await tenant_collection.data.exists(uuid=uuid)

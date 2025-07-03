@@ -2,6 +2,7 @@
 
 import pytest
 from tests.weaviate_service.utils import create_test_collection
+from hypha_rpc.rpc import RemoteException
 
 
 @pytest.mark.asyncio
@@ -73,3 +74,31 @@ async def test_collection_exists(weaviate_service):
     exists = await weaviate_service.collections.exists("Movie")
 
     assert exists is False
+
+
+@pytest.mark.asyncio
+async def test_collection_get_artifact(weaviate_service):
+    """Test retrieving a collection's artifact name."""
+    # First create a collection
+    await create_test_collection(weaviate_service)
+
+    # Get the collection artifact name
+    artifact_name = await weaviate_service.collections.get_artifact("Movie")
+
+    assert artifact_name is not None
+    assert isinstance(artifact_name, str)
+    # The artifact name should be the full collection name with workspace prefix
+    # Format: SHARED__DELIM__Movie
+    assert artifact_name == "Shared__DELIM__Movie"
+
+    # Clean up
+    await weaviate_service.collections.delete("Movie")
+
+
+@pytest.mark.asyncio
+async def test_collection_get_artifact_nonexistent(weaviate_service):
+    """Test retrieving artifact name for a non-existent collection."""
+    with pytest.raises(
+        RemoteException, match="Collection 'NonExistentCollection' does not exist."
+    ):
+        await weaviate_service.collections.get_artifact("NonExistentCollection")

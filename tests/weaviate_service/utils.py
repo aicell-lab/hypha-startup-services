@@ -1,5 +1,7 @@
 """Common utilities for Weaviate tests."""
 
+from hypha_rpc.rpc import RemoteException
+
 APP_ID = "TestApp"
 USER1_APP_ID = "User1App"
 USER2_APP_ID = "User2App"
@@ -52,8 +54,8 @@ async def create_test_collection(weaviate_service):
     # Try to delete if it exists - ignore errors
     try:
         await weaviate_service.collections.delete("Movie")
-    except Exception:
-        pass
+    except RemoteException as e:
+        print(f"Error deleting collection: {e}")
 
     class_obj = MOVIE_COLLECTION_CONFIG.copy()
     # Add vector configurations
@@ -95,6 +97,15 @@ async def create_test_collection(weaviate_service):
 async def create_test_application(weaviate_service):
     """Create a test application for Weaviate tests."""
     await create_test_collection(weaviate_service)
+    # TODO: fix this uncommented code
+    # if await weaviate_service.applications.exists(
+    #     collection_name="Movie", application_id=APP_ID
+    # ):
+    #     # If the application already exists, delete it first
+    #     await weaviate_service.applications.delete(
+    #         collection_name="Movie", application_id=APP_ID
+    #     )
+
     await weaviate_service.applications.create(
         application_id=APP_ID,
         collection_name="Movie",

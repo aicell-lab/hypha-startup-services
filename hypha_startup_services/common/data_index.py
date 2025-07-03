@@ -1,7 +1,7 @@
 """Data structures and indexing for EBI nodes and technologies."""
 
 import os
-from typing import Any, Set, Callable, Coroutine
+from typing import Any, Set
 from pydantic import Field
 import json
 import logging
@@ -329,6 +329,21 @@ def get_related_entities(
     raise ValueError(f"Entity not found: {entity_id}")
 
 
+def _get_object_property_dict(
+    obj: Any,
+) -> dict[str, Any]:
+    return {
+        "entity_id": obj.get("entity_id")
+        or obj.get("uuid")
+        or str(getattr(obj, "uuid", "")),
+        "entity_type": obj.get("entity_type"),
+        "text": obj.get("text", ""),
+        "description": obj.get("description", ""),
+        "name": obj.get("name", ""),
+        "country": obj.get("country"),
+    }
+
+
 def _extract_object_properties(result_obj: Any) -> dict[str, Any]:
     """Extract properties from a result object, handling both dict and Weaviate Object structures.
 
@@ -336,43 +351,33 @@ def _extract_object_properties(result_obj: Any) -> dict[str, Any]:
         result_obj: The result object from a query (could be dict or Weaviate Object)
 
     Returns:
-        A dictionary with extracted properties (entity_id, entity_type, text, country)
+        A dictionary with extracted properties (entity_id, entity_type, text, country, description, name)
     """
     if hasattr(result_obj, "properties") and hasattr(result_obj, "uuid"):
         # Weaviate Object structure
         properties = getattr(result_obj, "properties", {})
-        return {
-            "entity_id": str(getattr(result_obj, "uuid", ""))
-            or properties.get("entity_id"),
-            "entity_type": properties.get("entity_type"),
-            "text": properties.get("text", ""),
-            "country": properties.get("country", ""),
-        }
+        return _get_object_property_dict(properties)
     elif isinstance(result_obj, dict):
-        # Dict-like structure
-        return {
-            "entity_id": result_obj.get("entity_id"),
-            "entity_type": result_obj.get("entity_type"),
-            "text": result_obj.get("text", ""),
-            "country": result_obj.get("country", ""),
-        }
+        # Dict-like structure - handle both direct properties and nested properties
+        if "properties" in result_obj:
+            properties = result_obj["properties"]
+            return _get_object_property_dict(properties)
+        else:
+            return _get_object_property_dict(result_obj)
     else:
         # Fallback: try to convert to dict
         try:
             obj_dict = dict(result_obj) if hasattr(result_obj, "__iter__") else {}
-            return {
-                "entity_id": obj_dict.get("entity_id"),
-                "entity_type": obj_dict.get("entity_type"),
-                "text": obj_dict.get("text", ""),
-                "country": obj_dict.get("country", ""),
-            }
+            return _get_object_property_dict(obj_dict)
         except (TypeError, ValueError):
             # Return empty dict for objects we can't process
             return {
                 "entity_id": None,
                 "entity_type": None,
                 "text": "",
-                "country": "",
+                "description": "",
+                "name": "",
+                "country": None,
             }
 
 
@@ -397,12 +402,19 @@ def add_related_entities(
         if props["entity_id"] is None:
             continue
 
+        # Use text first, fallback to description, then name
+        info_text = props["text"] or props["description"] or props["name"] or ""
+
         enhanced_result = {
             "entity_id": props["entity_id"],
-            "info": props["text"],
-            "country": props["country"],
+            "info": info_text,
             "entity_type": props["entity_type"],
         }
+
+        # Only include country for nodes, not for technologies
+        if props["entity_type"] == "node" and props["country"]:
+            enhanced_result["country"] = props["country"]
+
         relation_type = (
             "exists_in_nodes"
             if props["entity_type"] == "technology"
@@ -421,9 +433,10 @@ def add_related_entities(
                 related_entities = []
         else:
             related_entities = []
+
         related_entities_names = [
             {
-                "entity_id": entity.get("entity_id", "Unknown"),
+                "entity_id": entity.get("id", entity.get("entity_id", "Unknown")),
                 "name": entity.get("name", entity.get("entity_id", "Unknown")),
             }
             for entity in related_entities

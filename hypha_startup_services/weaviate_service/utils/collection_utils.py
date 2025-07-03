@@ -60,6 +60,16 @@ def format_tenant_name(tenant_name: str) -> str:
     return tenant_name.lower().replace("|", "_")
 
 
+async def is_multitenancy_enabled(
+    client: WeaviateAsyncClient,
+    collection_name: str,
+) -> bool:
+    """Check if multitenancy is enabled for the collection."""
+    collection = acquire_collection(client, collection_name)
+    collection_config = await collection.config.get()
+    return collection_config.multi_tenancy_config.enabled
+
+
 async def add_tenant_if_not_exists(
     client: WeaviateAsyncClient,
     collection_name: str,
@@ -75,12 +85,15 @@ async def add_tenant_if_not_exists(
         )
 
 
-def get_tenant_collection(
+async def get_tenant_collection(
     client: WeaviateAsyncClient,
     collection_name: str,
     tenant_name: str,
 ) -> CollectionAsync:
     """Get the tenant collection from the client."""
     collection = acquire_collection(client, collection_name)
-    formatted_tenant_name = format_tenant_name(tenant_name)
-    return collection.with_tenant(formatted_tenant_name)
+    if await is_multitenancy_enabled(client, collection_name):
+        formatted_tenant_name = format_tenant_name(tenant_name)
+        return collection.with_tenant(formatted_tenant_name)
+
+    return collection

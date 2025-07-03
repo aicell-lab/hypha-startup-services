@@ -80,6 +80,7 @@ async def test_weaviate_bioimage_search_test(weaviate_bioimage_test_service):
         assert "entity_id" in item or "id" in item or "name" in item
 
 
+# TODO: fix non-multitenancy collections
 @pytest.mark.asyncio
 async def test_weaviate_bioimage_query_test(weaviate_bioimage_test_service):
     result = await weaviate_bioimage_test_service.query(query_text="microscopy")
@@ -172,7 +173,7 @@ async def test_local_integration_weaviate_bioimage(weaviate_bioimage_test_servic
         entity_id="f78b39ca-3b2a-49f4-99eb-a7f241640bf2"
     )
     assert len(result) > 0
-    assert "entity_id" in result[0]
+    assert "id" in result[0]
 
 
 # Remote integration tests
@@ -682,12 +683,12 @@ async def test_investigate_eurobioimaging_shared_app_contents(
                 "keywords": ["microscopy", "imaging", "bioimage"],
             }
 
-            result = await weaviate_service.data.insert(
+            added_object_uuid = await weaviate_service.data.insert(
                 collection_name=collection_name,
                 application_id=application_id,
                 properties=test_object,
             )
-            print(f"Insert result: {result}")
+            print(f"Insert result: {added_object_uuid}")
 
             # Try fetching again after insert
             objects = await weaviate_service.query.fetch_objects(
@@ -696,6 +697,11 @@ async def test_investigate_eurobioimaging_shared_app_contents(
             if isinstance(objects, dict) and "objects" in objects:
                 print(f"After insert - Number of objects: {len(objects['objects'])}")
 
+            await weaviate_service.data.delete_by_id(
+                collection_name=collection_name,
+                application_id=application_id,
+                uuid=added_object_uuid,
+            )
         except Exception as e:
             print(f"Insert/fetch after insert failed: {e}")
 

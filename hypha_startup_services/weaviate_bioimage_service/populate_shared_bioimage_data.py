@@ -38,21 +38,6 @@ DEFAULT_SERVER_URL = "https://hypha.aicell.io"
 WEAVIATE_SERVICE_ID = "aria-agents/weaviate"
 
 
-async def delete_all_objects_in_application(weaviate_service):
-    """Delete all objects in the shared application before populating."""
-    logger.warning(
-        "Deleting all objects in application '%s' in collection '%s'...",
-        SHARED_APPLICATION_ID,
-        COLLECTION_NAME,
-    )
-    result = await weaviate_service.data.delete_many(
-        collection_name=COLLECTION_NAME,
-        application_id=SHARED_APPLICATION_ID,
-        where=None,  # Delete all objects in the application
-    )
-    logger.info("Delete result: %s", result)
-
-
 async def load_data_files() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Load nodes and technologies data from JSON files."""
     script_dir = Path(__file__).parent.parent
@@ -185,9 +170,6 @@ async def ensure_collection_exists(
 
     class_obj = {
         "class": COLLECTION_NAME,
-        "multiTenancyConfig": {
-            "enabled": True,
-        },
         "description": "EuroBioImaging nodes and technologies data",
         "properties": [
             {
@@ -418,12 +400,15 @@ async def main():
             ollama_endpoint=args.ollama_endpoint,
         )
 
+        if args.delete_existing:
+            await weaviate_service.applications.delete(
+                collection_name=COLLECTION_NAME,
+                application_id=SHARED_APPLICATION_ID,
+            )
+
         # Ensure application exists
         logger.info("🔧 Ensuring application exists...")
         await ensure_application_exists(weaviate_service)
-
-        if args.delete_existing:
-            await delete_all_objects_in_application(weaviate_service)
 
         # Load data
         nodes_data, tech_data = await load_data_files()

@@ -32,6 +32,8 @@ from .methods import (
     query_fetch_objects,
     query_hybrid,
     generate_near_text,
+    collections_get_artifact,
+    applications_get_artifact,
 )
 from .utils.constants import DEFAULT_SERVICE_ID
 
@@ -73,12 +75,14 @@ async def register_weaviate_service(
                 "list_all": partial(collections_list_all, client),
                 "get": partial(collections_get, client),
                 "exists": partial(collections_exists, client),
+                "get_artifact": partial(collections_get_artifact, client),
             },
             "applications": {
                 "create": partial(applications_create, client),
                 "delete": partial(applications_delete, client),
-                "get": applications_get,
-                "exists": applications_exists,
+                "get": partial(applications_get, client),
+                "exists": partial(applications_exists, client),
+                "get_artifact": partial(applications_get_artifact, client),
             },
             "data": {
                 "insert_many": partial(data_insert_many, client),

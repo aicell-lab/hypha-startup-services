@@ -34,6 +34,7 @@ async def ensure_shared_application_exists(
     client: WeaviateAsyncClient, context: dict[str, Any] | None = None
 ) -> None:
     exists = await applications_exists(
+        client=client,
         collection_name=BIOIMAGE_COLLECTION,
         application_id=SHARED_APPLICATION_ID,
         context=context,
@@ -149,6 +150,15 @@ async def search(
             where_filter = Filter.by_property("entity_type").equal(entity_types[0])
         else:
             where_filter = Filter.by_property("entity_type").contains_any(entity_types)
+
+    fetched_objects = await query_fetch_objects(
+        client=client,
+        collection_name=BIOIMAGE_COLLECTION,
+        application_id=SHARED_APPLICATION_ID,
+        context=context,
+    )
+
+    fetched_objects = fetched_objects["objects"]
 
     semantic_results = await query_hybrid(
         client=client,

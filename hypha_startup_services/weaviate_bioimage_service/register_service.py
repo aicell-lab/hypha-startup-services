@@ -59,6 +59,8 @@ async def register_weaviate_bioimage_service(
 
     bioimage_index = load_external_data()
 
+    # raise ValueError([node["id"] for node in bioimage_index.get_all_nodes()])
+
     # Create service functions using factory pattern
     query_func = create_query(weaviate_client)
     get_entity_func = create_get_entity(weaviate_client)

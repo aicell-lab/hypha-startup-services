@@ -7,17 +7,14 @@ from tests.weaviate_service.utils import (
     APP_ID,
     USER1_APP_ID,
 )
+from hypha_rpc.rpc import RemoteException
 
 
 @pytest.mark.asyncio
 async def test_create_application(weaviate_service):
     """Test creating a Weaviate application with proper schema configuration."""
     await create_test_collection(weaviate_service)
-    await weaviate_service.applications.create(
-        application_id=APP_ID,
-        collection_name="Movie",
-        description="An application for movie data",
-    )
+    await create_test_application(weaviate_service)
 
 
 @pytest.mark.asyncio
@@ -123,11 +120,11 @@ async def test_application_exists_across_users(weaviate_service, weaviate_servic
     assert exists is True
 
     # User 2 cannot see User 1's application
-    exists = await weaviate_service2.applications.exists(
-        collection_name="Movie",
-        application_id=USER1_APP_ID,
-    )
-    assert exists is False
+    with pytest.raises(RemoteException):
+        await weaviate_service2.applications.exists(
+            collection_name="Movie",
+            application_id=USER1_APP_ID,
+        )
 
     # Clean up
     await weaviate_service.applications.delete(
@@ -170,3 +167,70 @@ async def test_insert_data_invalid_application(weaviate_service):
             "permission",
         ]
     )
+
+
+@pytest.mark.asyncio
+async def test_application_invalid_collection(weaviate_service):
+    """Create a test application with an invalid collection."""
+    with pytest.raises(RemoteException) as exc_info:
+        await weaviate_service.applications.create(
+            application_id=APP_ID,
+            collection_name="NonExistentCollection",
+            description="An application for movie data",
+        )
+    assert "Collection 'NonExistentCollection' does not exist." in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_application_get_artifact(weaviate_service):
+    """Test retrieving an application's artifact information."""
+    # First create a collection and application
+    await create_test_application(weaviate_service)
+
+    # Get the application artifact
+    artifact = await weaviate_service.applications.get_artifact(
+        collection_name="Movie",
+        application_id=APP_ID,
+    )
+
+    assert artifact is not None
+    assert isinstance(artifact, str)
+    # The artifact should contain application configuration information
+    assert "Shared__DELIM__Movie" in artifact
+
+    # Clean up
+    await weaviate_service.applications.delete(
+        collection_name="Movie",
+        application_id=APP_ID,
+    )
+    await weaviate_service.collections.delete("Movie")
+
+
+@pytest.mark.asyncio
+async def test_application_get_artifact_nonexistent(weaviate_service):
+    """Test retrieving artifact for a non-existent application."""
+    # First create a collection but no application
+    await create_test_collection(weaviate_service)
+
+    # Try to get artifact for non-existent application
+    with pytest.raises(RemoteException) as exc_info:
+        await weaviate_service.applications.get_artifact(
+            collection_name="Movie",
+            application_id="NonExistentApp",
+        )
+
+    # Verify that an error was raised
+    assert exc_info.value is not None
+    error_message = str(exc_info.value).lower()
+    assert any(
+        keyword in error_message
+        for keyword in [
+            "not found",
+            "not exist",
+            "artifact",
+            "application",
+        ]
+    )
+
+    # Clean up
+    await weaviate_service.collections.delete("Movie")

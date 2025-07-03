@@ -1,6 +1,7 @@
 import logging
 from typing import Any
 from hypha_startup_services.common.artifacts import (
+    artifact_exists,
     create_artifact,
     delete_artifact,
 )
@@ -95,6 +96,7 @@ async def create_application_artifact(
     application_id: str,
     description: str,
     user_ws: str,
+    caller_ws: str,
 ) -> dict[str, Any]:
     """Create an application artifact.
 
@@ -112,7 +114,7 @@ async def create_application_artifact(
         collection_name=collection_name,
         application_id=application_id,
         user_workspace=user_ws,
-        creator_id=user_ws,
+        creator_id=caller_ws,
         desc=description,
         permissions=make_artifact_permissions(owners=user_ws),
         metadata={

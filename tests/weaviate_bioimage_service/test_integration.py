@@ -62,7 +62,9 @@ class TestRemoteBioImageService:
 
         # Should also have a generated response
         if "generated" in result:
-            assert result["generated"] is None or isinstance(result["generated"], str)
+            assert result["generated"] is not None and isinstance(
+                result["generated"], str
+            )
 
         # Should return some results for a broad query like "microscopy"
         objects = result["objects"]
