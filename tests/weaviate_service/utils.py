@@ -97,14 +97,13 @@ async def create_test_collection(weaviate_service):
 async def create_test_application(weaviate_service):
     """Create a test application for Weaviate tests."""
     await create_test_collection(weaviate_service)
-    # TODO: fix this uncommented code
-    # if await weaviate_service.applications.exists(
-    #     collection_name="Movie", application_id=APP_ID
-    # ):
-    #     # If the application already exists, delete it first
-    #     await weaviate_service.applications.delete(
-    #         collection_name="Movie", application_id=APP_ID
-    #     )
+    if await weaviate_service.applications.exists(
+        collection_name="Movie", application_id=APP_ID
+    ):
+        # If the application already exists, delete it first
+        await weaviate_service.applications.delete(
+            collection_name="Movie", application_id=APP_ID
+        )
 
     await weaviate_service.applications.create(
         application_id=APP_ID,

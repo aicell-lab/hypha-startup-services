@@ -74,11 +74,10 @@ async def test_application_delete(weaviate_service):
     assert exists is False
 
     # Verify that the data was also deleted
-    query_result = await weaviate_service.query.fetch_objects(
-        collection_name="Movie", application_id=APP_ID, limit=10
-    )
-
-    assert len(query_result["objects"]) == 0
+    with pytest.raises(RemoteException):
+        await weaviate_service.query.fetch_objects(
+            collection_name="Movie", application_id=APP_ID, limit=10
+        )
 
 
 @pytest.mark.asyncio

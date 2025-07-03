@@ -39,6 +39,10 @@ from .utils.service_utils import (
     prepare_tenant_collection,
     ws_app_exists,
 )
+from .utils.collection_utils import (
+    add_tenant_if_not_exists,
+    is_multitenancy_enabled,
+)
 from .utils.format_utils import (
     get_full_collection_names,
     collection_to_config_dict,
@@ -199,7 +203,6 @@ async def collections_delete(
     full_names = get_full_collection_names(short_names)
     await client.collections.delete(full_names)
     await delete_collection_artifacts(short_names)
-    # TODO: implement await delete_collection_applications()
 
 
 async def collections_get_artifact(
@@ -298,6 +301,19 @@ async def applications_delete(
         user_ws=user_ws,
         context=context,
     )
+
+    if user_ws is None:
+        assert (
+            context is not None
+        ), "Context must be provided to determine the tenant workspace"
+        user_ws = ws_from_context(context)
+
+    if await is_multitenancy_enabled(client, collection_name):
+        await add_tenant_if_not_exists(
+            client,
+            collection_name,
+            user_ws,
+        )
 
     result = await data_delete_many(
         client,

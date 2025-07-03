@@ -12,7 +12,7 @@ from hypha_rpc.rpc import RemoteService
 COLLECTION_NAME = "bioimage_data"
 SHARED_APPLICATION_ID = "eurobioimaging-shared"
 DEFAULT_SERVER_URL = "https://hypha.aicell.io"
-WEAVIATE_SERVICE_ID = "aria-agents/weaviate"
+WEAVIATE_SERVICE_ID = "aria-agents/weaviate-test"
 OUTPUT_FILE = "bioimage_data_export.json"
 
 logger = logging.getLogger(__name__)
