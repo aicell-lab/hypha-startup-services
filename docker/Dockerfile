@@ -20,6 +20,9 @@ WORKDIR /app/
 # Copy the repository to the image
 COPY . .
 
+# Initialize and update submodules to ensure EB-1-Nodes-Technologies data is available
+RUN git submodule update --init --recursive
+
 # Create logs directory and set permissions for /app, /app/logs, and home directory
 RUN mkdir -p /app/logs && \
     mkdir -p /home/hypha_startup_services/.mem0 && \
