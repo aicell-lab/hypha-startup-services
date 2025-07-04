@@ -50,7 +50,7 @@ async def test_weaviate_bioimage_get_nodes_by_technology_id_test(
     weaviate_bioimage_test_service,
 ):
     result = await weaviate_bioimage_test_service.get_related(
-        entity_id="f0acc857-fc72-4094-bf14-c36ac40801c5"
+        entity_id="660fd1fc-a138-5740-b298-14b0c3b24fb9"
     )
     assert len(result) > 0
     assert "name" in result[0]
@@ -97,7 +97,7 @@ async def test_weaviate_bioimage_get_nodes_by_technology_id_live(
     weaviate_bioimage_live_service,
 ):
     result = await weaviate_bioimage_live_service.get_related(
-        entity_id="f0acc857-fc72-4094-bf14-c36ac40801c5"
+        entity_id="660fd1fc-a138-5740-b298-14b0c3b24fb9"
     )
     assert len(result) > 0
     assert "name" in result[0]
@@ -180,7 +180,7 @@ async def test_local_integration_weaviate_bioimage(weaviate_bioimage_test_servic
 @pytest.mark.asyncio
 async def test_remote_integration_weaviate_bioimage(weaviate_bioimage_live_service):
     result = await weaviate_bioimage_live_service.get_related(
-        entity_id="f0acc857-fc72-4094-bf14-c36ac40801c5"
+        entity_id="660fd1fc-a138-5740-b298-14b0c3b24fb9"
     )
     assert len(result) > 0
     assert "id" in result[0]
@@ -289,7 +289,7 @@ async def test_check_bioimage_application_exists(weaviate_bioimage_test_service)
     try:
         # Try a known entity ID from other tests
         result = await weaviate_bioimage_test_service.get_related(
-            entity_id="f0acc857-fc72-4094-bf14-c36ac40801c5"
+            entity_id="660fd1fc-a138-5740-b298-14b0c3b24fb9"
         )
         print(f"get_related result: {len(result)} entities found")
         if len(result) > 0:
@@ -341,7 +341,7 @@ async def test_check_if_population_needed(weaviate_bioimage_test_service):
     try:
         # Try get_entity method with a known ID
         entity_result = await weaviate_bioimage_test_service.get_entity(
-            entity_id="f0acc857-fc72-4094-bf14-c36ac40801c5"
+            entity_id="660fd1fc-a138-5740-b298-14b0c3b24fb9"
         )
         print(f"get_entity result type: {type(entity_result)}")
         print(f"get_entity result: {entity_result}")

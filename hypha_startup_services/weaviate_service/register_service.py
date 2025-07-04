@@ -34,6 +34,8 @@ from .methods import (
     generate_near_text,
     collections_get_artifact,
     applications_get_artifact,
+    applications_add_permissions,
+    applications_remove_permissions,
 )
 from .utils.constants import DEFAULT_SERVICE_ID
 
@@ -83,6 +85,8 @@ async def register_weaviate_service(
                 "get": partial(applications_get, client),
                 "exists": partial(applications_exists, client),
                 "get_artifact": partial(applications_get_artifact, client),
+                "add_permissions": partial(applications_add_permissions, client),
+                "remove_permissions": partial(applications_remove_permissions, client),
             },
             "data": {
                 "insert_many": partial(data_insert_many, client),

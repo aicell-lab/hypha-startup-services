@@ -18,7 +18,7 @@ EBI_NODES_DATA = [
         "description": "The Italian ALM Node comprises five imaging facilities located in Naples, Genoa, Padua, Florence and Milan specializing in correlative light electron microscopy, super-resolution, and functional imaging.",
         "country": {"name": "Italy", "iso_a2": "IT"},
         "technologies": [
-            "f0acc857-fc72-4094-bf14-c36ac40801c5",  # 3D CLEM
+            "660fd1fc-a138-5740-b298-14b0c3b24fb9",
             "68a3b6c4-9c19-4446-9617-22e7d37e0f2c",  # 4Pi microscopy
             "correlative_microscopy",
             "super_resolution",
@@ -31,7 +31,7 @@ EBI_NODES_DATA = [
         "description": "Multi-sited, multimodal EuroBioimaging Node offering open access to multi-modal ALM, CLEM, EM, functional imaging, high-throughput microscopy and super-resolution microscopy.",
         "country": {"name": "Poland", "iso_a2": "PL"},
         "technologies": [
-            "f0acc857-fc72-4094-bf14-c36ac40801c5",  # 3D CLEM
+            "660fd1fc-a138-5740-b298-14b0c3b24fb9",
             "multi_modal_alm",
             "clem",
             "electron_microscopy",
@@ -53,7 +53,7 @@ EBI_NODES_DATA = [
 
 EBI_TECHNOLOGIES_DATA = [
     {
-        "id": "f0acc857-fc72-4094-bf14-c36ac40801c5",
+        "id": "660fd1fc-a138-5740-b298-14b0c3b24fb9",
         "name": "3D Correlative Light and Electron Microscopy (3D-CLEM)",
         "abbr": "3D-CLEM",
         "description": "3D CLEM combines volume EM methods with 3D light microscopy techniques requiring 3D registration between modalities.",
@@ -74,6 +74,15 @@ EBI_TECHNOLOGIES_DATA = [
         "category": {"name": "Fluorescence Nanoscopy"},
     },
 ]
+
+
+@pytest_asyncio.fixture
+async def mem0_live_service():
+    """Mem0 BioImage service fixture for live (admin) environment."""
+    server = await get_user_server("HYPHA_TOKEN")
+    service = await server.get_service("aria-agents/mem0")
+    yield service
+    await server.disconnect()
 
 
 @pytest.fixture
@@ -100,7 +109,7 @@ async def test_bioimage_index_basic_functionality(bioimage_index):
     assert node["name"] == "Advanced Light Microscopy Italian Node"
 
     # Test technology retrieval
-    tech = bioimage_index.get_technology_by_id("f0acc857-fc72-4094-bf14-c36ac40801c5")
+    tech = bioimage_index.get_technology_by_id("660fd1fc-a138-5740-b298-14b0c3b24fb9")
     assert tech is not None
     assert "3D Correlative Light and Electron Microscopy" in tech["name"]
 
@@ -111,7 +120,7 @@ async def test_get_nodes_by_technology_id(bioimage_index):
     # Test with known technology ID - this should find nodes that provide this technology
     result = get_related_entities(
         bioimage_index=bioimage_index,
-        entity_id="f0acc857-fc72-4094-bf14-c36ac40801c5",  # 3D-CLEM technology
+        entity_id="660fd1fc-a138-5740-b298-14b0c3b24fb9",  # 3D-CLEM technology
     )
 
     # Should return a list of nodes that have this technology
@@ -195,7 +204,7 @@ async def test_get_technology_details(bioimage_index):
     # Test with known technology ID
     result = await get_entity_details(
         bioimage_index=bioimage_index,
-        entity_id="f0acc857-fc72-4094-bf14-c36ac40801c5",  # 3D-CLEM technology
+        entity_id="660fd1fc-a138-5740-b298-14b0c3b24fb9",  # 3D-CLEM technology
     )
 
     assert "entity_id" in result
@@ -342,9 +351,7 @@ async def test_mem0_bioimage_integration(mem0_bioimage_live_service, mem0_live_s
 
         # Search in mem0 with the specified agent_id and workspace
         search_result = await mem0_bioimage_live_service.search(
-            query=query,
-            agent_id="ebi_file_loader",
-            workspace="aria-agents",
+            query_text=query,
             limit=3,  # Get top 3 results
         )
 
@@ -353,21 +360,16 @@ async def test_mem0_bioimage_integration(mem0_bioimage_live_service, mem0_live_s
         assert "results" in search_result, "Search result missing 'results' key"
         results = search_result["results"]
 
-        # If no results found, skip this query (remote service may not have data loaded)
-        if len(results) == 0:
-            print(f"No search results found for query: {query} - skipping")
-            continue
-
         assert (
-            len(results) <= 3
-        ), f"Too many results returned (expected max 3): {len(results)}"
+            len(results) == 3
+        ), f"Wrong number of results returned (expected 3): {len(results)}"
 
         print(f"Found {len(results)} mem0 results")
 
         # Test bioimage service with known IDs (deterministic)
         # Test with known technology ID
-        tech_result = await mem0_bioimage_live_service.get_nodes_by_technology_id(
-            technology_id="f0acc857-fc72-4094-bf14-c36ac40801c5"  # 3D-CLEM
+        tech_result = await mem0_bioimage_live_service.get(
+            "660fd1fc-a138-5740-b298-14b0c3b24fb9"  # 3D-CLEM
         )
 
         # Validate bioimage service technology lookup
@@ -379,8 +381,8 @@ async def test_mem0_bioimage_integration(mem0_bioimage_live_service, mem0_live_s
         ), "Expected at least one node for known technology"
 
         # Test with known node ID
-        node_result = await mem0_bioimage_live_service.get_technologies_by_node_id(
-            node_id="7409a98f-1bdb-47d2-80e7-c89db73efedd"  # Italian node
+        node_result = await mem0_bioimage_live_service.get(
+            "7409a98f-1bdb-47d2-80e7-c89db73efedd"  # Italian node
         )
 
         # Validate bioimage service node lookup
@@ -449,14 +451,16 @@ async def test_mem0_bioimage_search_test_service(mem0_bioimage_test_service):
 async def test_mem0_bioimage_search_live_service(mem0_bioimage_live_service):
     # Use a query that should return results
     query = "microscopy"
-    result = await mem0_bioimage_live_service.search(query=query, limit=3)
+    result = await mem0_bioimage_live_service.search(query_text=query, limit=3)
     assert result is not None, "Search result should not be None"
     assert isinstance(result, dict), "Search result should be a dict"
     assert "results" in result, "Search result missing 'results' key"
     assert isinstance(result["results"], list), "'results' should be a list"
     assert len(result["results"]) > 0, "Search should return at least one result"
     for item in result["results"]:
-        assert "id" in item or "name" in item, "Each result should have an id or name"
+        assert (
+            "entity_id" in item or "name" in item
+        ), "Each result should have an id or name"
 
 
 # If there is a query method, add a test for it as well

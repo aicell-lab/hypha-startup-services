@@ -60,7 +60,7 @@ def test_get_technologies_by_node_id_unit(mock_mem0_bioimage_service):
 @pytest.mark.asyncio
 async def test_local_integration_mem0_bioimage(mem0_bioimage_test_service):
     result = await mem0_bioimage_test_service.get_related(
-        entity_id="f0acc857-fc72-4094-bf14-c36ac40801c5"
+        entity_id="660fd1fc-a138-5740-b298-14b0c3b24fb9"
     )
     assert len(result) > 0
     assert "name" in result[0]
@@ -79,6 +79,6 @@ async def mem0_bioimage_live_service():
 @pytest.mark.asyncio
 async def test_remote_integration_mem0_bioimage(mem0_bioimage_live_service):
     result = await mem0_bioimage_live_service.get_related(
-        entity_id="f0acc857-fc72-4094-bf14-c36ac40801c5"
+        entity_id="660fd1fc-a138-5740-b298-14b0c3b24fb9"
     )
     assert "info" in result

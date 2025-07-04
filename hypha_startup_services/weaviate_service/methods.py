@@ -31,6 +31,7 @@ from hypha_startup_services.common.permissions import (
 from hypha_startup_services.common.artifacts import (
     get_artifact,
     artifact_exists,
+    artifact_edit,
 )
 from .utils.service_utils import (
     prepare_application_creation,
@@ -444,6 +445,100 @@ async def applications_get_artifact(
     return artifact_name
 
 
+async def applications_add_permissions(
+    client: WeaviateAsyncClient,
+    collection_name: str,
+    application_id: str,
+    permissions: dict[str, Any],
+    user_ws: str | None = None,
+    context: dict[str, Any] | None = None,
+) -> None:
+    """Add permissions for an application.
+
+    Updates the application artifact by merging the provided permissions with existing ones.
+    Verifies that the caller has permission to access the application.
+
+    Args:
+        client: WeaviateAsyncClient instance
+        collection_name: Name of the collection containing the application
+        application_id: ID of the application to update permissions for
+        permissions: Dictionary of permissions to add/merge
+        user_ws: Optional user workspace to use as tenant (if different from caller)
+        context: Context containing caller information
+    """
+
+    artifact_name = await applications_get_artifact(
+        client,
+        collection_name,
+        application_id,
+        user_ws=user_ws,
+        context=context,
+    )
+
+    manifest = await get_artifact(artifact_name)
+
+    # Get existing permissions to merge with
+    existing_permissions = {}
+    if "config" in manifest and "permissions" in manifest["config"]:
+        existing_permissions = manifest["config"]["permissions"]
+
+    # Merge new permissions with existing ones
+    merged_permissions = {**existing_permissions, **permissions}
+
+    await artifact_edit(
+        artifact_id=artifact_name,
+        config={"permissions": merged_permissions},
+    )
+
+
+async def applications_remove_permissions(
+    client: WeaviateAsyncClient,
+    collection_name: str,
+    application_id: str,
+    permission_keys: list[str],
+    user_ws: str | None = None,
+    context: dict[str, Any] | None = None,
+) -> None:
+    """Remove permissions for an application.
+
+    Updates the application artifact by removing the specified permission keys.
+    Verifies that the caller has permission to access the application.
+
+    Args:
+        client: WeaviateAsyncClient instance
+        collection_name: Name of the collection containing the application
+        application_id: ID of the application to update permissions for
+        permission_keys: List of permission keys to remove
+        user_ws: Optional user workspace to use as tenant (if different from caller)
+        context: Context containing caller information
+    """
+
+    artifact_name = await applications_get_artifact(
+        client,
+        collection_name,
+        application_id,
+        user_ws=user_ws,
+        context=context,
+    )
+
+    manifest = await get_artifact(artifact_name)
+
+    # Get existing permissions to modify
+    existing_permissions = {}
+    if "config" in manifest and "permissions" in manifest["config"]:
+        existing_permissions = manifest["config"]["permissions"].copy()
+
+    # Remove specified permission keys
+    for key in permission_keys:
+        if key in existing_permissions:
+            del existing_permissions[key]
+
+    await artifact_edit(
+        artifact_id=artifact_name,
+        config={"permissions": existing_permissions},
+    )
+
+
 async def data_insert_many(
     client: WeaviateAsyncClient,
     collection_name: str,
@@ -753,7 +848,7 @@ async def generate_near_text(
 
     return {
         "objects": objects_part_coll_name(response.objects),
-        "generated": response.generated,
+        "generated": response.generative.text if response.generative else None,
     }
 
 

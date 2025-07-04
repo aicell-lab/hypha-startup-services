@@ -325,6 +325,9 @@ async def insert_data_in_batches(
                 collection_name=COLLECTION_NAME,
                 application_id=SHARED_APPLICATION_ID,
                 objects=batch,
+                enable_chunking=True,
+                chunk_size=512,
+                text_field="text",
             )
 
             if result.get("has_errors"):
