@@ -695,94 +695,111 @@ def patch_ollama_embed():
 def patch_mem0_embedding_cache():
     """
     Monkey patch to fix the issue where mem0 tries to use lists as dictionary keys.
-    
+
     This patches the exact problematic operation by overriding dict behavior.
     """
     try:
         import mem0.memory.main
         import asyncio
-        
+
         # Get the AsyncMemory class
         AsyncMemory = mem0.memory.main.AsyncMemory
-        
+
         # Check if the method exists
-        if not hasattr(AsyncMemory, '_add_to_vector_store'):
-            logger.warning("Could not find AsyncMemory._add_to_vector_store method to patch")
+        if not hasattr(AsyncMemory, "_add_to_vector_store"):
+            logger.warning(
+                "Could not find AsyncMemory._add_to_vector_store method to patch"
+            )
             return False
-            
+
         # Store the original method
-        original_method = getattr(AsyncMemory, '_add_to_vector_store')
-        
-        async def patched_add_to_vector_store(self, messages, metadata, effective_filters, infer=True):
+        original_method = getattr(AsyncMemory, "_add_to_vector_store")
+
+        async def patched_add_to_vector_store(
+            self, messages, metadata, effective_filters, infer=True
+        ):
             """
             Patched version that handles unhashable list errors by creating a custom dictionary.
             """
             # First, try the original method as-is
             try:
-                return await original_method(self, messages, metadata, effective_filters, infer)
+                return await original_method(
+                    self, messages, metadata, effective_filters, infer
+                )
             except TypeError as e:
                 if "unhashable type: 'list'" not in str(e):
                     raise
-                    
-                logger.warning("Caught unhashable list error. Attempting fallback with custom dict.")
-                
+
+                logger.warning(
+                    "Caught unhashable list error. Attempting fallback with custom dict."
+                )
+
                 # The issue is in mem0's internal logic where it uses new_mem_content as a dict key
                 # Let's try to bypass this by temporarily monkey-patching dict assignment
-                
+
                 # This is a hacky solution but should work for the specific case
                 try:
                     # Try calling the original method but with a custom exception handler
                     # We'll catch the specific line where the error occurs and handle it
-                    return await self._patched_add_with_string_keys(messages, metadata, effective_filters, infer)
+                    return await self._patched_add_with_string_keys(
+                        messages, metadata, effective_filters, infer
+                    )
                 except Exception as fallback_error:
                     logger.error(f"Fallback method also failed: {fallback_error}")
                     return []
-        
-        async def patched_add_with_string_keys(self, messages, metadata, effective_filters, infer=True):
+
+        async def patched_add_with_string_keys(
+            self, messages, metadata, effective_filters, infer=True
+        ):
             """
             Custom implementation that ensures all content used as keys is converted to strings.
             This is a simplified approach that doesn't rely on LLM-specific methods.
             """
             try:
                 logger.info(f"Custom fallback: processing {len(messages)} messages")
-                
+
                 # Create simple facts from user messages without relying on LLM
                 facts = []
                 for msg in messages:
-                    if isinstance(msg, dict) and msg.get('role') == 'user':
-                        content = msg.get('content', '')
+                    if isinstance(msg, dict) and msg.get("role") == "user":
+                        content = msg.get("content", "")
                         if content:
-                            facts.append({
-                                'content': content,
-                                'category': 'conversation'
-                            })
-                            logger.info(f"Created fact from user message: {content[:100]}...")
-                
+                            facts.append(
+                                {"content": content, "category": "conversation"}
+                            )
+                            logger.info(
+                                f"Created fact from user message: {content[:100]}..."
+                            )
+
                 if not facts:
                     logger.info("No user messages found to create facts from")
                     return []
-                
+
                 logger.info(f"Created {len(facts)} facts from messages")
-                
+
                 # Process each fact and create memories
                 created_memories = 0
                 for fact in facts:
                     try:
                         # Get the content from the fact
                         new_mem_content = fact.get("content", "")
-                        
+
                         # Convert to string if it's a list (safety check)
                         if isinstance(new_mem_content, list):
-                            content_key = " ".join(str(item) for item in new_mem_content)
-                            logger.info(f"Converted list content to string: {new_mem_content} -> {content_key}")
+                            content_key = " ".join(
+                                str(item) for item in new_mem_content
+                            )
+                            logger.info(
+                                f"Converted list content to string: {new_mem_content} -> {content_key}"
+                            )
                         else:
                             content_key = str(new_mem_content)
-                        
+
                         # Get embeddings for the content
                         embeddings = await asyncio.to_thread(
                             self.embedding_model.embed, content_key, "add"
                         )
-                        
+
                         # Search for similar memories
                         search_results = await self.vector_store.search(
                             query="",
@@ -790,65 +807,79 @@ def patch_mem0_embedding_cache():
                             limit=5,
                             filters=effective_filters,
                         )
-                        
+
                         similar_memories = [
                             result for result in search_results if result.score >= 0.7
                         ]
-                        
+
                         if similar_memories:
                             # Update existing memory
-                            logger.info(f"Found similar memory, updating: {similar_memories[0].id}")
+                            logger.info(
+                                f"Found similar memory, updating: {similar_memories[0].id}"
+                            )
                             existing_memory = similar_memories[0]
-                            
+
                             # Create a simple updated memory without relying on LLM
                             updated_memory = {
-                                'content': content_key,
-                                'category': fact.get('category', 'conversation'),
-                                'data': content_key  # mem0 stores content in 'data' field
+                                "content": content_key,
+                                "category": fact.get("category", "conversation"),
+                                "data": content_key,  # mem0 stores content in 'data' field
                             }
-                            
+
                             await self.vector_store.update(
                                 vector_id=existing_memory.id,
                                 vector=embeddings,
-                                payload={**existing_memory.payload, **updated_memory, **metadata}
+                                payload={
+                                    **existing_memory.payload,
+                                    **updated_memory,
+                                    **metadata,
+                                },
                             )
                             created_memories += 1
                         else:
                             # Create new memory
-                            logger.info(f"Creating new memory for content: {content_key[:100]}...")
-                            
+                            logger.info(
+                                f"Creating new memory for content: {content_key[:100]}..."
+                            )
+
                             # Create a simple memory structure that mem0 expects
                             new_memory = {
-                                'content': content_key,
-                                'category': fact.get('category', 'conversation'),
-                                'data': content_key  # mem0 stores the actual content in 'data'
+                                "content": content_key,
+                                "category": fact.get("category", "conversation"),
+                                "data": content_key,  # mem0 stores the actual content in 'data'
                             }
-                            
+
                             await self.vector_store.insert(
                                 vectors=[embeddings],
-                                payloads=[{**new_memory, **metadata}]
+                                payloads=[{**new_memory, **metadata}],
                             )
                             created_memories += 1
-                            
+
                     except Exception as fact_error:
                         logger.error(f"Error processing fact: {fact_error}")
                         continue
-                
-                logger.info(f"Successfully created/updated {created_memories} memories using simplified approach")
+
+                logger.info(
+                    f"Successfully created/updated {created_memories} memories using simplified approach"
+                )
                 return facts
-                
+
             except Exception as e:
                 logger.error(f"Error in patched_add_with_string_keys: {e}")
                 return []
-        
+
         # Add the custom method to the class
-        setattr(AsyncMemory, '_patched_add_with_string_keys', patched_add_with_string_keys)
-        
+        setattr(
+            AsyncMemory, "_patched_add_with_string_keys", patched_add_with_string_keys
+        )
+
         # Apply the main patch
-        setattr(AsyncMemory, '_add_to_vector_store', patched_add_to_vector_store)
-        logger.info("Successfully patched AsyncMemory._add_to_vector_store with string-key fallback")
+        setattr(AsyncMemory, "_add_to_vector_store", patched_add_to_vector_store)
+        logger.info(
+            "Successfully patched AsyncMemory._add_to_vector_store with string-key fallback"
+        )
         return True
-        
+
     except Exception as e:
         logger.error("Error patching mem0 embedding cache: %s", str(e))
         return False
