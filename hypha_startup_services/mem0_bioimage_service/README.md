@@ -66,7 +66,7 @@ async def example():
     print(f"Found {result['total_nodes']} nodes providing 3D-CLEM")
     
     # Find technologies at Italian node
-    result = await service.get_technologies_by_node_id("7409a98f-1bdb-47d2-80e7-c89db73efedd")
+    result = await service.get_technologies_by_node_id("7e35b2a1-22ef-58ec-a32b-805e388932ee")
     print(f"Italian node provides {result['total_technologies']} technologies")
     
     # Search for microscopy nodes
@@ -92,7 +92,7 @@ python -m hypha_startup_services mem0-bioimage remote --server-url https://hypha
 - Output: List of nodes in Italy, Poland, etc. that provide 3D-CLEM
 
 **Node to Technologies Lookup**:
-- Input: `node_id = "7409a98f-1bdb-47d2-80e7-c89db73efedd"` (Italian Node)
+- Input: `node_id = "660fd1fc-a138-5740-b298-14b0c3b24fb9"` (Italian Node)
 - Output: List of technologies like 3D-CLEM, 4Pi microscopy, super-resolution, etc.
 
 **Search Example**:
