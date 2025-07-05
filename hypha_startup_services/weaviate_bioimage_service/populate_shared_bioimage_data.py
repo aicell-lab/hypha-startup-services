@@ -33,6 +33,7 @@ logger.setLevel(logging.INFO)
 
 # Constants
 COLLECTION_NAME = "bioimage_data"
+TEST_COLLECTION_NAME = "bioimage_data_test"
 SHARED_APPLICATION_ID = "eurobioimaging-shared"
 DEFAULT_SERVER_URL = "https://hypha.aicell.io"
 WEAVIATE_SERVICE_ID = "aria-agents/weaviate"
@@ -124,8 +125,11 @@ def prepare_technology_objects(tech_data: list[dict[str, Any]]) -> list[dict[str
     return objects
 
 
-async def get_weaviate_service(server_url: str):
+async def get_weaviate_service(server_url: str, service_id: str | None = None):
     """Connect to the Weaviate service."""
+    if service_id is None:
+        service_id = WEAVIATE_SERVICE_ID
+
     logger.info("Connecting to server: %s", server_url)
 
     # Get token from environment
@@ -143,8 +147,8 @@ async def get_weaviate_service(server_url: str):
     )
 
     # Get the Weaviate service
-    logger.info("Getting Weaviate service: %s", WEAVIATE_SERVICE_ID)
-    weaviate_service = await server.get_service(WEAVIATE_SERVICE_ID)
+    logger.info("Getting Weaviate service: %s", service_id)
+    weaviate_service = await server.get_service(service_id)
     logger.info("Connected to Weaviate service")
 
     return server, weaviate_service
@@ -152,6 +156,7 @@ async def get_weaviate_service(server_url: str):
 
 async def ensure_collection_exists(
     weaviate_service,
+    collection_name: str,
     ollama_model: str = "mxbai-embed-large:latest",
     ollama_llm_model: str = "qwen2.5:7b",
     ollama_endpoint: str = "https://hypha-ollama.scilifelab-2-dev.sys.kth.se",
@@ -159,17 +164,17 @@ async def ensure_collection_exists(
     """Ensure the bioimage collection exists with proper configuration."""
     try:
         # Check if collection exists
-        exists = await weaviate_service.collections.exists(COLLECTION_NAME)
+        exists = await weaviate_service.collections.exists(collection_name)
         if exists:
-            logger.info("Collection %s already exists", COLLECTION_NAME)
+            logger.info("Collection %s already exists", collection_name)
             return
     except Exception as e:
         logger.warning("Error checking if collection exists: %s", e)
 
-    logger.info("Creating collection %s...", COLLECTION_NAME)
+    logger.info("Creating collection %s...", collection_name)
 
     class_obj = {
-        "class": COLLECTION_NAME,
+        "class": collection_name,
         "description": "EuroBioImaging nodes and technologies data",
         "properties": [
             {
@@ -263,26 +268,34 @@ async def ensure_collection_exists(
         raise
 
 
-async def ensure_application_exists(weaviate_service) -> None:
+async def ensure_application_exists(
+    weaviate_service, collection_name: str, application_id: str
+) -> None:
     """Ensure the shared bioimage application exists."""
     try:
         # Check if application exists
         exists = await weaviate_service.applications.exists(
-            collection_name=COLLECTION_NAME,
-            application_id=SHARED_APPLICATION_ID,
+            collection_name=collection_name,
+            application_id=application_id,
         )
         if exists:
-            logger.info("Application %s already exists", SHARED_APPLICATION_ID)
+            logger.info(
+                "Application %s already exists in collection %s",
+                application_id,
+                collection_name,
+            )
             return
     except Exception as e:
         logger.warning("Error checking if application exists: %s", e)
 
-    logger.info("Creating application %s...", SHARED_APPLICATION_ID)
+    logger.info(
+        "Creating application %s in collection %s...", application_id, collection_name
+    )
 
     try:
         await weaviate_service.applications.create(
-            collection_name=COLLECTION_NAME,
-            application_id=SHARED_APPLICATION_ID,
+            collection_name=collection_name,
+            application_id=application_id,
             description="Shared EuroBioImaging nodes and technologies database",
         )
         logger.info("✅ Created application %s successfully", SHARED_APPLICATION_ID)
@@ -355,6 +368,82 @@ async def insert_data_in_batches(
     return total_results
 
 
+async def populate_collection(
+    weaviate_service,
+    collection_name: str,
+    application_id: str,
+    delete_existing: bool,
+    ollama_model: str,
+    ollama_llm_model: str,
+    ollama_endpoint: str,
+) -> None:
+    """Populate a specific collection with bioimage data."""
+    logger.info("🔧 Ensuring collection %s exists...", collection_name)
+
+    if delete_existing:
+        try:
+            await weaviate_service.collections.delete(name=collection_name)
+            logger.info("Deleted existing collection %s", collection_name)
+        except Exception as e:
+            logger.warning("Error deleting collection %s: %s", collection_name, e)
+
+    await ensure_collection_exists(
+        weaviate_service,
+        collection_name=collection_name,
+        ollama_model=ollama_model,
+        ollama_llm_model=ollama_llm_model,
+        ollama_endpoint=ollama_endpoint,
+    )
+
+    if delete_existing:
+        try:
+            await weaviate_service.applications.delete(
+                collection_name=collection_name,
+                application_id=application_id,
+            )
+            logger.info(
+                "Deleted existing application %s in collection %s",
+                application_id,
+                collection_name,
+            )
+        except Exception as e:
+            logger.warning("Error deleting application: %s", e)
+
+    # Ensure application exists
+    logger.info("🔧 Ensuring application exists in collection %s...", collection_name)
+    await ensure_application_exists(weaviate_service, collection_name, application_id)
+
+    # Load data
+    logger.info("📊 Loading bioimage data for collection %s...", collection_name)
+    nodes_data, tech_data = await load_data_files()
+
+    # Prepare objects
+    nodes_objects = prepare_node_objects(nodes_data)
+    tech_objects = prepare_technology_objects(tech_data)
+
+    logger.info(
+        "Found %d nodes and %d technologies", len(nodes_objects), len(tech_objects)
+    )
+
+    # Insert data in batches
+    all_objects = nodes_objects + tech_objects
+
+    if all_objects:
+        logger.info(
+            "💾 Inserting %d objects into collection %s...",
+            len(all_objects),
+            collection_name,
+        )
+        await weaviate_service.data.insert_many(
+            collection_name=collection_name,
+            application_id=application_id,
+            objects=all_objects,
+        )
+        logger.info("✅ Successfully inserted data into collection %s", collection_name)
+    else:
+        logger.warning("⚠️  No objects to insert into collection %s", collection_name)
+
+
 async def main():
     """Main function to populate shared bioimage application with data."""
     # Parse command line arguments
@@ -384,88 +473,95 @@ async def main():
 
     args = parser.parse_args()
 
-    logger.info("🚀 Populating shared bioimage application with data")
+    logger.info("🚀 Populating shared bioimage applications with data")
     logger.info("Using Ollama endpoint: %s", args.ollama_endpoint)
     logger.info("Using embedding model: %s", args.ollama_model)
     logger.info("Using generation model: %s", args.ollama_llm_model)
 
-    server = None
+    test_server = None
+    prod_server = None
+
     try:
-        # Connect to server
-        server, weaviate_service = await get_weaviate_service(DEFAULT_SERVER_URL)
+        # Create TEST collection (uses external Weaviate URL)
+        logger.info("=" * 60)
+        logger.info("🧪 SETTING UP TEST COLLECTION: %s", TEST_COLLECTION_NAME)
+        logger.info("=" * 60)
 
-        # Ensure collection exists
-        logger.info("🔧 Ensuring collection exists...")
-        if args.delete_existing:
-            await weaviate_service.collections.delete(
-                name=COLLECTION_NAME,
-            )
+        test_server, test_weaviate_service = await get_weaviate_service(
+            DEFAULT_SERVER_URL
+        )
 
-        await ensure_collection_exists(
-            weaviate_service,
+        await populate_collection(
+            weaviate_service=test_weaviate_service,
+            collection_name=TEST_COLLECTION_NAME,
+            application_id=SHARED_APPLICATION_ID,
+            delete_existing=args.delete_existing,
             ollama_model=args.ollama_model,
             ollama_llm_model=args.ollama_llm_model,
             ollama_endpoint=args.ollama_endpoint,
         )
 
-        if args.delete_existing:
-            await weaviate_service.applications.delete(
-                collection_name=COLLECTION_NAME,
-                application_id=SHARED_APPLICATION_ID,
+        logger.info("✅ Test collection %s setup complete!", TEST_COLLECTION_NAME)
+
+        # Create PRODUCTION collection (uses internal K8s Weaviate URL)
+        logger.info("=" * 60)
+        logger.info("🚀 SETTING UP PRODUCTION COLLECTION: %s", COLLECTION_NAME)
+        logger.info("=" * 60)
+
+        try:
+            prod_server, prod_weaviate_service = await get_weaviate_service(
+                DEFAULT_SERVER_URL
             )
 
-        # Ensure application exists
-        logger.info("🔧 Ensuring application exists...")
-        await ensure_application_exists(weaviate_service)
+            await populate_collection(
+                weaviate_service=prod_weaviate_service,
+                collection_name=COLLECTION_NAME,
+                application_id=SHARED_APPLICATION_ID,
+                delete_existing=args.delete_existing,
+                ollama_model=args.ollama_model,
+                ollama_llm_model=args.ollama_llm_model,
+                ollama_endpoint=args.ollama_endpoint,
+            )
 
-        # Load data
-        nodes_data, tech_data = await load_data_files()
+            logger.info("✅ Production collection %s setup complete!", COLLECTION_NAME)
 
-        # Prepare objects
-        node_objects = prepare_node_objects(nodes_data)
-        tech_objects = prepare_technology_objects(tech_data)
+        except Exception as e:
+            logger.error(
+                "❌ Failed to setup production collection (this is expected if not in K8s): %s",
+                e,
+            )
+            logger.info(
+                "ℹ️  Production collection will be available when deployed to Kubernetes"
+            )
 
-        # Insert data in batches
-        logger.info("📥 Inserting bioimage data into shared application...")
-        nodes_result = await insert_data_in_batches(
-            weaviate_service, node_objects, "nodes"
+        logger.info("=" * 60)
+        logger.info("🎉 ALL COLLECTIONS SETUP COMPLETE!")
+        logger.info(
+            "   • Test collection: %s (external Weaviate)", TEST_COLLECTION_NAME
         )
-        tech_result = await insert_data_in_batches(
-            weaviate_service, tech_objects, "technologies"
+        logger.info(
+            "   • Production collection: %s (internal K8s Weaviate)", COLLECTION_NAME
         )
-
-        # Summary
-        logger.info("✅ Data population completed!")
-        logger.info("Application ID: %s", SHARED_APPLICATION_ID)
-        logger.info("Collection: %s", COLLECTION_NAME)
-        logger.info("Nodes processed: %d", len(node_objects))
-        logger.info("Technologies processed: %d", len(tech_objects))
-
-        # Check for errors
-        nodes_errors = nodes_result.get("has_errors", False)
-        tech_errors = tech_result.get("has_errors", False)
-
-        if nodes_errors or tech_errors:
-            logger.warning("⚠️ Some errors occurred during data insertion:")
-            if nodes_errors:
-                logger.warning(
-                    "- Node insertion errors: %s", nodes_result.get("errors", "Unknown")
-                )
-            if tech_errors:
-                logger.warning(
-                    "- Technology insertion errors: %s",
-                    tech_result.get("errors", "Unknown"),
-                )
-        else:
-            logger.info("🎉 All data inserted successfully!")
-
+        logger.info("=" * 60)
     except Exception as e:
-        logger.error("Error populating shared application: %s", e)
+        logger.error("❌ Error during data population: %s", e)
         raise
 
     finally:
-        if server is not None:
-            await server.disconnect()
+        # Disconnect from servers
+        if test_server is not None:
+            try:
+                await test_server.disconnect()
+                logger.info("Disconnected from test server")
+            except Exception as e:
+                logger.warning("Error disconnecting from test server: %s", e)
+
+        if prod_server is not None:
+            try:
+                await prod_server.disconnect()
+                logger.info("Disconnected from production server")
+            except Exception as e:
+                logger.warning("Error disconnecting from production server: %s", e)
 
 
 if __name__ == "__main__":

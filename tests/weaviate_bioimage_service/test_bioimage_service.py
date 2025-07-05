@@ -405,16 +405,16 @@ async def test_populate_bioimage_test_service(weaviate_bioimage_test_service):
             weaviate_service = await server.get_service("aria-agents/weaviate")
             print("Found weaviate service for population")
 
-            # Check if the bioimage_data collection exists
+            # Check if the bioimage_data_test collection exists
             try:
                 collections = await weaviate_service.collections.list_all()
                 print(f"Available collections: {list(collections.keys())}")
 
-                if "bioimage_data" not in collections:
-                    print("bioimage_data collection doesn't exist, creating it...")
+                if "bioimage_data_test" not in collections:
+                    print("bioimage_data_test collection doesn't exist, creating it...")
                     # Create the collection
                     collection_config = {
-                        "class": "bioimage_data",
+                        "class": "bioimage_data_test",
                         "description": "BioImage data collection for testing",
                         "properties": [
                             {
@@ -435,18 +435,20 @@ async def test_populate_bioimage_test_service(weaviate_bioimage_test_service):
                         ],
                     }
                     await weaviate_service.collections.create(collection_config)
-                    print("Created bioimage_data collection")
+                    print("Created bioimage_data_test collection")
 
                 # Check if applications exist
                 try:
-                    apps = await weaviate_service.applications.list("bioimage_data")
+                    apps = await weaviate_service.applications.list(
+                        "bioimage_data_test"
+                    )
                     print(f"Available applications: {apps}")
 
                     # Create test application if it doesn't exist
                     test_app_id = "bioimage-test-data"
                     if test_app_id not in apps:
                         await weaviate_service.applications.create(
-                            collection_name="bioimage_data",
+                            collection_name="bioimage_data_test",
                             application_id=test_app_id,
                             description="Test application for bioimage data",
                         )
@@ -469,7 +471,7 @@ async def test_populate_bioimage_test_service(weaviate_bioimage_test_service):
                     for node in test_nodes:
                         try:
                             result = await weaviate_service.data.insert(
-                                collection_name="bioimage_data",
+                                collection_name="bioimage_data_test",
                                 application_id=test_app_id,
                                 properties=node,
                             )
@@ -523,7 +525,7 @@ async def test_check_and_populate_eurobioimaging_shared_app(
         weaviate_service = await server.get_service("aria-agents/weaviate")
 
         # Check if the eurobioimaging-shared application exists
-        collection_name = "bioimage_data"
+        collection_name = "bioimage_data_test"
         application_id = "eurobioimaging-shared"
 
         try:
@@ -645,7 +647,7 @@ async def test_investigate_eurobioimaging_shared_app_contents(
         server = await get_user_server("PERSONAL_TOKEN")
         weaviate_service = await server.get_service("aria-agents/weaviate")
 
-        collection_name = "bioimage_data"
+        collection_name = "bioimage_data_test"
         application_id = "eurobioimaging-shared"
 
         # Try to fetch objects instead of counting

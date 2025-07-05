@@ -75,7 +75,7 @@ SEARCH_QUERY_PREFERENCES = "What kind of movies do I like?"
 
 
 async def cleanup_mem0_memories(
-    service, agent_id: str, workspace: str, run_id: str | None = None
+    service: RemoteService, agent_id: str, workspace: str, run_id: str | None = None
 ):
     """Clean up memories for a specific agent and workspace."""
     try:
