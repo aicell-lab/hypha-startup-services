@@ -170,7 +170,7 @@ def mock_bioimage_service_fixture():
 @pytest.mark.asyncio
 async def test_local_integration_weaviate_bioimage(weaviate_bioimage_test_service):
     result = await weaviate_bioimage_test_service.get_related(
-        entity_id="f78b39ca-3b2a-49f4-99eb-a7f241640bf2"
+        entity_id="d793e58b-cbbb-547f-be43-d09ef0f7e6a0"
     )
     assert len(result) > 0
     assert "id" in result[0]

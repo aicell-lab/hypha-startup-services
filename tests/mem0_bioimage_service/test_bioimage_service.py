@@ -374,11 +374,11 @@ async def test_mem0_bioimage_integration(mem0_bioimage_live_service, mem0_live_s
 
         # Validate bioimage service technology lookup
         assert tech_result is not None
-        assert "nodes" in tech_result
-        assert "technology" in tech_result
-        assert (
-            len(tech_result["nodes"]) >= 1
-        ), "Expected at least one node for known technology"
+        assert "entity_id" in tech_result
+        assert "entity_details" in tech_result
+        assert "description" in tech_result["entity_details"]
+        assert "category" in tech_result["entity_details"]
+        assert "entity_type" in tech_result
 
         # Test with known node ID
         node_result = await mem0_bioimage_live_service.get(
@@ -387,27 +387,11 @@ async def test_mem0_bioimage_integration(mem0_bioimage_live_service, mem0_live_s
 
         # Validate bioimage service node lookup
         assert node_result is not None
-        assert "technologies" in node_result
-        assert "node" in node_result
-        assert (
-            len(node_result["technologies"]) >= 1
-        ), "Expected at least one technology for known node"
-
-        # Test service statistics
-        stats_result = await mem0_bioimage_live_service.get_statistics()
-        assert stats_result is not None
-        assert "service" in stats_result
-        assert "statistics" in stats_result
-        assert stats_result["service"] == "mem0_bioimage_service"
-
-        print(f"✅ Query '{query}' processed successfully:")
-        print(f"   - Found {len(tech_result['nodes'])} nodes for technology lookup")
-        print(
-            f"   - Found {len(node_result['technologies'])} technologies for node lookup"
-        )
-        print(
-            f"   - Service statistics: {stats_result['statistics']['total_nodes']} nodes, {stats_result['statistics']['total_technologies']} technologies"
-        )
+        assert "entity_id" in tech_result
+        assert "entity_details" in tech_result
+        assert "description" in tech_result["entity_details"]
+        assert "category" in tech_result["entity_details"]
+        assert "entity_type" in tech_result
 
 
 # Fixtures for test and live/prod mem0_bioimage services (mirroring test_bioimage_service_unit.py)

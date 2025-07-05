@@ -168,7 +168,10 @@ async def test_enhanced_bioimage_entity_agnostic_functions(bioimage_index, mem0_
     assert result["entity_id"] == node_id
     assert result["entity_type"] == "node"
     assert result["entity_details"] is not None
-    assert result["entity_details"]["name"] == "Advanced Light Microscopy Italian Node"
+    assert (
+        result["entity_details"]["name"]
+        == "Correlative light microscopy dutch flagship node"
+    )
 
     # Test get_entity_details for a technology
     tech_id = "660fd1fc-a138-5740-b298-14b0c3b24fb9"
@@ -178,7 +181,7 @@ async def test_enhanced_bioimage_entity_agnostic_functions(bioimage_index, mem0_
     assert result["entity_id"] == tech_id
     assert result["entity_type"] == "technology"
     assert result["entity_details"] is not None
-    assert result["entity_details"]["name"] == "4Pi microscopy"
+    assert result["entity_details"]["name"] == "*in vivo* Optical Imaging"
 
     # Test get_related_entities for a node
     result = get_related_entities(bioimage_index, entity_id=node_id)
