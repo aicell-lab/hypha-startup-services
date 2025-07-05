@@ -143,7 +143,7 @@ async def test_get_related_entities_works_correctly(bioimage_index):
     """Test that get_related_entities function works correctly."""
 
     # Test with a known technology ID that should have related nodes
-    tech_id = "68a3b6c4-9c19-4446-9617-22e7d37e0f2c"  # 4Pi microscopy
+    tech_id = "660fd1fc-a138-5740-b298-14b0c3b24fb9"  # 4Pi microscopy
 
     related_entities = get_related_entities(
         bioimage_index=bioimage_index,

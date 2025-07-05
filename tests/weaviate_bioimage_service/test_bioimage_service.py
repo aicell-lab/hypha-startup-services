@@ -61,7 +61,7 @@ async def test_weaviate_bioimage_get_technologies_by_node_id_test(
     weaviate_bioimage_test_service,
 ):
     result = await weaviate_bioimage_test_service.get_related(
-        entity_id="7409a98f-1bdb-47d2-80e7-c89db73efedd"
+        entity_id="7e35b2a1-22ef-58ec-a32b-805e388932ee"
     )
     assert len(result) > 0
     assert "name" in result[0]
@@ -108,7 +108,7 @@ async def test_weaviate_bioimage_get_technologies_by_node_id_live(
     weaviate_bioimage_live_service,
 ):
     result = await weaviate_bioimage_live_service.get_related(
-        entity_id="7409a98f-1bdb-47d2-80e7-c89db73efedd"
+        entity_id="7e35b2a1-22ef-58ec-a32b-805e388932ee"
     )
     assert len(result) > 0
     assert "name" in result[0]
@@ -303,7 +303,7 @@ async def test_check_bioimage_application_exists(weaviate_bioimage_test_service)
     # Test 8: Try another known entity ID
     try:
         result = await weaviate_bioimage_test_service.get_related(
-            entity_id="7409a98f-1bdb-47d2-80e7-c89db73efedd"
+            entity_id="7e35b2a1-22ef-58ec-a32b-805e388932ee"
         )
         print(f"get_related result for second entity: {len(result)} entities found")
     except Exception as e:

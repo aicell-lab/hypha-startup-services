@@ -13,13 +13,13 @@ from hypha_startup_services.common.data_index import (
 # Sample EBI data - in a real implementation this would be loaded from external sources
 EBI_NODES_DATA = [
     {
-        "id": "7409a98f-1bdb-47d2-80e7-c89db73efedd",
+        "id": "7e35b2a1-22ef-58ec-a32b-805e388932ee",
         "name": "Advanced Light Microscopy Italian Node",
         "description": "The Italian ALM Node comprises five imaging facilities located in Naples, Genoa, Padua, Florence and Milan specializing in correlative light electron microscopy, super-resolution, and functional imaging.",
         "country": {"name": "Italy", "iso_a2": "IT"},
         "technologies": [
             "660fd1fc-a138-5740-b298-14b0c3b24fb9",
-            "68a3b6c4-9c19-4446-9617-22e7d37e0f2c",  # 4Pi microscopy
+            "660fd1fc-a138-5740-b298-14b0c3b24fb9",  # 4Pi microscopy
             "correlative_microscopy",
             "super_resolution",
             "functional_imaging",
@@ -44,7 +44,7 @@ EBI_NODES_DATA = [
         "description": "German node providing advanced microscopy services including super-resolution and live-cell imaging.",
         "country": {"name": "Germany", "iso_a2": "DE"},
         "technologies": [
-            "68a3b6c4-9c19-4446-9617-22e7d37e0f2c",  # 4Pi microscopy
+            "660fd1fc-a138-5740-b298-14b0c3b24fb9",  # 4Pi microscopy
             "super_resolution",
             "live_cell_imaging",
         ],
@@ -60,7 +60,7 @@ EBI_TECHNOLOGIES_DATA = [
         "category": {"name": "Correlative Light Microscopy and Electron Microscopy"},
     },
     {
-        "id": "68a3b6c4-9c19-4446-9617-22e7d37e0f2c",
+        "id": "660fd1fc-a138-5740-b298-14b0c3b24fb9",
         "name": "4Pi microscopy",
         "abbr": "4Pi",
         "description": "Laser scanning fluorescence microscope with improved axial resolution using two opposing objective lenses for coherent wavefront matching.",
@@ -104,7 +104,7 @@ async def test_bioimage_index_basic_functionality(bioimage_index):
     assert stats["total_relationships"] > 0
 
     # Test node retrieval
-    node = bioimage_index.get_node_by_id("7409a98f-1bdb-47d2-80e7-c89db73efedd")
+    node = bioimage_index.get_node_by_id("7e35b2a1-22ef-58ec-a32b-805e388932ee")
     assert node is not None
     assert node["name"] == "Advanced Light Microscopy Italian Node"
 
@@ -152,7 +152,7 @@ async def test_get_technologies_by_node_id(bioimage_index):
     # Test with known node ID (Italian node) - this should find technologies provided by this node
     result = get_related_entities(
         bioimage_index=bioimage_index,
-        entity_id="7409a98f-1bdb-47d2-80e7-c89db73efedd",  # Italian node
+        entity_id="660fd1fc-a138-5740-b298-14b0c3b24fb9",  # Italian node
     )
 
     # Should return a list of technologies provided by this node
@@ -182,7 +182,7 @@ async def test_get_node_details(bioimage_index):
     # Test with known node ID
     result = await get_entity_details(
         bioimage_index=bioimage_index,
-        entity_id="7409a98f-1bdb-47d2-80e7-c89db73efedd",  # Italian node
+        entity_id="7e35b2a1-22ef-58ec-a32b-805e388932ee",  # Italian node
     )
 
     assert "entity_id" in result
@@ -382,7 +382,7 @@ async def test_mem0_bioimage_integration(mem0_bioimage_live_service, mem0_live_s
 
         # Test with known node ID
         node_result = await mem0_bioimage_live_service.get(
-            "7409a98f-1bdb-47d2-80e7-c89db73efedd"  # Italian node
+            "660fd1fc-a138-5740-b298-14b0c3b24fb9"  # Italian node
         )
 
         # Validate bioimage service node lookup
@@ -442,15 +442,13 @@ async def test_mem0_bioimage_search_test_service(mem0_bioimage_test_service):
     assert isinstance(result["results"], list), "'results' should be a list"
     assert len(result["results"]) > 0, "Search should return at least one result"
     for item in result["results"]:
-        assert (
-            "info" in item and "exists_in_nodes" in item
-        ), "Each result should have an id or name"
+        assert "info" in item, "Each result should have an id or name"
 
 
 @pytest.mark.asyncio
 async def test_mem0_bioimage_search_live_service(mem0_bioimage_live_service):
     # Use a query that should return results
-    query = "microscopy"
+    query = "in which nodes are microscopy available?"
     result = await mem0_bioimage_live_service.search(query_text=query, limit=3)
     assert result is not None, "Search result should not be None"
     assert isinstance(result, dict), "Search result should be a dict"

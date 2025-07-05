@@ -30,7 +30,7 @@ async def test_enhanced_bioimage_find_related_entities_by_technology_id(bioimage
     """Test finding related entities by technology ID (auto-infer type)."""
 
     # Find entities related to 4Pi technology (should automatically infer it's a technology)
-    tech_id = "68a3b6c4-9c19-4446-9617-22e7d37e0f2c"
+    tech_id = "660fd1fc-a138-5740-b298-14b0c3b24fb9"
 
     result = get_related_entities(bioimage_index, entity_id=tech_id)
 
@@ -50,7 +50,7 @@ async def test_enhanced_bioimage_find_related_entities_by_technology_id(bioimage
 async def test_enhanced_bioimage_find_related_entities_by_node_id(bioimage_index):
     """Test finding related entities by node ID (auto-infer type)."""
     # Find entities related to Italian ALM Node (should automatically infer it's a node)
-    node_id = "7409a98f-1bdb-47d2-80e7-c89db73efedd"
+    node_id = "7e35b2a1-22ef-58ec-a32b-805e388932ee"
 
     result = get_related_entities(bioimage_index, entity_id=node_id)
 
@@ -131,7 +131,7 @@ async def test_enhanced_bioimage_traditional_methods_still_work(
 ):
     """Test that traditional exact matching methods still work."""
     # Test getting nodes by technology ID
-    tech_id = "68a3b6c4-9c19-4446-9617-22e7d37e0f2c"
+    tech_id = "660fd1fc-a138-5740-b298-14b0c3b24fb9"
 
     result = get_related_entities(bioimage_index, entity_id=tech_id)
 
@@ -161,7 +161,7 @@ async def test_enhanced_bioimage_entity_agnostic_functions(bioimage_index, mem0_
     """Test the new entity-type-agnostic functions."""
 
     # Test get_entity_details for a node
-    node_id = "7409a98f-1bdb-47d2-80e7-c89db73efedd"
+    node_id = "7e35b2a1-22ef-58ec-a32b-805e388932ee"
     result = await get_entity_details(bioimage_index, entity_id=node_id)
 
     assert result is not None
@@ -171,7 +171,7 @@ async def test_enhanced_bioimage_entity_agnostic_functions(bioimage_index, mem0_
     assert result["entity_details"]["name"] == "Advanced Light Microscopy Italian Node"
 
     # Test get_entity_details for a technology
-    tech_id = "68a3b6c4-9c19-4446-9617-22e7d37e0f2c"
+    tech_id = "660fd1fc-a138-5740-b298-14b0c3b24fb9"
     result = await get_entity_details(bioimage_index, entity_id=tech_id)
 
     assert result is not None

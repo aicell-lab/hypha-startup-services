@@ -49,7 +49,9 @@ MOVIE_COLLECTION_CONFIG = {
 async def create_test_collection(weaviate_service):
     """Create a test collection for Weaviate tests."""
     ollama_endpoint = "https://hypha-ollama.scilifelab-2-dev.sys.kth.se"
-    ollama_model = "llama3.2"  # For embeddings - using an available model
+    ollama_model = (
+        "mxbai-embed-large:latest"  # For embeddings - using an available model
+    )
 
     # Try to delete if it exists - ignore errors
     try:

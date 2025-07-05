@@ -81,4 +81,8 @@ async def test_remote_integration_mem0_bioimage(mem0_bioimage_live_service):
     result = await mem0_bioimage_live_service.get_related(
         entity_id="660fd1fc-a138-5740-b298-14b0c3b24fb9"
     )
-    assert "info" in result
+
+    for item in result:
+        assert "name" in item
+        assert "id" in item
+        assert "description" in item
