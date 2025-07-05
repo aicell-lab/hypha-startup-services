@@ -31,7 +31,7 @@ async def get_mem0() -> AsyncMemory:
         "llm": {
             "provider": "ollama",
             "config": {
-                "model": "qwen3:8b",
+                "model": "qwen2.5:7b",
                 # "temperature": 0,
                 "max_tokens": 2000,
                 "ollama_base_url": "https://hypha-ollama.scilifelab-2-dev.sys.kth.se",  # Ensure this URL is correct

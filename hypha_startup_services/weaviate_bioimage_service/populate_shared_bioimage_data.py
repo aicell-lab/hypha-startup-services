@@ -153,7 +153,7 @@ async def get_weaviate_service(server_url: str):
 async def ensure_collection_exists(
     weaviate_service,
     ollama_model: str = "mxbai-embed-large:latest",
-    ollama_llm_model: str = "qwen3:8b",
+    ollama_llm_model: str = "qwen2.5:7b",
     ollama_endpoint: str = "https://hypha-ollama.scilifelab-2-dev.sys.kth.se",
 ) -> None:
     """Ensure the bioimage collection exists with proper configuration."""
@@ -368,8 +368,8 @@ async def main():
     )
     parser.add_argument(
         "--ollama-llm-model",
-        default="qwen3:8b",
-        help="Ollama model to use for generation (default: qwen3:8b)",
+        default="qwen2.5:7b",
+        help="Ollama model to use for generation (default: qwen2.5:7b)",
     )
     parser.add_argument(
         "--ollama-endpoint",
@@ -396,6 +396,11 @@ async def main():
 
         # Ensure collection exists
         logger.info("🔧 Ensuring collection exists...")
+        if args.delete_existing:
+            await weaviate_service.collections.delete(
+                name=COLLECTION_NAME,
+            )
+
         await ensure_collection_exists(
             weaviate_service,
             ollama_model=args.ollama_model,
