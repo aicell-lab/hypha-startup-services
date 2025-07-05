@@ -229,6 +229,26 @@ def load_external_data(
             os.path.dirname(__file__), "assets", "ebi-tech.json"
         )
 
+    logger.info("Loading external data from:")
+    logger.info("  Nodes file: %s (exists: %s)", nodes_file, os.path.exists(nodes_file))
+    logger.info(
+        "  Technologies file: %s (exists: %s)",
+        technologies_file,
+        os.path.exists(technologies_file),
+    )
+
+    # Additional debugging info
+    assets_dir = os.path.join(os.path.dirname(__file__), "assets")
+    logger.info(
+        "  Assets directory: %s (exists: %s)", assets_dir, os.path.exists(assets_dir)
+    )
+    if os.path.exists(assets_dir):
+        try:
+            files_in_assets = os.listdir(assets_dir)
+            logger.info("  Files in assets directory: %s", files_in_assets)
+        except OSError as e:
+            logger.warning("  Cannot list files in assets directory: %s", e)
+
     nodes_data = []
     technologies_data = []
 
@@ -236,26 +256,41 @@ def load_external_data(
         try:
             with open(nodes_file, "r", encoding="utf-8") as f:
                 nodes_data = json.load(f)
-            logger.info("Loaded nodes data from %s", nodes_file)
+            logger.info("Loaded %d nodes from %s", len(nodes_data), nodes_file)
         except (IOError, json.JSONDecodeError) as e:
             logger.warning(
                 "Failed to load nodes from %s: %s, using default data", nodes_file, e
             )
+    else:
+        logger.warning("Nodes file not found or not specified: %s", nodes_file)
 
     if technologies_file and os.path.exists(technologies_file):
         try:
             with open(technologies_file, "r", encoding="utf-8") as f:
                 technologies_data = json.load(f)
-            logger.info("Loaded technologies data from %s", technologies_file)
+            logger.info(
+                "Loaded %d technologies from %s",
+                len(technologies_data),
+                technologies_file,
+            )
         except (IOError, json.JSONDecodeError) as e:
             logger.warning(
                 "Failed to load technologies from %s: %s, using default data",
                 technologies_file,
                 e,
             )
+    else:
+        logger.warning(
+            "Technologies file not found or not specified: %s", technologies_file
+        )
 
     index = BioimageIndex()
     index.load_data(nodes_data, technologies_data)
+
+    # Log final statistics
+    stats = index.get_statistics()
+    logger.info("Index statistics: %s", stats)
+
     return index
 
 
