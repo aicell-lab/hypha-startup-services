@@ -217,17 +217,44 @@ class BioimageIndex:
         }
 
 
+def _find_asset_file(filename: str) -> str:
+    """Find an asset file by trying multiple possible locations.
+
+    Args:
+        filename: The name of the asset file to find (e.g., "ebi-nodes.json")
+
+    Returns:
+        The path to the file if found, otherwise the default package location.
+    """
+    possible_locations = [
+        # Docker container location
+        f"/app/hypha_startup_services/common/assets/{filename}",
+        # Development location (relative to current file)
+        os.path.join(os.path.dirname(__file__), "assets", filename),
+        # Alternative app root resolution
+        os.path.join(
+            os.getcwd(), "hypha_startup_services", "common", "assets", filename
+        ),
+    ]
+
+    for location in possible_locations:
+        if os.path.exists(location):
+            return location
+
+    # Default fallback to package location
+    return os.path.join(os.path.dirname(__file__), "assets", filename)
+
+
 def load_external_data(
     nodes_file: str | None = None, technologies_file: str | None = None
 ) -> BioimageIndex:
     """Load data from external JSON files."""
     # Default to assets directory if no files specified
     if nodes_file is None:
-        nodes_file = os.path.join(os.path.dirname(__file__), "assets", "ebi-nodes.json")
+        nodes_file = _find_asset_file("ebi-nodes.json")
+
     if technologies_file is None:
-        technologies_file = os.path.join(
-            os.path.dirname(__file__), "assets", "ebi-tech.json"
-        )
+        technologies_file = _find_asset_file("ebi-tech.json")
 
     logger.info("Loading external data from:")
     logger.info("  Nodes file: %s (exists: %s)", nodes_file, os.path.exists(nodes_file))
@@ -237,7 +264,10 @@ def load_external_data(
         os.path.exists(technologies_file),
     )
 
-    # Additional debugging info
+    # Additional debugging info - show all possible locations
+    logger.info("  Current working directory: %s", os.getcwd())
+    logger.info("  __file__ location: %s", os.path.dirname(__file__))
+
     assets_dir = os.path.join(os.path.dirname(__file__), "assets")
     logger.info(
         "  Assets directory: %s (exists: %s)", assets_dir, os.path.exists(assets_dir)
