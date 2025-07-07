@@ -19,7 +19,7 @@ class TestConstants:
 
     def test_constants_defined(self):
         """Test that required constants are defined."""
-        assert BIOIMAGE_COLLECTION == "bioimage_data_test"
+        assert BIOIMAGE_COLLECTION == "bioimage_data"
         assert SHARED_APPLICATION_ID == "eurobioimaging-shared"
 
 

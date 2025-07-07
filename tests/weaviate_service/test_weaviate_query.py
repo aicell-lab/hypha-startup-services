@@ -186,7 +186,7 @@ async def test_collection_query_near_vector(weaviate_service):
 
     # Get a vector to use for near_vector search
     # This is a simplified example - in a real application we would use a proper embedding
-    dummy_vector = [0.1] * 3072  # Assuming 3072-dimensional vectors
+    dummy_vector = [0.1] * 1024  # Assuming 3072-dimensional vectors
 
     # Perform near_vector search
     result = await weaviate_service.query.near_vector(

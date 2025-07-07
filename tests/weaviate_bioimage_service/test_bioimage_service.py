@@ -61,7 +61,7 @@ async def test_weaviate_bioimage_get_technologies_by_node_id_test(
     weaviate_bioimage_test_service,
 ):
     result = await weaviate_bioimage_test_service.get_related(
-        entity_id="7409a98f-1bdb-47d2-80e7-c89db73efedd"
+        entity_id="1dc91e38-8234-5b08-ad4f-a162da9486f6"
     )
     assert len(result) > 0
     assert "name" in result[0]
@@ -108,7 +108,7 @@ async def test_weaviate_bioimage_get_technologies_by_node_id_live(
     weaviate_bioimage_live_service,
 ):
     result = await weaviate_bioimage_live_service.get_related(
-        entity_id="7409a98f-1bdb-47d2-80e7-c89db73efedd"
+        entity_id="1dc91e38-8234-5b08-ad4f-a162da9486f6"
     )
     assert len(result) > 0
     assert "name" in result[0]
@@ -170,7 +170,7 @@ def mock_bioimage_service_fixture():
 @pytest.mark.asyncio
 async def test_local_integration_weaviate_bioimage(weaviate_bioimage_test_service):
     result = await weaviate_bioimage_test_service.get_related(
-        entity_id="f78b39ca-3b2a-49f4-99eb-a7f241640bf2"
+        entity_id="94c38160-4e93-5bc1-b2bc-1d5c86bb1d87"
     )
     assert len(result) > 0
     assert "id" in result[0]
@@ -303,7 +303,7 @@ async def test_check_bioimage_application_exists(weaviate_bioimage_test_service)
     # Test 8: Try another known entity ID
     try:
         result = await weaviate_bioimage_test_service.get_related(
-            entity_id="7409a98f-1bdb-47d2-80e7-c89db73efedd"
+            entity_id="1dc91e38-8234-5b08-ad4f-a162da9486f6"
         )
         print(f"get_related result for second entity: {len(result)} entities found")
     except Exception as e:

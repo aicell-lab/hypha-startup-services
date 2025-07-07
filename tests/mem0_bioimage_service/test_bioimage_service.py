@@ -111,7 +111,7 @@ async def test_bioimage_index_basic_functionality(bioimage_index):
     # Test technology retrieval
     tech = bioimage_index.get_technology_by_id("660fd1fc-a138-5740-b298-14b0c3b24fb9")
     assert tech is not None
-    assert "3D Correlative Light and Electron Microscopy" in tech["name"]
+    assert "4Pi microscopy" in tech["name"]
 
 
 @pytest.mark.asyncio
@@ -211,10 +211,7 @@ async def test_get_technology_details(bioimage_index):
     assert "entity_type" in result
     assert result["entity_type"] == "technology"
     assert "entity_details" in result
-    assert (
-        "3D Correlative Light and Electron Microscopy"
-        in result["entity_details"]["name"]
-    )
+    assert "4Pi microscopy" in result["entity_details"]["name"]
 
     # Test with non-existent technology ID - should raise ValueError
     with pytest.raises(ValueError, match="Entity not found"):

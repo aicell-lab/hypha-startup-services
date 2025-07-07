@@ -182,20 +182,16 @@ async def test_multi_user_same_agent_different_runs(mem0_service, mem0_service2)
     )
 
     # User 1 adds memories with their run ID
-    user1_run_messages = generate_unique_test_messages("user1_run_movies", 2)
     add_result1 = await mem0_service.add(
-        messages=user1_run_messages,
+        messages=TEST_MESSAGES,
         agent_id=TEST_AGENT_ID,
         workspace=USER1_WS,
         run_id=run_id_1,
     )
 
     # User 2 adds memories with their run ID
-    user2_run_messages = generate_unique_simple_message(
-        "My favorite Italian dishes are pasta and pizza", "user2_run_food", 2
-    )
     add_result2 = await mem0_service2.add(
-        messages=user2_run_messages,
+        messages=TEST_MESSAGES2,
         agent_id=TEST_AGENT_ID,
         workspace=USER2_WS,
         run_id=run_id_2,
