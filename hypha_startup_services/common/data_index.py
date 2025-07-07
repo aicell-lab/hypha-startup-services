@@ -217,67 +217,17 @@ class BioimageIndex:
         }
 
 
-def _find_asset_file(filename: str) -> str:
-    """Find an asset file by trying multiple possible locations.
-
-    Args:
-        filename: The name of the asset file to find (e.g., "ebi-nodes.json")
-
-    Returns:
-        The path to the file if found, otherwise the default package location.
-    """
-    possible_locations = [
-        # Docker container location
-        f"/app/hypha_startup_services/common/assets/{filename}",
-        # Development location (relative to current file)
-        os.path.join(os.path.dirname(__file__), "assets", filename),
-        # Alternative app root resolution
-        os.path.join(
-            os.getcwd(), "hypha_startup_services", "common", "assets", filename
-        ),
-    ]
-
-    for location in possible_locations:
-        if os.path.exists(location):
-            return location
-
-    # Default fallback to package location
-    return os.path.join(os.path.dirname(__file__), "assets", filename)
-
-
 def load_external_data(
     nodes_file: str | None = None, technologies_file: str | None = None
 ) -> BioimageIndex:
     """Load data from external JSON files."""
     # Default to assets directory if no files specified
     if nodes_file is None:
-        nodes_file = _find_asset_file("ebi-nodes.json")
-
+        nodes_file = os.path.join(os.path.dirname(__file__), "assets", "ebi-nodes.json")
     if technologies_file is None:
-        technologies_file = _find_asset_file("ebi-tech.json")
-
-    logger.info("Loading external data from:")
-    logger.info("  Nodes file: %s (exists: %s)", nodes_file, os.path.exists(nodes_file))
-    logger.info(
-        "  Technologies file: %s (exists: %s)",
-        technologies_file,
-        os.path.exists(technologies_file),
-    )
-
-    # Additional debugging info - show all possible locations
-    logger.info("  Current working directory: %s", os.getcwd())
-    logger.info("  __file__ location: %s", os.path.dirname(__file__))
-
-    assets_dir = os.path.join(os.path.dirname(__file__), "assets")
-    logger.info(
-        "  Assets directory: %s (exists: %s)", assets_dir, os.path.exists(assets_dir)
-    )
-    if os.path.exists(assets_dir):
-        try:
-            files_in_assets = os.listdir(assets_dir)
-            logger.info("  Files in assets directory: %s", files_in_assets)
-        except OSError as e:
-            logger.warning("  Cannot list files in assets directory: %s", e)
+        technologies_file = os.path.join(
+            os.path.dirname(__file__), "assets", "ebi-tech.json"
+        )
 
     nodes_data = []
     technologies_data = []
@@ -286,41 +236,26 @@ def load_external_data(
         try:
             with open(nodes_file, "r", encoding="utf-8") as f:
                 nodes_data = json.load(f)
-            logger.info("Loaded %d nodes from %s", len(nodes_data), nodes_file)
+            logger.info("Loaded nodes data from %s", nodes_file)
         except (IOError, json.JSONDecodeError) as e:
             logger.warning(
                 "Failed to load nodes from %s: %s, using default data", nodes_file, e
             )
-    else:
-        logger.warning("Nodes file not found or not specified: %s", nodes_file)
 
     if technologies_file and os.path.exists(technologies_file):
         try:
             with open(technologies_file, "r", encoding="utf-8") as f:
                 technologies_data = json.load(f)
-            logger.info(
-                "Loaded %d technologies from %s",
-                len(technologies_data),
-                technologies_file,
-            )
+            logger.info("Loaded technologies data from %s", technologies_file)
         except (IOError, json.JSONDecodeError) as e:
             logger.warning(
                 "Failed to load technologies from %s: %s, using default data",
                 technologies_file,
                 e,
             )
-    else:
-        logger.warning(
-            "Technologies file not found or not specified: %s", technologies_file
-        )
 
     index = BioimageIndex()
     index.load_data(nodes_data, technologies_data)
-
-    # Log final statistics
-    stats = index.get_statistics()
-    logger.info("Index statistics: %s", stats)
-
     return index
 
 

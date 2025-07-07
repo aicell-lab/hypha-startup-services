@@ -124,19 +124,20 @@ async def artifact_edit(
     artifact_id: str,
     manifest: dict[str, Any] | None = None,
     config: dict[str, Any] | None = None,
+    **kwargs,
 ) -> None:
-    """Edit an existing artifact's description or manifest."""
+    """Edit an existing artifact's manifest, config, or other properties."""
     server = await get_server("https://hypha.aicell.io")
     artifact_manager = await server.get_service("public/artifact-manager")
 
     if not await artifact_exists(artifact_id):
         raise ValueError(f"Artifact '{artifact_id}' does not exist.")
 
-    # Build the edit parameters
     edit_params: dict[str, Any] = {"artifact_id": artifact_id}
     if manifest is not None:
         edit_params["manifest"] = manifest
     if config is not None:
         edit_params["config"] = config
+    edit_params.update(kwargs)
 
     await artifact_manager.edit(**edit_params)

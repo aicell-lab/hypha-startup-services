@@ -1,13 +1,13 @@
 """Tests for Weaviate application functionality."""
 
 import pytest
+from hypha_rpc.rpc import RemoteException
 from tests.weaviate_service.utils import (
     create_test_collection,
     create_test_application,
     APP_ID,
     USER1_APP_ID,
 )
-from hypha_rpc.rpc import RemoteException
 
 
 @pytest.mark.asyncio
@@ -236,15 +236,15 @@ async def test_application_get_artifact_nonexistent(weaviate_service):
 
 
 @pytest.mark.asyncio
-async def test_application_add_permissions_merge(weaviate_service):
-    """Test adding permissions with the new add_permissions function."""
+async def test_application_set_permissions_merge(weaviate_service):
+    """Test setting permissions with merge=True (default behavior)."""
     # First create a collection and application
     await create_test_application(weaviate_service)
 
     # Set initial permissions
     initial_permissions = {"user1": "rw", "user2": "r"}
 
-    await weaviate_service.applications.add_permissions(
+    await weaviate_service.applications.set_permissions(
         collection_name="Movie",
         application_id=APP_ID,
         permissions=initial_permissions,
@@ -255,19 +255,21 @@ async def test_application_add_permissions_merge(weaviate_service):
         collection_name="Movie",
         application_id=APP_ID,
     )
+
     assert app_data["config"]["permissions"]["user1"] == "rw"
     assert app_data["config"]["permissions"]["user2"] == "r"
 
-    # Add additional permissions
+    # Add additional permissions with merge=True (default)
     additional_permissions = {
-        "user3": "admin",
-        "user2": "rw",  # This should override the user2 permission
+        "user3": "*",
+        "user1": "r",  # This should override user1's permission from "rw" to "r"
     }
 
-    await weaviate_service.applications.add_permissions(
+    await weaviate_service.applications.set_permissions(
         collection_name="Movie",
         application_id=APP_ID,
         permissions=additional_permissions,
+        merge=True,
     )
 
     # Verify permissions were merged correctly
@@ -277,9 +279,9 @@ async def test_application_add_permissions_merge(weaviate_service):
     )
     permissions = updated_app_data["config"]["permissions"]
 
-    assert permissions["user1"] == "rw"  # Should remain unchanged
-    assert permissions["user2"] == "rw"  # Should be overwritten
-    assert permissions["user3"] == "admin"  # Should be added
+    assert permissions["user2"] == "r"  # Should remain unchanged
+    assert permissions["user1"] == "r"  # Should be overwritten from "rw" to "r"
+    assert permissions["user3"] == "*"  # Should be added
 
     # Clean up
     await weaviate_service.applications.delete(
@@ -290,43 +292,43 @@ async def test_application_add_permissions_merge(weaviate_service):
 
 
 @pytest.mark.asyncio
-async def test_application_remove_permissions(weaviate_service):
-    """Test removing permissions with the new remove_permissions function."""
+async def test_application_set_permissions_no_merge(weaviate_service):
+    """Test setting permissions with merge=False (replace behavior)."""
     # First create a collection and application
     await create_test_application(weaviate_service)
 
     # Set initial permissions
-    initial_permissions = {
-        "user1": "rw",
-        "user2": "r",
-        "admin_user": "*",
-        "guest": "r",
-    }
+    initial_permissions = {"user1": "rw", "user2": "r", "admin_user": "*"}
 
-    await weaviate_service.applications.add_permissions(
+    await weaviate_service.applications.set_permissions(
         collection_name="Movie",
         application_id=APP_ID,
         permissions=initial_permissions,
     )
 
-    # Remove specific permissions
-    await weaviate_service.applications.remove_permissions(
+    # Replace permissions entirely with merge=False
+    new_permissions = {"user3": "r", "user4": "r", "user5": "rw"}
+
+    await weaviate_service.applications.set_permissions(
         collection_name="Movie",
         application_id=APP_ID,
-        permission_keys=["user2", "guest"],
+        permissions=new_permissions,
+        merge=False,
     )
 
-    # Verify permissions were removed
+    # Verify permissions were replaced entirely
     updated_app_data = await weaviate_service.applications.get(
         collection_name="Movie",
         application_id=APP_ID,
     )
     permissions = updated_app_data["config"]["permissions"]
 
-    assert permissions["user1"] == "rw"  # Should remain
-    assert permissions["admin_user"] == "*"  # Should remain
-    assert "user2" not in permissions  # Should be removed
-    assert "guest" not in permissions  # Should be removed
+    assert permissions["user3"] == "r"  # New read permissions
+    assert permissions["user4"] == "r"  # New read permissions
+    assert permissions["user5"] == "rw"  # New read-write permissions
+    assert "user1" not in permissions  # Old permissions should be gone
+    assert "user2" not in permissions  # Old permissions should be gone
+    assert "admin_user" not in permissions  # Old permissions should be gone
 
     # Clean up
     await weaviate_service.applications.delete(
@@ -337,35 +339,75 @@ async def test_application_remove_permissions(weaviate_service):
 
 
 @pytest.mark.asyncio
-async def test_application_remove_permissions_nonexistent_keys(weaviate_service):
-    """Test removing permissions that don't exist (should not error)."""
+async def test_application_set_permissions_default_merge(weaviate_service):
+    """Test that merge=True is the default behavior for backward compatibility."""
     # First create a collection and application
     await create_test_application(weaviate_service)
 
     # Set initial permissions
-    initial_permissions = {"user1": "rw"}
+    initial_permissions = {"user1": "r", "user2": "rw"}
 
-    await weaviate_service.applications.add_permissions(
+    await weaviate_service.applications.set_permissions(
         collection_name="Movie",
         application_id=APP_ID,
         permissions=initial_permissions,
     )
 
-    # Try to remove non-existent permissions (should not error)
-    await weaviate_service.applications.remove_permissions(
+    # Add permissions without specifying merge parameter (should default to True)
+    additional_permissions = {"admin_user": "*"}
+
+    await weaviate_service.applications.set_permissions(
         collection_name="Movie",
         application_id=APP_ID,
-        permission_keys=["nonexistent_user", "another_fake_user"],
+        permissions=additional_permissions,
+        # Note: not specifying merge parameter
     )
 
-    # Verify original permissions are still there
+    # Verify permissions were merged (default behavior)
     updated_app_data = await weaviate_service.applications.get(
         collection_name="Movie",
         application_id=APP_ID,
     )
     permissions = updated_app_data["config"]["permissions"]
 
-    assert permissions["user1"] == "rw"  # Should remain unchanged
+    assert permissions["user1"] == "r"  # Original permissions preserved
+    assert permissions["user2"] == "rw"  # Original permissions preserved
+    assert permissions["admin_user"] == "*"  # New permissions added
+
+    # Clean up
+    await weaviate_service.applications.delete(
+        collection_name="Movie",
+        application_id=APP_ID,
+    )
+    await weaviate_service.collections.delete("Movie")
+
+
+@pytest.mark.asyncio
+async def test_application_set_permissions_empty_manifest(weaviate_service):
+    """Test setting permissions when manifest has no existing permissions."""
+    # First create a collection and application
+    await create_test_application(weaviate_service)
+
+    # Set permissions when no permissions exist yet
+    new_permissions = {"user1": "r", "user2": "rw"}
+
+    await weaviate_service.applications.set_permissions(
+        collection_name="Movie",
+        application_id=APP_ID,
+        permissions=new_permissions,
+        merge=True,
+    )
+
+    # Verify permissions were set correctly
+    updated_app_data = await weaviate_service.applications.get(
+        collection_name="Movie",
+        application_id=APP_ID,
+    )
+
+    permissions = updated_app_data["config"]["permissions"]
+
+    assert permissions["user1"] == "r"
+    assert permissions["user2"] == "rw"
 
     # Clean up
     await weaviate_service.applications.delete(

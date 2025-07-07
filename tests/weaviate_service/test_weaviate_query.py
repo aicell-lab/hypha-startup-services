@@ -186,8 +186,7 @@ async def test_collection_query_near_vector(weaviate_service):
 
     # Get a vector to use for near_vector search
     # This is a simplified example - in a real application we would use a proper embedding
-    # The vector dimension should match what the ollama model produces (1024 dimensions for llama3.2)
-    dummy_vector = [0.1] * 1024  # Correct dimension based on the error message
+    dummy_vector = [0.1] * 3072  # Assuming 3072-dimensional vectors
 
     # Perform near_vector search
     result = await weaviate_service.query.near_vector(

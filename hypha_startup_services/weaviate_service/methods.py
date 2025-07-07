@@ -445,26 +445,31 @@ async def applications_get_artifact(
     return artifact_name
 
 
-async def applications_add_permissions(
+async def applications_set_permissions(
     client: WeaviateAsyncClient,
     collection_name: str,
     application_id: str,
     permissions: dict[str, Any],
     user_ws: str | None = None,
+    merge: bool = True,
     context: dict[str, Any] | None = None,
 ) -> None:
-    """Add permissions for an application.
+    """Set permissions for an application.
 
-    Updates the application artifact by merging the provided permissions with existing ones.
+    Updates the application artifact with the provided permissions.
     Verifies that the caller has permission to access the application.
 
     Args:
         client: WeaviateAsyncClient instance
         collection_name: Name of the collection containing the application
         application_id: ID of the application to update permissions for
-        permissions: Dictionary of permissions to add/merge
+        permissions: Dictionary of permissions to set
         user_ws: Optional user workspace to use as tenant (if different from caller)
+        merge: If True, merge with existing permissions; if False, replace entirely
         context: Context containing caller information
+
+    Returns:
+        Dictionary with updated application artifact information
     """
 
     artifact_name = await applications_get_artifact(
@@ -475,67 +480,31 @@ async def applications_add_permissions(
         context=context,
     )
 
-    manifest = await get_artifact(artifact_name)
+    artifact_data = await get_artifact(artifact_name)
 
-    # Get existing permissions to merge with
-    existing_permissions = {}
-    if "config" in manifest and "permissions" in manifest["config"]:
-        existing_permissions = manifest["config"]["permissions"]
-
-    # Merge new permissions with existing ones
-    merged_permissions = {**existing_permissions, **permissions}
-
-    await artifact_edit(
-        artifact_id=artifact_name,
-        config={"permissions": merged_permissions},
-    )
-
-
-async def applications_remove_permissions(
-    client: WeaviateAsyncClient,
-    collection_name: str,
-    application_id: str,
-    permission_keys: list[str],
-    user_ws: str | None = None,
-    context: dict[str, Any] | None = None,
-) -> None:
-    """Remove permissions for an application.
-
-    Updates the application artifact by removing the specified permission keys.
-    Verifies that the caller has permission to access the application.
-
-    Args:
-        client: WeaviateAsyncClient instance
-        collection_name: Name of the collection containing the application
-        application_id: ID of the application to update permissions for
-        permission_keys: List of permission keys to remove
-        user_ws: Optional user workspace to use as tenant (if different from caller)
-        context: Context containing caller information
-    """
-
-    artifact_name = await applications_get_artifact(
-        client,
-        collection_name,
+    logger.info(
+        "Setting permissions for application '%s' in collection '%s' with user workspace '%s'",
         application_id,
-        user_ws=user_ws,
-        context=context,
+        collection_name,
+        user_ws or "default",
     )
 
-    manifest = await get_artifact(artifact_name)
+    # Get current permissions from config
+    current_permissions = artifact_data.get("config", {}).get("permissions", {})
 
-    # Get existing permissions to modify
-    existing_permissions = {}
-    if "config" in manifest and "permissions" in manifest["config"]:
-        existing_permissions = manifest["config"]["permissions"].copy()
+    if merge:
+        # Merge new permissions with existing ones
+        updated_permissions = {
+            **current_permissions,
+            **permissions,
+        }
+    else:
+        # Replace permissions entirely
+        updated_permissions = permissions
 
-    # Remove specified permission keys
-    for key in permission_keys:
-        if key in existing_permissions:
-            del existing_permissions[key]
-
+    # Use artifact_edit function with config parameter
     await artifact_edit(
-        artifact_id=artifact_name,
-        config={"permissions": existing_permissions},
+        artifact_id=artifact_name, config={"permissions": updated_permissions}
     )
 
 

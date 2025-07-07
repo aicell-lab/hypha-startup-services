@@ -13,6 +13,7 @@ from .methods import (
     mem0_get_all,
     init_run,
     init_agent,
+    mem0_set_permissions,
 )
 from .utils.constants import DEFAULT_SERVICE_ID
 
@@ -43,6 +44,7 @@ async def register_mem0_service(
             "search": partial(mem0_search, memory=mem0),
             "delete_all": partial(mem0_delete_all, memory=mem0),
             "get_all": partial(mem0_get_all, memory=mem0),
+            "set_permissions": mem0_set_permissions,
         }
     )
 

@@ -11,6 +11,8 @@ from hypha_rpc.utils import ObjectProxy
 from hypha_startup_services.common.artifacts import (
     create_artifact,
     artifact_exists,
+    artifact_edit,
+    get_artifact,
 )
 from hypha_startup_services.common.permissions import (
     require_permission,
@@ -352,3 +354,71 @@ async def mem0_get_all(
     get_all_result = await memory.get_all(agent_id=agent_id, **kwargs)
     logger.info("Retrieved all memories for agent %s", agent_id)
     return get_all_result
+
+
+async def mem0_set_permissions(
+    agent_id: str,
+    permissions: dict[str, str],
+    workspace: str | None = None,
+    *,
+    run_id: str | None = None,
+    merge: bool = True,
+    context: dict[str, Any],
+) -> None:
+    """
+    Set permissions for an agent in the memory service.
+
+    Args:
+        agent_id: ID of the agent to set permissions for.
+        permissions: Dictionary of permissions to set.
+        workspace: Workspace of the user setting the permissions.
+        memory: The AsyncMemory instance to set permissions on.
+        context: Context from Hypha-rpc for permissions.
+
+    Raises:
+        HyphaPermissionError: If the user does not have permission to set permissions.
+        ValueError: If the permission parameters are invalid.
+    """
+    accessor_ws = ws_from_context(context)
+
+    if workspace is None:
+        workspace = accessor_ws
+
+    validate_workspace(workspace)
+
+    permission_params = AgentPermissionParams(
+        agent_id=agent_id,
+        accessed_workspace=workspace,
+        accessor_workspace=accessor_ws,
+        run_id=run_id,
+        operation="rw",
+    )
+
+    assert await artifact_exists(
+        artifact_id=permission_params.artifact_id,
+    ), "Please call init_agent() before setting permissions."
+
+    await require_permission(permission_params)
+
+    artifact_data = await get_artifact(
+        artifact_id=permission_params.artifact_id,
+    )
+
+    # Get current permissions from config
+    current_permissions = artifact_data.get("config", {}).get("permissions", {})
+
+    if merge:
+        # Merge new permissions with existing ones
+        updated_permissions = {
+            **current_permissions,
+            **permissions,
+        }
+    else:
+        # Replace permissions entirely
+        updated_permissions = permissions
+
+    # Use artifact_edit function with config parameter
+    await artifact_edit(
+        artifact_id=permission_params.artifact_id,
+        config={"permissions": updated_permissions},
+    )
