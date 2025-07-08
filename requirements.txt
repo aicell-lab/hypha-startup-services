@@ -4,7 +4,7 @@ weaviate-client>=4.14.0
 setuptools==80.9.0
 hypha==0.20.60
 hypha-rpc==0.20.64
-python-dotenv==1.1.0
+python-dotenv==1.1.1
 redis==6.2.0
 markdownify==1.1.0
 ollama>=0.4.5
