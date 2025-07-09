@@ -4,9 +4,9 @@ A specialized vector database service built on the core [Weaviate Service](../we
 
 ## Service Endpoints
 
-⚠️ **Performance Warning**: Query methods can be slow and may timeout for large datasets or complex scientific data operations. Consider using appropriate filters and limits to optimize performance.
+⚠️ **Performance Warning**: The query method can be slow and may timeout for large datasets or complex scientific data operations. Consider using `search` instead and giving that as input to an LLM for generation.
 
-### query(query_text, entity_types=None, limit=10, context=None)
+### `query(query_text: str, entity_types: list | None = None, limit: int = 10)`
 
 Query bioimage data using natural language.
 
@@ -14,7 +14,6 @@ Query bioimage data using natural language.
 - `query_text` (str): Natural language query
 - `entity_types` (list, optional): Filter by entity types ('node', 'technology', or both)
 - `limit` (int): Maximum number of results (default: 10)
-- `context` (dict, optional): Context containing caller information
 
 **Returns:** Dictionary with query results and generated response
 
@@ -32,12 +31,11 @@ async def bioimage_query():
         entity_types=["node"],
         limit=5
     )
-    print(result)
 
 asyncio.run(bioimage_query())
 ```
 
-### search(query_text, entity_types=None, include_related=True, limit=10, context=None)
+### `search(query_text: str, entity_types: list | None = None, include_related: bool = True, limit: int = 10)`
 
 Search bioimage data using natural language.
 
@@ -46,7 +44,6 @@ Search bioimage data using natural language.
 - `entity_types` (list, optional): Filter by entity types ('node', 'technology', or both)
 - `include_related` (bool): Include related entities in results (default: True)
 - `limit` (int): Maximum number of results (default: 10)
-- `context` (dict, optional): Context containing caller information
 
 **Returns:** Dictionary with search results and generated response
 
@@ -58,38 +55,33 @@ result = await bioimage.search(
     include_related=True,
     limit=3
 )
-print(result)
 ```
 
-### get_entity(entity_id, context=None)
+### `get(entity_id: str)`
 
 Get a specific entity by ID.
 
 **Parameters:**
 - `entity_id` (str): ID of the entity to retrieve
-- `context` (dict, optional): Context containing caller information
 
 **Returns:** Dictionary with entity details
 
 **Example:**
 ```python
 italy_node_id = "7e35b2a1-22ef-58ec-a32b-805e388932ee"
-entity = await bioimage.get_entity(entity_id=italy_node_id)
-print(entity)
+entity = await bioimage.get(entity_id=italy_node_id)
 ```
 
-### get_related(entity_id, context=None)
+### `get_related(entity_id: str)`
 
 Get entities related to the specified entity.
 
 **Parameters:**
 - `entity_id` (str): ID of the entity to find related entities for
-- `context` (dict, optional): Context containing caller information
 
 **Returns:** List of related entities
 
 **Example:**
 ```python
 related_entities = await bioimage.get_related(entity_id=italy_node_id)
-print(related_entities)
 ```

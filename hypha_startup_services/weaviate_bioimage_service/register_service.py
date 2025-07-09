@@ -78,7 +78,7 @@ async def register_weaviate_bioimage_service(
             },
             "query": query_func,
             "get_related": get_related_func,
-            "get_entity": get_entity_func,
+            "get": get_entity_func,
             "search": search_func,
         }
     )

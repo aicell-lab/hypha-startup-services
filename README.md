@@ -32,10 +32,10 @@ The bioimage services are specialized applications of the core services, demonst
 
 2. **Install dependencies:**
    ```bash
-   pip install -r requirements.txt
+   pip install -r requirements_test.txt
    ```
 
-3. **Install in development mode (optional):**
+3. **Install in development mode:**
    ```bash
    pip install -e .
    ```

@@ -4,7 +4,7 @@ import argparse
 import asyncio
 import logging
 from argparse import Namespace
-from typing import Callable, Optional
+from typing import Callable
 from hypha_rpc.rpc import RemoteException, RemoteService
 from .common.constants import (
     DEFAULT_LOCAL_HOST,
@@ -124,7 +124,7 @@ def get_service_configurations(
 
 async def handle_local_services(
     args: Namespace, service_ids: list[str], startup_function_paths: list[str]
-) -> Optional[RemoteService]:
+) -> RemoteService | None:
     """Handle local services setup.
 
     Args:
