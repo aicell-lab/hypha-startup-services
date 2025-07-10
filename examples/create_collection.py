@@ -1,6 +1,8 @@
 import os
 import asyncio
+from typing import Any, AsyncGenerator
 from dotenv import load_dotenv
+from contextlib import asynccontextmanager
 from hypha_rpc import connect_to_server
 from hypha_rpc.rpc import RemoteService
 from hypha_startup_services.weaviate_service.register_service import register_weaviate
@@ -9,7 +11,8 @@ load_dotenv()
 SERVICE_NAME = "weaviate-test"
 
 
-async def get_server(server_url: str):
+@asynccontextmanager
+async def get_server(server_url: str) -> AsyncGenerator[RemoteService, Any]:
     token = os.environ.get("HYPHA_TOKEN")
     assert token is not None, "HYPHA_TOKEN environment variable is not set"
     server: RemoteService = await connect_to_server(
@@ -19,17 +22,10 @@ async def get_server(server_url: str):
         }
     )  # type: ignore
     await register_weaviate(server, SERVICE_NAME)
-
-    return server
-
-
-async def get_weaviate_service():
-    """Fixture for connecting to the weaviate service.
-
-    Use --service-id command-line option to override the default service ID.
-    """
-    server = await get_server("https://hypha.aicell.io")
-    return await server.get_service(SERVICE_NAME)
+    try:
+        yield server
+    finally:
+        await server.disconnect()
 
 
 async def create_document_collection(
@@ -132,12 +128,13 @@ async def create_document_collection(
 
 
 async def main():
-    weaviate_service = await get_weaviate_service()
-    await create_document_collection(
-        weaviate_service,
-        ollama_model="llama3.2",
-        ollama_endpoint="https://hypha-ollama.scilifelab-2-dev.sys.kth.se",
-    )
+    async with get_server("https://hypha.aicell.io") as server:
+        service = await server.get_service(SERVICE_NAME)
+        await create_document_collection(
+            service,
+            ollama_model="llama3.2",
+            ollama_endpoint="https://hypha-ollama.scilifelab-2-dev.sys.kth.se",
+        )
 
 
 if __name__ == "__main__":

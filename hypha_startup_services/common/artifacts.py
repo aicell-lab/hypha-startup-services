@@ -1,7 +1,7 @@
 from typing import Any
 from abc import ABC, abstractmethod
 import logging
-from hypha_rpc.rpc import RemoteException, RemoteService
+from hypha_rpc.rpc import RemoteException
 from hypha_startup_services.common.server_utils import get_server
 
 # from .server_utils import get_server
@@ -58,19 +58,16 @@ async def get_artifact(
     Raises:
         RemoteException: If there's a server communication error
     """
-    server = await get_server("https://hypha.aicell.io")
-    artifact_manager = await server.get_service("public/artifact-manager")
-    artifact = await artifact_manager.read(artifact_id=artifact_id)
-    return artifact
+    async with get_server("https://hypha.aicell.io") as server:
+        artifact_manager = await server.get_service("public/artifact-manager")
+        artifact = await artifact_manager.read(artifact_id=artifact_id)
+        return artifact
 
 
 async def create_artifact(
     artifact_params: BaseArtifactParams,
-) -> dict[str, Any] | None:
+) -> dict[str, Any]:
     """Create a new artifact using the model-based approach."""
-
-    server: RemoteService = await get_server("https://hypha.aicell.io")
-    artifact_manager = await server.get_service("public/artifact-manager")
 
     if await artifact_exists(
         artifact_id=artifact_params.artifact_id,
@@ -84,26 +81,29 @@ async def create_artifact(
             "status": "already_exists",
         }
 
-    await artifact_manager.create(**artifact_params.creation_dict)
-    logger.info(
-        "Artifact created: '%s' with params: %s",
-        artifact_params.artifact_id,
-        artifact_params.creation_dict,
-    )
-    return {"artifact_name": artifact_params.artifact_id, "status": "created"}
+    async with get_server("https://hypha.aicell.io") as server:
+        artifact_manager = await server.get_service("public/artifact-manager")
+
+        await artifact_manager.create(**artifact_params.creation_dict)
+        logger.info(
+            "Artifact created: '%s' with params: %s",
+            artifact_params.artifact_id,
+            artifact_params.creation_dict,
+        )
+        return {"artifact_name": artifact_params.artifact_id, "status": "created"}
 
 
 async def delete_artifact(
     artifact_id: str,
 ) -> None:
     """Delete an artifact."""
-    server = await get_server("https://hypha.aicell.io")
-    artifact_manager = await server.get_service("public/artifact-manager")
-    try:
-        await artifact_manager.delete(artifact_id=artifact_id, delete_files=True)
-        logger.info("Artifact deleted: '%s'", artifact_id)
-    except RemoteException as e:
-        logger.warning("Error deleting artifact '%s'. Error: %s", artifact_id, e)
+    async with get_server("https://hypha.aicell.io") as server:
+        artifact_manager = await server.get_service("public/artifact-manager")
+        try:
+            await artifact_manager.delete(artifact_id=artifact_id, delete_files=True)
+            logger.info("Artifact deleted: '%s'", artifact_id)
+        except RemoteException as e:
+            logger.warning("Error deleting artifact '%s'. Error: %s", artifact_id, e)
 
 
 async def artifact_exists(
@@ -127,12 +127,6 @@ async def artifact_edit(
     **kwargs,
 ) -> None:
     """Edit an existing artifact's manifest, config, or other properties."""
-    server = await get_server("https://hypha.aicell.io")
-    artifact_manager = await server.get_service("public/artifact-manager")
-
-    if not await artifact_exists(artifact_id):
-        raise ValueError(f"Artifact '{artifact_id}' does not exist.")
-
     edit_params: dict[str, Any] = {"artifact_id": artifact_id}
     if manifest is not None:
         edit_params["manifest"] = manifest
@@ -140,4 +134,10 @@ async def artifact_edit(
         edit_params["config"] = config
     edit_params.update(kwargs)
 
-    await artifact_manager.edit(**edit_params)
+    if not await artifact_exists(artifact_id):
+        raise ValueError(f"Artifact '{artifact_id}' does not exist.")
+
+    async with get_server("https://hypha.aicell.io") as server:
+        artifact_manager = await server.get_service("public/artifact-manager")
+
+        await artifact_manager.edit(**edit_params)

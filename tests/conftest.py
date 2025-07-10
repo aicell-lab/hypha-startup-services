@@ -1,7 +1,6 @@
 """Shared test fixtures and utilities across all test suites."""
 
 import os
-import pytest_asyncio
 from dotenv import load_dotenv
 from hypha_rpc import connect_to_server
 from hypha_rpc.rpc import RemoteService

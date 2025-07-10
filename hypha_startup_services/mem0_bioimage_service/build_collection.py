@@ -136,6 +136,8 @@ async def get_memory_service(
             raise RuntimeError(
                 f"Failed to connect to remote service {service_id}: {e}"
             ) from e
+        finally:
+            await server.disconnect()  # type: ignore
     else:
         logger.info("🔌 Using local mem0 service...")
         return await get_mem0()
