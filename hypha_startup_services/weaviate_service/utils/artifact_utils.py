@@ -1,8 +1,13 @@
 import logging
 from typing import Any
+from datetime import (
+    datetime,
+    timezone,
+)
 from hypha_startup_services.common.artifacts import (
     create_artifact,
     delete_artifact,
+    artifact_edit,
 )
 from hypha_startup_services.common.utils import (
     get_application_artifact_name,
@@ -150,4 +155,22 @@ async def delete_application_artifact(
     )
     await delete_artifact(
         artifact_name,
+    )
+
+
+async def log_application_use(
+    full_collection_name: str, application_id: str, user_ws: str
+) -> None:
+    """Log the access time of an object in a tenant collection."""
+    artifact_name = get_application_artifact_name(
+        full_collection_name=full_collection_name,
+        application_id=application_id,
+        user_ws=user_ws,
+    )
+    access_time = datetime.now(timezone.utc)
+    await artifact_edit(
+        artifact_id=artifact_name,
+        manifest={
+            "application_last_used": access_time.isoformat(),
+        },
     )

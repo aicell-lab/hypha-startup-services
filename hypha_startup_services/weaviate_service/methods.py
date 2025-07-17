@@ -5,6 +5,7 @@ This module provides functionality to interface with Weaviate vector database,
 handling collections, data operations, and query functionality with user isolation.
 """
 
+import json
 import logging
 import uuid as uuid_class
 from typing import Any
@@ -32,6 +33,8 @@ from hypha_startup_services.common.artifacts import (
     get_artifact,
     artifact_exists,
     artifact_edit,
+    artifact_put_file,
+    artifact_get_file,
 )
 from .utils.service_utils import (
     prepare_application_creation,
@@ -56,6 +59,7 @@ from .utils.artifact_utils import (
     delete_collection_artifacts,
     create_application_artifact,
     delete_application_artifact,
+    log_application_use,
 )
 
 logger = logging.getLogger(__name__)
@@ -354,6 +358,18 @@ async def applications_get(
     Returns:
         Dictionary with application artifact information
     """
+    if user_ws is None:
+        assert (
+            context is not None
+        ), "Context must be provided to determine the tenant workspace"
+        user_ws = ws_from_context(context)
+
+    await log_application_use(
+        full_collection_name=get_full_collection_name(collection_name),
+        application_id=application_id,
+        user_ws=user_ws,
+    )
+
     artifact_name = await applications_get_artifact(
         client,
         collection_name,
@@ -390,6 +406,12 @@ async def applications_exists(
 
     if user_ws is None:
         user_ws = caller_ws
+
+    await log_application_use(
+        full_collection_name=get_full_collection_name(collection_name),
+        application_id=application_id,
+        user_ws=user_ws,
+    )
 
     await get_permitted_collection(
         client,
@@ -428,6 +450,12 @@ async def applications_get_artifact(
             context is not None
         ), "Context must be provided to determine the tenant workspace"
         user_ws = ws_from_context(context)
+
+    await log_application_use(
+        full_collection_name=get_full_collection_name(collection_name),
+        application_id=application_id,
+        user_ws=user_ws,
+    )
 
     await prepare_tenant_collection(
         client,
@@ -471,6 +499,18 @@ async def applications_set_permissions(
     Returns:
         Dictionary with updated application artifact information
     """
+
+    if user_ws is None:
+        assert (
+            context is not None
+        ), "Context must be provided to determine the tenant workspace"
+        user_ws = ws_from_context(context)
+
+    await log_application_use(
+        full_collection_name=get_full_collection_name(collection_name),
+        application_id=application_id,
+        user_ws=user_ws,
+    )
 
     artifact_name = await applications_get_artifact(
         client,
@@ -541,6 +581,18 @@ async def data_insert_many(
     Returns:
         Dictionary with insertion results including UUIDs and any errors
     """
+    if user_ws is None:
+        assert (
+            context is not None
+        ), "Context must be provided to determine the tenant workspace"
+        user_ws = ws_from_context(context)
+
+    await log_application_use(
+        full_collection_name=get_full_collection_name(collection_name),
+        application_id=application_id,
+        user_ws=user_ws,
+    )
+
     tenant_collection = await prepare_tenant_collection(
         client,
         collection_name,
@@ -618,6 +670,19 @@ async def data_insert(
     Returns:
         UUID of the inserted object (or first chunk if chunking enabled)
     """
+
+    if user_ws is None:
+        assert (
+            context is not None
+        ), "Context must be provided to determine the tenant workspace"
+        user_ws = ws_from_context(context)
+
+    await log_application_use(
+        full_collection_name=get_full_collection_name(collection_name),
+        application_id=application_id,
+        user_ws=user_ws,
+    )
+
     tenant_collection = await prepare_tenant_collection(
         client,
         collection_name,
@@ -677,6 +742,19 @@ async def query_near_vector(
     Returns:
         Dictionary containing objects with shortened collection names
     """
+
+    if user_ws is None:
+        assert (
+            context is not None
+        ), "Context must be provided to determine the tenant workspace"
+        user_ws = ws_from_context(context)
+
+    await log_application_use(
+        full_collection_name=get_full_collection_name(collection_name),
+        application_id=application_id,
+        user_ws=user_ws,
+    )
+
     tenant_collection = await prepare_tenant_collection(
         client,
         collection_name,
@@ -719,6 +797,19 @@ async def query_fetch_objects(
     Returns:
         Dictionary containing objects with shortened collection names
     """
+
+    if user_ws is None:
+        assert (
+            context is not None
+        ), "Context must be provided to determine the tenant workspace"
+        user_ws = ws_from_context(context)
+
+    await log_application_use(
+        full_collection_name=get_full_collection_name(collection_name),
+        application_id=application_id,
+        user_ws=user_ws,
+    )
+
     tenant_collection = await prepare_tenant_collection(
         client,
         collection_name,
@@ -761,6 +852,19 @@ async def query_hybrid(
     Returns:
         Dictionary containing objects with shortened collection names
     """
+
+    if user_ws is None:
+        assert (
+            context is not None
+        ), "Context must be provided to determine the tenant workspace"
+        user_ws = ws_from_context(context)
+
+    await log_application_use(
+        full_collection_name=get_full_collection_name(collection_name),
+        application_id=application_id,
+        user_ws=user_ws,
+    )
+
     tenant_collection = await prepare_tenant_collection(
         client,
         collection_name,
@@ -803,6 +907,19 @@ async def generate_near_text(
     Returns:
         Dictionary containing objects with shortened collection names and generated content
     """
+
+    if user_ws is None:
+        assert (
+            context is not None
+        ), "Context must be provided to determine the tenant workspace"
+        user_ws = ws_from_context(context)
+
+    await log_application_use(
+        full_collection_name=get_full_collection_name(collection_name),
+        application_id=application_id,
+        user_ws=user_ws,
+    )
+
     tenant_collection = await prepare_tenant_collection(
         client,
         collection_name,
@@ -845,6 +962,19 @@ async def data_update(
     Returns:
         None
     """
+
+    if user_ws is None:
+        assert (
+            context is not None
+        ), "Context must be provided to determine the tenant workspace"
+        user_ws = ws_from_context(context)
+
+    await log_application_use(
+        full_collection_name=get_full_collection_name(collection_name),
+        application_id=application_id,
+        user_ws=user_ws,
+    )
+
     tenant_collection = await prepare_tenant_collection(
         client,
         collection_name,
@@ -880,6 +1010,19 @@ async def data_delete_by_id(
     Returns:
         True if deletion was successful (implicitly, as no error is raised)
     """
+
+    if user_ws is None:
+        assert (
+            context is not None
+        ), "Context must be provided to determine the tenant workspace"
+        user_ws = ws_from_context(context)
+
+    await log_application_use(
+        full_collection_name=get_full_collection_name(collection_name),
+        application_id=application_id,
+        user_ws=user_ws,
+    )
+
     tenant_collection = await prepare_tenant_collection(
         client,
         collection_name,
@@ -917,6 +1060,19 @@ async def data_delete_many(
     Returns:
         Dictionary with deletion operation results including match counts
     """
+
+    if user_ws is None:
+        assert (
+            context is not None
+        ), "Context must be provided to determine the tenant workspace"
+        user_ws = ws_from_context(context)
+
+    await log_application_use(
+        full_collection_name=get_full_collection_name(collection_name),
+        application_id=application_id,
+        user_ws=user_ws,
+    )
+
     tenant_collection = await prepare_tenant_collection(
         client,
         collection_name,
@@ -961,6 +1117,19 @@ async def data_exists(
     Returns:
         Boolean indicating whether the object exists
     """
+
+    if user_ws is None:
+        assert (
+            context is not None
+        ), "Context must be provided to determine the tenant workspace"
+        user_ws = ws_from_context(context)
+
+    await log_application_use(
+        full_collection_name=get_full_collection_name(collection_name),
+        application_id=application_id,
+        user_ws=user_ws,
+    )
+
     tenant_collection = await prepare_tenant_collection(
         client,
         collection_name,
@@ -970,3 +1139,86 @@ async def data_exists(
     )
 
     return await tenant_collection.data.exists(uuid=uuid)
+
+
+async def offload_application_objects(
+    client: WeaviateAsyncClient,
+    full_collection_name: str,
+    application_id: str,
+    user_ws: str,
+) -> dict[str, Any]:
+    """Offload application objects.
+
+    Args:
+        full_collection_name: Full collection name
+        application_id: Application ID
+        user_ws: User workspace
+    """
+
+    artifact_name = get_application_artifact_name(
+        full_collection_name, user_ws, application_id
+    )
+
+    file_name = f"{application_id}.json"
+
+    object_response = await query_fetch_objects(
+        client=client,
+        collection_name=full_collection_name,
+        application_id=application_id,
+        user_ws=user_ws,
+    )
+
+    objects = object_response.get("objects", [])
+
+    # Convert objects to JSON bytes
+    objects_json = json.dumps(objects, ensure_ascii=False).encode("utf-8")
+
+    await artifact_put_file(
+        artifact_id=artifact_name,
+        file_path=file_name,
+        data=objects_json,
+    )
+
+    return await data_delete_many(
+        client=client,
+        collection_name=full_collection_name,
+        application_id=application_id,
+        user_ws=user_ws,
+    )
+
+
+async def load_application_objects(
+    client: WeaviateAsyncClient,
+    full_collection_name: str,
+    application_id: str,
+    user_ws: str,
+) -> dict[str, Any]:
+    """Load application objects.
+
+    Args:
+        full_collection_name: Full collection name
+        application_id: Application ID
+        user_ws: User workspace
+
+    Returns:
+        Bytes data of the application objects
+    """
+    artifact_name = get_application_artifact_name(
+        full_collection_name, user_ws, application_id
+    )
+
+    file_name = f"{application_id}.json"
+
+    file_bytes = await artifact_get_file(artifact_id=artifact_name, file_path=file_name)
+
+    file_json = file_bytes.decode("utf-8")
+
+    objects = json.loads(file_json)
+
+    return await data_insert_many(
+        client=client,
+        collection_name=full_collection_name,
+        application_id=application_id,
+        objects=objects,
+        user_ws=user_ws,
+    )
