@@ -5,7 +5,6 @@ This module provides functionality to interface with Weaviate vector database,
 handling collections, data operations, and query functionality with user isolation.
 """
 
-import json
 import logging
 import uuid as uuid_class
 from typing import Any
@@ -30,8 +29,6 @@ from hypha_startup_services.common.permissions import (
     assert_is_admin_ws,
 )
 from hypha_startup_services.common.artifacts import (
-    artifact_put_file,
-    artifact_get_file,
     get_artifact,
     artifact_exists,
     artifact_edit,
@@ -973,85 +970,3 @@ async def data_exists(
     )
 
     return await tenant_collection.data.exists(uuid=uuid)
-
-
-async def offload_application_objects(
-    client: WeaviateAsyncClient,
-    full_collection_name: str,
-    application_id: str,
-    user_ws: str,
-) -> dict[str, Any]:
-    """Offload application objects.
-
-    Args:
-        full_collection_name: Full collection name
-        application_id: Application ID
-        user_ws: User workspace
-    """
-    artifact_name = get_application_artifact_name(
-        full_collection_name, user_ws, application_id
-    )
-
-    file_name = f"{application_id}.json"
-
-    object_response = await query_fetch_objects(
-        client=client,
-        collection_name=full_collection_name,
-        application_id=application_id,
-        user_ws=user_ws,
-    )
-
-    objects = object_response.get("objects", [])
-
-    # Convert objects to JSON bytes
-    objects_json = json.dumps(objects, ensure_ascii=False).encode("utf-8")
-
-    await artifact_put_file(
-        artifact_id=artifact_name,
-        file_path=file_name,
-        data=objects_json,
-    )
-
-    return await data_delete_many(
-        client=client,
-        collection_name=full_collection_name,
-        application_id=application_id,
-        user_ws=user_ws,
-    )
-
-
-async def load_application_objects(
-    client: WeaviateAsyncClient,
-    full_collection_name: str,
-    application_id: str,
-    user_ws: str,
-) -> dict[str, Any]:
-    """Load application objects.
-
-    Args:
-        full_collection_name: Full collection name
-        application_id: Application ID
-        user_ws: User workspace
-
-    Returns:
-        Bytes data of the application objects
-    """
-    artifact_name = get_application_artifact_name(
-        full_collection_name, user_ws, application_id
-    )
-
-    file_name = f"{application_id}.json"
-
-    file_bytes = await artifact_get_file(artifact_id=artifact_name, file_path=file_name)
-
-    file_json = file_bytes.decode("utf-8")
-
-    objects = json.loads(file_json)
-
-    return await data_insert_many(
-        client=client,
-        collection_name=full_collection_name,
-        application_id=application_id,
-        objects=objects,
-        user_ws=user_ws,
-    )

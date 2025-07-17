@@ -1,7 +1,6 @@
 from typing import Any
 from abc import ABC, abstractmethod
 import logging
-import httpx
 from hypha_rpc.rpc import RemoteException
 from hypha_startup_services.common.server_utils import get_server
 
@@ -142,39 +141,3 @@ async def artifact_edit(
         artifact_manager = await server.get_service("public/artifact-manager")
 
         await artifact_manager.edit(**edit_params)
-
-
-async def artifact_get_file(
-    artifact_id: str,
-    file_path: str,
-) -> bytes:
-    """Download a file from an artifact."""
-    async with get_server("https://hypha.aicell.io") as server:
-        artifact_manager = await server.get_service("public/artifact-manager")
-        get_url = await artifact_manager.get_file(
-            artifact_id=artifact_id, file_path=file_path
-        )
-        async with httpx.AsyncClient() as client:
-            response = await client.get(get_url)
-            response.raise_for_status()
-            return response.content
-
-
-async def artifact_put_file(
-    artifact_id: str,
-    file_path: str,
-    data: bytes,
-) -> None:
-    """Upload a file to an artifact."""
-
-    async with get_server("https://hypha.aicell.io") as server:
-        artifact_manager = await server.get_service("public/artifact-manager")
-        put_url = await artifact_manager.put_file(
-            artifact_id=artifact_id, file_path=file_path
-        )
-        async with httpx.AsyncClient() as client:
-            response = await client.put(
-                put_url,
-                content=data,
-            )
-            response.raise_for_status()
