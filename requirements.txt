@@ -1,9 +1,9 @@
-mem0ai
-pydantic
+mem0ai==0.1.116
+pydantic==2.11.7
 weaviate-client>=4.14.0
 setuptools==80.9.0
-hypha
-hypha-rpc
+hypha==0.21.5
+hypha-rpc==0.20.77
 python-dotenv==1.1.0
 redis==6.2.0
 markdownify==1.1.0
