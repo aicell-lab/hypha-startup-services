@@ -13,7 +13,6 @@ dependencies = [
   "setuptools>=70.0.0",
   "hypha-rpc>=0.20.55",
   "python-dotenv>=0.9.0",
-  "protobuf>=6.30.0,<7.0.0"
 ]
 license = "MIT"
 license-files = ["LICENSE"]
