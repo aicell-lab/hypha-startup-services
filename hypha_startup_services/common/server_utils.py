@@ -1,20 +1,24 @@
 """Common server management utilities for hypha startup services."""
 
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 import os
 import sys
 import subprocess
 import logging
+from typing import Any
 from hypha_rpc import connect_to_server
 from hypha_rpc.rpc import RemoteService
 
 logger = logging.getLogger(__name__)
 
 
+@asynccontextmanager
 async def get_server(
     provided_url: str,
     port: int | None = None,
     client_id: str | None = None,
-) -> RemoteService:
+) -> AsyncGenerator[RemoteService, Any]:
     """Get a connection to a remote Hypha server.
 
     Args:
@@ -35,7 +39,10 @@ async def get_server(
     if not isinstance(server, RemoteService):
         raise ValueError("Server is not a RemoteService instance.")
 
-    return server
+    try:
+        yield server
+    finally:
+        await server.disconnect()
 
 
 async def run_local_services(

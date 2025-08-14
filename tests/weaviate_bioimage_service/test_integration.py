@@ -48,7 +48,7 @@ class TestRemoteBioImageService:
         assert remote_service is not None
         # Service should have query and get_entity methods
         assert hasattr(remote_service, "query")
-        assert hasattr(remote_service, "get_entity")
+        assert hasattr(remote_service, "get")
 
     @pytest.mark.asyncio
     @pytest.mark.integration
@@ -151,7 +151,7 @@ class TestRemoteBioImageService:
                 entity_id = entity_with_id["entity_id"]
 
                 # Test get_entity with this ID
-                entity_result = await remote_service.get_entity(entity_id)
+                entity_result = await remote_service.get(entity_id)
 
                 assert isinstance(entity_result, dict)
                 assert "objects" in entity_result
@@ -167,7 +167,7 @@ class TestRemoteBioImageService:
     @pytest.mark.integration
     async def test_get_entity_nonexistent(self, remote_service):
         """Test get_entity with a nonexistent ID."""
-        result = await remote_service.get_entity("nonexistent_id_xyz123")
+        result = await remote_service.get("nonexistent_id_xyz123")
 
         assert isinstance(result, dict)
         assert "objects" in result

@@ -4,7 +4,7 @@ import argparse
 import asyncio
 import logging
 from argparse import Namespace
-from typing import Callable, Optional
+from typing import Callable
 from hypha_rpc.rpc import RemoteException, RemoteService
 from .common.constants import (
     DEFAULT_LOCAL_HOST,
@@ -122,9 +122,12 @@ def get_service_configurations(
     return service_ids, startup_function_paths, register_functions
 
 
-async def handle_local_services(
-    args: Namespace, service_ids: list[str], startup_function_paths: list[str]
-) -> Optional[RemoteService]:
+async def start_local_server(
+    args: Namespace,
+    service_ids: list[str],
+    startup_function_paths: list[str],
+    port: int = DEFAULT_LOCAL_PORT,
+) -> RemoteService | None:
     """Handle local services setup.
 
     Args:
@@ -135,27 +138,17 @@ async def handle_local_services(
     Returns:
         Server connection if connected to existing server, None if started new server
     """
-    port = args.port or DEFAULT_LOCAL_PORT
 
-    try:
-        server_url = args.server_url or DEFAULT_LOCAL_EXISTING_HOST
-        server = await get_server(server_url, port, client_id=args.client_id)
-        logger.info("Connected to existing local server at %s:%s", server_url, port)
-
-        return server
-    except (RemoteException, ValueError, OSError):
-        server_url = args.server_url or DEFAULT_LOCAL_HOST
-        for service_id in service_ids:
-            logger.info(
-                "Service %s available at %s:%s/services/%s",
-                service_id,
-                server_url,
-                port,
-                service_id,
-            )
-        await run_local_services(server_url, port, startup_function_paths)
-
-        return None  # Server started in subprocess
+    server_url = args.server_url or DEFAULT_LOCAL_HOST
+    for service_id in service_ids:
+        logger.info(
+            "Service %s available at %s:%s/services/%s",
+            service_id,
+            server_url,
+            port,
+            service_id,
+        )
+    await run_local_services(server_url, port, startup_function_paths)
 
 
 async def register_services_to_server(
@@ -173,38 +166,68 @@ async def register_services_to_server(
         logger.info("Registered service %s", service_id)
 
 
+async def serve_services(
+    server: RemoteService,
+    register_functions: list[Callable],
+    service_ids: list[str],
+    probes_service_id: str | None = None,
+) -> None:
+    """Register services and health probes to an existing server.
+
+    Args:
+        server: The server connection
+        register_functions: List of registration functions
+        service_ids: List of service IDs
+        probes_service_id: Custom ID for the probes service (optional)
+    """
+    await register_services_to_server(server, register_functions, service_ids)
+
+    for service_id in service_ids:
+        log_service(service_id, server)
+
+    if probes_service_id:
+        await add_probes(server, service_ids, probes_service_id)
+        logger.info("Health probes registered with ID %s", probes_service_id)
+
+    await server.serve()
+
+
+def log_service(service_id: str, server: RemoteService) -> None:
+    """Log the service URL."""
+    base_url = server.config.public_base_url
+    workspace = server.config.workspace
+    service_url = f"{base_url}/{workspace}/services/{service_id}"
+    logger.info("Service %s available at %s", service_id, service_url)
+
+
 async def handle_services(args: Namespace) -> None:
     """Handle multiple services mode."""
     service_ids, startup_function_paths, register_functions = (
         get_service_configurations(args)
     )
+    probes_service_id = args.probes_service_id
 
     if args.local:
-        server = await handle_local_services(args, service_ids, startup_function_paths)
-        if server is None:
-            return
+        port = args.port or DEFAULT_LOCAL_PORT
+        server_url = args.server_url or DEFAULT_LOCAL_EXISTING_HOST
+
+        try:
+            async with get_server(server_url, port, client_id=args.client_id) as server:
+                logger.info(
+                    "Connected to existing local server at %s:%s", server_url, port
+                )
+                await serve_services(
+                    server, register_functions, service_ids, probes_service_id
+                )
+        except (RemoteException, ValueError, OSError):
+            await start_local_server(args, service_ids, startup_function_paths, port)
     else:
         server_url = args.server_url or DEFAULT_REMOTE_URL
-        server = await get_server(server_url, client_id=args.client_id)
-        logger.info("Connected to remote server at %s", server_url)
-
-    try:
-        await register_services_to_server(server, register_functions, service_ids)
-        for service_id in service_ids:
-            base_url = server.config.public_base_url
-            workspace = server.config.workspace
-            service_url = f"{base_url}/{workspace}/services/{service_id}"
-            logger.info("Service %s available at %s", service_id, service_url)
-
-        probes_service_id = args.probes_service_id
-        await add_probes(server, service_ids, probes_service_id)
-        logger.info("Health probes registered, server running...")
-
-        await server.serve()
-    except KeyboardInterrupt:
-        logger.info("Shutting down services...")
-        if hasattr(server, "disconnect"):
-            await server.disconnect()
+        async with get_server(server_url, client_id=args.client_id) as server:
+            logger.info("Connected to remote server at %s", server_url)
+            await serve_services(
+                server, register_functions, service_ids, probes_service_id
+            )
 
 
 def main() -> None:

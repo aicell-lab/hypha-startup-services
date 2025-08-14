@@ -1,7 +1,6 @@
 import logging
 from typing import Any
 from hypha_startup_services.common.artifacts import (
-    artifact_exists,
     create_artifact,
     delete_artifact,
 )

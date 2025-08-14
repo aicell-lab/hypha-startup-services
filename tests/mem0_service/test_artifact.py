@@ -1,6 +1,7 @@
 """Unit tests for mem0_service artifact module."""
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, patch, MagicMock
+import contextlib
 import pytest
 
 from hypha_rpc.rpc import RemoteException
@@ -26,11 +27,16 @@ def mock_server_setup():
 
 @pytest.fixture
 def patch_get_server(mock_server_setup):
-    """Patch get_server to return our mock server."""
+    """Patch get_server to return our mock server as an async context manager, and allow call assertion."""
     server, artifact_manager = mock_server_setup
-    with patch("hypha_startup_services.common.artifacts.get_server") as mock_get_server:
-        mock_get_server.return_value = server
-        yield mock_get_server, server, artifact_manager
+
+    @contextlib.asynccontextmanager
+    async def mock_get_server_cm(*args, **kwargs):
+        yield server
+
+    mock_cm = MagicMock(wraps=mock_get_server_cm)
+    with patch("hypha_startup_services.common.artifacts.get_server", mock_cm):
+        yield mock_cm, server, artifact_manager
 
 
 class TestGetArtifact:

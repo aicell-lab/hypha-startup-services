@@ -340,7 +340,7 @@ async def test_check_if_population_needed(weaviate_bioimage_test_service):
     # Test different entity types to understand the data structure
     try:
         # Try get_entity method with a known ID
-        entity_result = await weaviate_bioimage_test_service.get_entity(
+        entity_result = await weaviate_bioimage_test_service.get(
             entity_id="660fd1fc-a138-5740-b298-14b0c3b24fb9"
         )
         print(f"get_entity result type: {type(entity_result)}")
