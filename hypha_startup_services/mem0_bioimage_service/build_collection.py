@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Improved script to build the bioimage index with deduplication and character cleaning.
+"""Improved script to build the bioimage index with deduplication and character cleaning.
 
 This script:
 1. Loads EBI nodes and technologies data from JSON files
@@ -25,11 +24,13 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import Set
 
 # Add the project root to Python path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
+
+from dotenv import load_dotenv
+from hypha_rpc import connect_to_server
 
 from hypha_startup_services.common.data_index import load_external_data
 from hypha_startup_services.mem0_bioimage_service.utils import (
@@ -39,14 +40,13 @@ from hypha_startup_services.mem0_bioimage_service.utils import (
     create_technology_metadata,
 )
 from hypha_startup_services.mem0_service.mem0_client import get_mem0
-from dotenv import load_dotenv
-from hypha_rpc import connect_to_server
 
 load_dotenv()
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
@@ -56,14 +56,14 @@ EBI_WORKSPACE = "ebi_data"
 
 
 def clean_text(text: str) -> str:
-    """
-    Clean text by removing problematic characters like null bytes and control characters.
+    """Clean text by removing problematic characters like null bytes and control characters.
 
     Args:
         text: The text to clean
 
     Returns:
         Cleaned text
+
     """
     if not isinstance(text, str):
         return str(text)
@@ -79,14 +79,14 @@ def clean_text(text: str) -> str:
 
 
 def create_content_hash(content: str) -> str:
-    """
-    Create a SHA-256 hash of the content for deduplication.
+    """Create a SHA-256 hash of the content for deduplication.
 
     Args:
         content: The content to hash
 
     Returns:
         Hexadecimal hash string
+
     """
     # Clean the content first
     cleaned_content = clean_text(content)
@@ -96,10 +96,10 @@ def create_content_hash(content: str) -> str:
 
 
 async def get_memory_service(
-    use_remote: bool = False, service_id: str = "aria-agents/mem0"
+    use_remote: bool = False,
+    service_id: str = "aria-agents/mem0",
 ):
-    """
-    Get the memory service - either local mem0 or remote Hypha service.
+    """Get the memory service - either local mem0 or remote Hypha service.
 
     Args:
         use_remote: If True, connect to remote Hypha service
@@ -107,13 +107,14 @@ async def get_memory_service(
 
     Returns:
         Memory service instance (either AsyncMemory or RemoteServiceWrapper)
+
     """
     if use_remote:
         # Get the HYPHA_TOKEN from environment
         token = os.environ.get("HYPHA_TOKEN")
         if not token:
             raise ValueError(
-                "HYPHA_TOKEN environment variable is required for remote connections"
+                "HYPHA_TOKEN environment variable is required for remote connections",
             )
 
         logger.info("🌐 Connecting to remote Hypha service...")
@@ -123,7 +124,7 @@ async def get_memory_service(
             {  # type: ignore
                 "server_url": "https://hypha.aicell.io",
                 "token": token,
-            }
+            },
         )
 
         # Get the remote service
@@ -134,7 +135,7 @@ async def get_memory_service(
         except Exception as e:
             await server.disconnect()  # type: ignore
             raise RuntimeError(
-                f"Failed to connect to remote service {service_id}: {e}"
+                f"Failed to connect to remote service {service_id}: {e}",
             ) from e
         finally:
             await server.disconnect()  # type: ignore
@@ -144,9 +145,7 @@ async def get_memory_service(
 
 
 class RemoteMemoryServiceWrapper:
-    """
-    Wrapper to adapt the remote Hypha mem0 service API to match local AsyncMemory interface.
-    """
+    """Wrapper to adapt the remote Hypha mem0 service API to match local AsyncMemory interface."""
 
     def __init__(self, service):
         self.service = service
@@ -189,21 +188,28 @@ class RemoteMemoryServiceWrapper:
         return await self.service.add(messages=messages, agent_id=agent_id, **kwargs)
 
     async def search(
-        self, query: str, agent_id: str = EBI_AGENT_ID, limit: int = 10, **kwargs
+        self,
+        query: str,
+        agent_id: str = EBI_AGENT_ID,
+        limit: int = 10,
+        **kwargs,
     ):
         """Search memories via remote service."""
         await self._ensure_initialized(agent_id)
         return await self.service.search(
-            query=query, agent_id=agent_id, limit=limit, **kwargs
+            query=query,
+            agent_id=agent_id,
+            limit=limit,
+            **kwargs,
         )
 
     async def delete(self, memory_id: str, **kwargs):
         """Delete single memory via remote service (not directly supported)."""
         logger.warning(
-            "Individual memory deletion not supported by remote service API. Use delete_all() instead."
+            "Individual memory deletion not supported by remote service API. Use delete_all() instead.",
         )
         raise NotImplementedError(
-            "Single memory deletion not supported by remote service API"
+            "Single memory deletion not supported by remote service API",
         )
 
     async def get_all(self, agent_id: str = EBI_AGENT_ID, limit: int = 10000, **kwargs):
@@ -224,13 +230,13 @@ async def initialize_bioimage_database_deduplicated(
     force_rebuild: bool = False,
 ) -> None:
     """Initialize the mem0 database with bioimage data, ensuring no duplicates."""
-
     if force_rebuild:
         logger.info("Force rebuild requested - clearing existing bioimage data...")
         try:
             # Get all memories for the EBI workspace
             existing_memories_response = await memory.get_all(
-                agent_id=EBI_AGENT_ID, limit=10000
+                agent_id=EBI_AGENT_ID,
+                limit=10000,
             )
 
             # Handle different response formats
@@ -246,7 +252,8 @@ async def initialize_bioimage_database_deduplicated(
 
             if existing_memories:
                 logger.info(
-                    "Found %d existing memories, clearing...", len(existing_memories)
+                    "Found %d existing memories, clearing...",
+                    len(existing_memories),
                 )
 
                 # For remote service, use delete_all; for local, delete individually
@@ -259,7 +266,8 @@ async def initialize_bioimage_database_deduplicated(
                         )
                     except Exception as e:
                         logger.warning(
-                            "Failed to clear memories via remote service: %s", e
+                            "Failed to clear memories via remote service: %s",
+                            e,
                         )
                 else:
                     # Local service - delete individual memories
@@ -281,7 +289,7 @@ async def initialize_bioimage_database_deduplicated(
     logger.info("Initializing bioimage database with mem0 (with deduplication)...")
 
     # Track content hashes to prevent duplicates
-    content_hashes: Set[str] = set()
+    content_hashes: set[str] = set()
     total_skipped = 0
     total_added = 0
 
@@ -296,7 +304,8 @@ async def initialize_bioimage_database_deduplicated(
             # Check for duplicates
             if content_hash in content_hashes:
                 logger.debug(
-                    "Skipping duplicate node content (hash: %s...)", content_hash[:12]
+                    "Skipping duplicate node content (hash: %s...)",
+                    content_hash[:12],
                 )
                 total_skipped += 1
                 continue
@@ -379,7 +388,9 @@ async def initialize_bioimage_database_deduplicated(
 
         except (KeyError, ValueError, RuntimeError) as e:
             logger.error(
-                "Failed to add technology %s: %s", tech.get("id", "unknown"), e
+                "Failed to add technology %s: %s",
+                tech.get("id", "unknown"),
+                e,
             )
             continue
 
@@ -414,7 +425,6 @@ async def build_bioimage_index_deduplicated(
     service_id: str = "aria-agents/mem0",
 ) -> bool:
     """Main function to build the bioimage index and database with deduplication."""
-
     logger.info("🔬 Starting deduplicated bioimage index and database build...")
 
     # Step 1: Load data and build Python index
@@ -428,7 +438,7 @@ async def build_bioimage_index_deduplicated(
         logger.info("   - Technologies: %d", stats["total_technologies"])
         logger.info("   - Relationships: %d", stats["total_relationships"])
 
-    except (IOError, ValueError, KeyError) as e:
+    except (OSError, ValueError, KeyError) as e:
         logger.error("❌ Failed to build Python index: %s", e)
         return False
 
@@ -443,7 +453,10 @@ async def build_bioimage_index_deduplicated(
         technologies_data = bioimage_index.get_all_technologies()
 
         await initialize_bioimage_database_deduplicated(
-            memory, nodes_data, technologies_data, force_rebuild
+            memory,
+            nodes_data,
+            technologies_data,
+            force_rebuild,
         )
 
     except (ConnectionError, RuntimeError, ValueError) as e:
@@ -455,7 +468,9 @@ async def build_bioimage_index_deduplicated(
     try:
         # Test a simple query to verify everything works
         test_response = await memory.search(
-            "microscopy", agent_id=EBI_AGENT_ID, limit=10
+            "microscopy",
+            agent_id=EBI_AGENT_ID,
+            limit=10,
         )
 
         # Extract results from the response
@@ -466,7 +481,8 @@ async def build_bioimage_index_deduplicated(
         )
 
         logger.info(
-            "✅ Verification successful - found %d test results", len(test_memories)
+            "✅ Verification successful - found %d test results",
+            len(test_memories),
         )
 
         # Check for duplicates in test results
@@ -508,7 +524,7 @@ async def build_bioimage_index_deduplicated(
 def main():
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
-        description="Build bioimage Python index and memory database (local mem0 or remote Hypha) with deduplication"
+        description="Build bioimage Python index and memory database (local mem0 or remote Hypha) with deduplication",
     )
 
     parser.add_argument(
@@ -563,7 +579,7 @@ def main():
                 force_rebuild=args.force_rebuild,
                 use_remote=args.remote,
                 service_id=args.service_id,
-            )
+            ),
         )
 
         if success:

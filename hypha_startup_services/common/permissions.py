@@ -1,17 +1,18 @@
-"""
-Unified permissions module for Hypha startup services.
+"""Unified permissions module for Hypha startup services.
 
 This module provides a consistent permission system across all services,
 based on the mem0 service design with enhancements for flexibility.
 """
 
-from typing import Any, Literal
 import logging
 from abc import ABC, abstractmethod
-from pydantic import BaseModel, Field
+from typing import Any, Literal
+
 from hypha_rpc.rpc import RemoteException
-from .constants import ADMIN_WORKSPACES
+from pydantic import BaseModel, Field
+
 from .artifacts import get_artifact
+from .constants import ADMIN_WORKSPACES
 from .utils import (
     get_application_artifact_name,
     get_full_collection_name,
@@ -21,7 +22,18 @@ logger = logging.getLogger(__name__)
 
 # Type alias for permission operations
 PermissionOperation = Literal[
-    "n", "l", "l+", "lv", "lv+", "lf", "lf+", "r", "r+", "rw", "rw+", "*"
+    "n",
+    "l",
+    "l+",
+    "lv",
+    "lv+",
+    "lf",
+    "lf+",
+    "r",
+    "r+",
+    "rw",
+    "rw+",
+    "*",
 ]
 
 
@@ -29,15 +41,16 @@ class HyphaPermissionError(Exception):
     """Custom exception for permission-related errors."""
 
     def __init__(
-        self, message: str, permission_params: "BasePermissionParams | None" = None
+        self,
+        message: str,
+        permission_params: "BasePermissionParams | None" = None,
     ):
         self.permission_params = permission_params
         super().__init__(message)
 
 
 class BasePermissionParams(ABC, BaseModel):
-    """
-    Abstract base class for permission parameters.
+    """Abstract base class for permission parameters.
 
     This defines the interface that all permission parameter classes must implement.
     """
@@ -62,9 +75,7 @@ class BasePermissionParams(ABC, BaseModel):
 
 
 class ArtifactPermissionParams(BasePermissionParams):
-    """
-    Permission parameters for direct artifact access.
-    """
+    """Permission parameters for direct artifact access."""
 
     artifact_name: str = Field(
         description="The name/ID of the artifact being accessed",
@@ -80,9 +91,7 @@ class ArtifactPermissionParams(BasePermissionParams):
 
 
 class AgentPermissionParams(BasePermissionParams):
-    """
-    Permission parameters for mem0-style agent operations.
-    """
+    """Permission parameters for mem0-style agent operations."""
 
     agent_id: str = Field(description="The ID of the agent")
     accessed_workspace: str = Field(description="The workspace being accessed")
@@ -107,9 +116,7 @@ class AgentPermissionParams(BasePermissionParams):
 
 
 class ApplicationPermissionParams(BasePermissionParams):
-    """
-    Permission parameters for Weaviate-style application operations.
-    """
+    """Permission parameters for Weaviate-style application operations."""
 
     collection_name: str = Field(description="The collection name")
     application_id: str = Field(description="The application ID")
@@ -118,10 +125,11 @@ class ApplicationPermissionParams(BasePermissionParams):
     @property
     def artifact_id(self) -> str:
         """Generate artifact ID for Weaviate-style application operations."""
-
         full_collection_name = get_full_collection_name(self.collection_name)
         return get_application_artifact_name(
-            full_collection_name, self.application_workspace, self.application_id
+            full_collection_name,
+            self.application_workspace,
+            self.application_id,
         )
 
     @property
@@ -130,9 +138,7 @@ class ApplicationPermissionParams(BasePermissionParams):
 
 
 class CollectionPermissionParams(BasePermissionParams):
-    """
-    Permission parameters for Weaviate-style collection operations.
-    """
+    """Permission parameters for Weaviate-style collection operations."""
 
     collection_names: list[str] = Field(description="List of collection names")
 
@@ -152,14 +158,14 @@ class CollectionPermissionParams(BasePermissionParams):
 
 
 def is_admin_workspace(workspace: str) -> bool:
-    """
-    Check if the given workspace is an admin workspace.
+    """Check if the given workspace is an admin workspace.
 
     Args:
         workspace: The workspace to check
 
     Returns:
         True if the workspace is an admin workspace, False otherwise
+
     """
     return workspace in ADMIN_WORKSPACES
 
@@ -167,20 +173,22 @@ def is_admin_workspace(workspace: str) -> bool:
 async def get_user_permissions(
     permission_params: BasePermissionParams,
 ) -> dict[str, Any] | str:
-    """
-    Get user permissions for a specific artifact.
+    """Get user permissions for a specific artifact.
 
     Args:
         permission_params: The permission parameters
 
     Returns:
         A dictionary or string containing the user's permissions for the artifact
+
     """
     try:
         artifact = await get_artifact(permission_params.artifact_id)
     except RemoteException as e:
         logger.error(
-            "Failed to retrieve artifact %s: %s", permission_params.artifact_id, e
+            "Failed to retrieve artifact %s: %s",
+            permission_params.artifact_id,
+            e,
         )
         return {}
 
@@ -191,14 +199,14 @@ async def get_user_permissions(
 async def user_has_operation_permission(
     permission_params: BasePermissionParams,
 ) -> bool:
-    """
-    Check if the user has the requested permissions for a specific artifact.
+    """Check if the user has the requested permissions for a specific artifact.
 
     Args:
         permission_params: The permission parameters
 
     Returns:
         True if the user has the requested permissions, False otherwise
+
     """
     user_permissions = await get_user_permissions(permission_params)
 
@@ -215,8 +223,7 @@ async def user_has_operation_permission(
 async def has_permission(
     permission_params: BasePermissionParams,
 ) -> bool:
-    """
-    Check if a user has permission to perform an operation.
+    """Check if a user has permission to perform an operation.
 
     First checks if the user is in admin workspaces, then checks artifact-specific permissions.
 
@@ -225,6 +232,7 @@ async def has_permission(
 
     Returns:
         True if the user has permission, False otherwise
+
     """
     # Admin workspaces have full access
     if is_admin_workspace(permission_params.accessor_workspace):
@@ -274,11 +282,11 @@ async def has_permission(
 async def require_permission(
     permission_params: BasePermissionParams,
 ) -> None:
-    """
-    Ensure user has permission or raise HyphaPermissionError.
+    """Ensure user has permission or raise HyphaPermissionError.
 
     Raises:
         HyphaPermissionError: If the user doesn't have the required permission
+
     """
     if not await has_permission(permission_params):
         raise HyphaPermissionError(
@@ -289,8 +297,7 @@ async def require_permission(
 
 
 def make_artifact_permissions(owners: str | list[str]) -> dict[str, str]:
-    """
-    Generate permissions dictionary for artifacts.
+    """Generate permissions dictionary for artifacts.
 
     This function creates a permission structure compatible with both services.
 
@@ -299,6 +306,7 @@ def make_artifact_permissions(owners: str | list[str]) -> dict[str, str]:
 
     Returns:
         A permissions dictionary with appropriate permission levels
+
     """
     if isinstance(owners, str):
         owners = [owners]
@@ -325,7 +333,7 @@ def assert_is_admin_ws(user_ws: str) -> None:
     """Assert that user has admin permissions."""
     if not is_admin_workspace(user_ws):
         raise HyphaPermissionError(
-            f"User workspace '{user_ws}' is not an admin workspace"
+            f"User workspace '{user_ws}' is not an admin workspace",
         )
 
 

@@ -1,7 +1,9 @@
 """Common utility functions shared between services."""
 
 from typing import Any
+
 from hypha_rpc.utils import ObjectProxy
+
 from .constants import (
     ARTIFACT_DELIMITER,
     COLLECTION_DELIMITER,
@@ -24,7 +26,9 @@ def assert_valid_application_name(application_id: str) -> None:
 
 
 def get_application_artifact_name(
-    full_collection_name: str, user_ws: str, application_id: str
+    full_collection_name: str,
+    user_ws: str,
+    application_id: str,
 ) -> str:
     """Create a full application artifact name."""
     assert_valid_application_name(application_id)

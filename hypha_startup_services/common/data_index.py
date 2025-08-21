@@ -1,12 +1,13 @@
 """Data structures and indexing for EBI nodes and technologies."""
 
-import os
-from typing import Any, Set
-from pydantic import Field
 import json
 import logging
-from markdownify import markdownify as md
+import os
+from typing import Any
+
 from hypha_rpc.rpc import schema_function
+from markdownify import markdownify as md
+from pydantic import Field
 
 logger = logging.getLogger(__name__)
 
@@ -31,13 +32,13 @@ def process_node_data(node: dict[str, Any]) -> dict[str, Any]:
     processed_node = node.copy()
 
     # Convert HTML description to markdown
-    if "description" in processed_node and processed_node["description"]:
+    if processed_node.get("description"):
         processed_node["description"] = html_to_markdown(processed_node["description"])
 
     # Handle long_description if present
-    if "long_description" in processed_node and processed_node["long_description"]:
+    if processed_node.get("long_description"):
         processed_node["long_description"] = html_to_markdown(
-            processed_node["long_description"]
+            processed_node["long_description"],
         )
 
     return processed_node
@@ -48,13 +49,13 @@ def process_technology_data(tech: dict[str, Any]) -> dict[str, Any]:
     processed_tech = tech.copy()
 
     # Convert HTML description to markdown
-    if "description" in processed_tech and processed_tech["description"]:
+    if processed_tech.get("description"):
         processed_tech["description"] = html_to_markdown(processed_tech["description"])
 
     # Handle long_description if present
-    if "long_description" in processed_tech and processed_tech["long_description"]:
+    if processed_tech.get("long_description"):
         processed_tech["long_description"] = html_to_markdown(
-            processed_tech["long_description"]
+            processed_tech["long_description"],
         )
 
     return processed_tech
@@ -66,8 +67,8 @@ class BioimageIndex:
     def __init__(self):
         self.nodes: dict[str, dict[str, Any]] = {}
         self.technologies: dict[str, dict[str, Any]] = {}
-        self.node_to_technologies: dict[str, Set[str]] = {}
-        self.technology_to_nodes: dict[str, Set[str]] = {}
+        self.node_to_technologies: dict[str, set[str]] = {}
+        self.technology_to_nodes: dict[str, set[str]] = {}
         self.technology_name_to_id: dict[str, str] = {}
         self.node_name_to_id: dict[str, str] = {}
 
@@ -77,7 +78,6 @@ class BioimageIndex:
         technologies_data: list[dict[str, Any]],
     ):
         """Load and index the EBI data."""
-
         # Process and index technologies
         for tech in technologies_data:
             tech_id = tech["id"]
@@ -209,16 +209,17 @@ class BioimageIndex:
                 len(techs) for techs in self.node_to_technologies.values()
             ),
             "nodes_with_technologies": len(
-                [n for n in self.node_to_technologies.values() if n]
+                [n for n in self.node_to_technologies.values() if n],
             ),
             "technologies_with_nodes": len(
-                [t for t in self.technology_to_nodes.values() if t]
+                [t for t in self.technology_to_nodes.values() if t],
             ),
         }
 
 
 def load_external_data(
-    nodes_file: str | None = None, technologies_file: str | None = None
+    nodes_file: str | None = None,
+    technologies_file: str | None = None,
 ) -> BioimageIndex:
     """Load data from external JSON files."""
     # Default to assets directory if no files specified
@@ -226,7 +227,9 @@ def load_external_data(
         nodes_file = os.path.join(os.path.dirname(__file__), "assets", "ebi-nodes.json")
     if technologies_file is None:
         technologies_file = os.path.join(
-            os.path.dirname(__file__), "assets", "ebi-tech.json"
+            os.path.dirname(__file__),
+            "assets",
+            "ebi-tech.json",
         )
 
     nodes_data = []
@@ -234,20 +237,22 @@ def load_external_data(
 
     if nodes_file and os.path.exists(nodes_file):
         try:
-            with open(nodes_file, "r", encoding="utf-8") as f:
+            with open(nodes_file, encoding="utf-8") as f:
                 nodes_data = json.load(f)
             logger.info("Loaded nodes data from %s", nodes_file)
-        except (IOError, json.JSONDecodeError) as e:
+        except (OSError, json.JSONDecodeError) as e:
             logger.warning(
-                "Failed to load nodes from %s: %s, using default data", nodes_file, e
+                "Failed to load nodes from %s: %s, using default data",
+                nodes_file,
+                e,
             )
 
     if technologies_file and os.path.exists(technologies_file):
         try:
-            with open(technologies_file, "r", encoding="utf-8") as f:
+            with open(technologies_file, encoding="utf-8") as f:
                 technologies_data = json.load(f)
             logger.info("Loaded technologies data from %s", technologies_file)
-        except (IOError, json.JSONDecodeError) as e:
+        except (OSError, json.JSONDecodeError) as e:
             logger.warning(
                 "Failed to load technologies from %s: %s, using default data",
                 technologies_file,
@@ -263,12 +268,11 @@ def load_external_data(
 async def get_entity_details(
     bioimage_index: BioimageIndex,
     entity_id: str = Field(
-        description="The ID of the entity (node or technology) to retrieve"
+        description="The ID of the entity (node or technology) to retrieve",
     ),
     context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """
-    Get details for a specific entity (node or technology).
+    """Get details for a specific entity (node or technology).
     Entity type is inferred if not provided.
 
     Args:
@@ -280,6 +284,7 @@ async def get_entity_details(
 
     Raises:
         ValueError: If entity is not found.
+
     """
     entity = bioimage_index.get_node_by_id(entity_id)
     entity_type = "node"
@@ -302,12 +307,11 @@ async def get_entity_details(
 def get_related_entities(
     bioimage_index: BioimageIndex,
     entity_id: str = Field(
-        description="The ID of the entity to find relationships for"
+        description="The ID of the entity to find relationships for",
     ),
     context: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
-    """
-    Get entities related to a specific entity.
+    """Get entities related to a specific entity.
     Entity type is inferred if not provided.
 
     Args:
@@ -319,6 +323,7 @@ def get_related_entities(
 
     Raises:
         ValueError: If entity is not found or no related entities exist.
+
     """
     if bioimage_index.get_node_by_id(entity_id):
         return bioimage_index.get_technologies_by_node_id(entity_id)
@@ -352,37 +357,37 @@ def _extract_object_properties(result_obj: Any) -> dict[str, Any]:
 
     Returns:
         A dictionary with extracted properties (entity_id, entity_type, text, country, description, name)
+
     """
     if hasattr(result_obj, "properties") and hasattr(result_obj, "uuid"):
         # Weaviate Object structure
         properties = getattr(result_obj, "properties", {})
         return _get_object_property_dict(properties)
-    elif isinstance(result_obj, dict):
+    if isinstance(result_obj, dict):
         # Dict-like structure - handle both direct properties and nested properties
         if "properties" in result_obj:
             properties = result_obj["properties"]
             return _get_object_property_dict(properties)
-        else:
-            return _get_object_property_dict(result_obj)
-    else:
-        # Fallback: try to convert to dict
-        try:
-            obj_dict = dict(result_obj) if hasattr(result_obj, "__iter__") else {}
-            return _get_object_property_dict(obj_dict)
-        except (TypeError, ValueError):
-            # Return empty dict for objects we can't process
-            return {
-                "entity_id": None,
-                "entity_type": None,
-                "text": "",
-                "description": "",
-                "name": "",
-                "country": None,
-            }
+        return _get_object_property_dict(result_obj)
+    # Fallback: try to convert to dict
+    try:
+        obj_dict = dict(result_obj) if hasattr(result_obj, "__iter__") else {}
+        return _get_object_property_dict(obj_dict)
+    except (TypeError, ValueError):
+        # Return empty dict for objects we can't process
+        return {
+            "entity_id": None,
+            "entity_type": None,
+            "text": "",
+            "description": "",
+            "name": "",
+            "country": None,
+        }
 
 
 def add_related_entities(
-    bioimage_index: BioimageIndex, objects: list[dict[str, Any]]
+    bioimage_index: BioimageIndex,
+    objects: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Get related entities for a list of bioimage objects.
 
@@ -392,6 +397,7 @@ def add_related_entities(
 
     Returns:
         list[dict[str, Any]]: A list of enhanced bioimage objects with related entities.
+
     """
     enhanced_results = []
     for result_obj in objects:
@@ -425,7 +431,8 @@ def add_related_entities(
         if props["entity_id"]:
             try:
                 related_entities = get_related_entities(
-                    bioimage_index=bioimage_index, entity_id=props["entity_id"]
+                    bioimage_index=bioimage_index,
+                    entity_id=props["entity_id"],
                 )
             except ValueError:
                 # Entity not found in bioimage index - this is okay for entities

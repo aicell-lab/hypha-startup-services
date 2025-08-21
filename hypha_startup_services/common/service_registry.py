@@ -1,20 +1,24 @@
 """Service registry for startup services."""
 
-from typing import Dict, Callable, Any
+from collections.abc import Callable
+from typing import Any
+
 from hypha_rpc.rpc import RemoteService
-from hypha_startup_services.weaviate_service.register_service import register_weaviate
-from hypha_startup_services.mem0_service.register_service import register_mem0_service
+
 from hypha_startup_services.mem0_bioimage_service.register_service import (
     register_mem0_bioimage_service,
 )
+from hypha_startup_services.mem0_service.register_service import register_mem0_service
 from hypha_startup_services.weaviate_bioimage_service.register_service import (
     register_weaviate_bioimage,
 )
+from hypha_startup_services.weaviate_service.register_service import register_weaviate
+
 from .constants import (
-    DEFAULT_WEAVIATE_SERVICE_ID,
-    DEFAULT_MEM0_SERVICE_ID,
     DEFAULT_MEM0_BIOIMAGE_SERVICE_ID,
+    DEFAULT_MEM0_SERVICE_ID,
     DEFAULT_WEAVIATE_BIOIMAGE_SERVICE_ID,
+    DEFAULT_WEAVIATE_SERVICE_ID,
 )
 
 
@@ -22,7 +26,7 @@ class ServiceRegistry:
     """Registry for different startup services."""
 
     def __init__(self):
-        self._services: Dict[str, Dict[str, Any]] = {}
+        self._services: dict[str, dict[str, Any]] = {}
 
     def register_service_type(
         self,
@@ -38,6 +42,7 @@ class ServiceRegistry:
             register_function: Function to register the service
             startup_function_path: Path to the startup function
             default_service_id: Default service ID
+
         """
         self._services[service_name] = {
             "register_function": register_function,
@@ -45,11 +50,11 @@ class ServiceRegistry:
             "default_service_id": default_service_id,
         }
 
-    def get_service_config(self, service_name: str) -> Dict[str, Any]:
+    def get_service_config(self, service_name: str) -> dict[str, Any]:
         """Get configuration for a service."""
         if service_name not in self._services:
             raise ValueError(
-                f"Unknown service: {service_name}. Available: {list(self._services.keys())}"
+                f"Unknown service: {service_name}. Available: {list(self._services.keys())}",
             )
         return self._services[service_name]
 

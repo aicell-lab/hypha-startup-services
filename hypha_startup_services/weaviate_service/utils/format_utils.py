@@ -1,6 +1,8 @@
 from typing import Any
+
 from weaviate.collections import CollectionAsync
 from weaviate.collections.classes.config import CollectionConfig
+
 from hypha_startup_services.common.constants import COLLECTION_DELIMITER
 from hypha_startup_services.common.utils import get_full_collection_name
 
@@ -36,6 +38,7 @@ async def collection_to_config_dict(collection: CollectionAsync) -> dict[str, An
 
     Returns:
         Dictionary representation of the collection configuration with short name
+
     """
     config = await collection.config.get()
     config_dict = config_with_short_name(config)
@@ -70,6 +73,7 @@ def add_app_id(
 
     Returns:
         List of objects with application_id added
+
     """
     for obj in objects:
         obj["application_id"] = application_id

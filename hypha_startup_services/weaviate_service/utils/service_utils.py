@@ -1,24 +1,26 @@
-"""
-Weaviate service utility functions.
+"""Weaviate service utility functions.
 
 This module contains helper functions for Weaviate service operations
 that need to be shared across different parts of the service.
 """
 
 from typing import Any
+
 from weaviate import WeaviateAsyncClient
 from weaviate.collections import CollectionAsync
-from hypha_startup_services.common.workspace_utils import ws_from_context
-from hypha_startup_services.common.utils import (
-    get_full_collection_name,
-    get_application_artifact_name,
-)
+
 from hypha_startup_services.common.artifacts import (
     artifact_exists,
 )
 from hypha_startup_services.common.permissions import (
     assert_has_application_permission,
 )
+from hypha_startup_services.common.utils import (
+    get_application_artifact_name,
+    get_full_collection_name,
+)
+from hypha_startup_services.common.workspace_utils import ws_from_context
+
 from .collection_utils import (
     add_tenant_if_not_exists,
     get_tenant_collection,
@@ -43,6 +45,7 @@ async def prepare_application_creation(
 
     Raises:
         ValueError: If the collection does not exist
+
     """
     # Make sure the collection exists and the user has the tenant
     if not await collection_exists(client, collection_name):
@@ -78,10 +81,14 @@ async def get_permitted_collection(
 
     Returns:
         Collection object with tenant permissions configured
+
     """
     if user_ws is not None:
         await assert_has_application_permission(
-            collection_name, application_id, caller_ws, user_ws
+            collection_name,
+            application_id,
+            caller_ws,
+            user_ws,
         )
         return await get_tenant_collection(client, collection_name, user_ws)
 
@@ -107,11 +114,13 @@ async def ws_app_exists(collection_name: str, application_id: str, workspace: st
 
     Returns:
         Boolean indicating whether the application exists for the user workspace
-    """
 
+    """
     full_collection_name = get_full_collection_name(collection_name)
     artifact_name = get_application_artifact_name(
-        full_collection_name, workspace, application_id
+        full_collection_name,
+        workspace,
+        application_id,
     )
     return await artifact_exists(artifact_name)
 
@@ -137,6 +146,7 @@ async def prepare_tenant_collection(
 
     Raises:
         Exception: If the Weaviate client is not properly configured
+
     """
     assert (
         context is not None

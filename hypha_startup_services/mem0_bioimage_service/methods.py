@@ -2,14 +2,17 @@
 
 import logging
 from typing import Any
+
+from hypha_rpc.utils.schema import schema_function
 from mem0 import AsyncMemory
 from pydantic import Field
-from hypha_rpc.utils.schema import schema_function
+
 from hypha_startup_services.common.data_index import (
     BioimageIndex,
+    get_entity_details,
     get_related_entities,
 )
-from hypha_startup_services.common.data_index import get_entity_details
+
 from .utils import (
     semantic_bioimage_search,
 )
@@ -26,8 +29,7 @@ async def search(
     limit: int = 10,
     context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """
-    Unified query method that combines semantic search with related entity lookup.
+    """Unified query method that combines semantic search with related entity lookup.
     This replaces the separate semantic_query and find_related_entities_semantic methods.
 
     Args:
@@ -41,6 +43,7 @@ async def search(
 
     Returns:
         Dictionary with semantic search results and related entities
+
     """
     logger.info("Performing unified query for: '%s'", query_text)
 
@@ -50,7 +53,7 @@ async def search(
         invalid_types = set(entity_types) - valid_types
         if invalid_types:
             raise ValueError(
-                f"Invalid entity types: {invalid_types}. Must be 'node' or 'technology'"
+                f"Invalid entity types: {invalid_types}. Must be 'node' or 'technology'",
             )
 
     # Step 1: Perform semantic search
@@ -84,13 +87,15 @@ async def search(
                 try:
                     # Call the related entities function directly
                     related_entities = get_related_entities(
-                        bioimage_index=bioimage_index, entity_id=entity_id
+                        bioimage_index=bioimage_index,
+                        entity_id=entity_id,
                     )
                     related_entities_names = [
                         {
                             "entity_id": entity.get("entity_id", "Unknown"),
                             "name": entity.get(
-                                "name", entity.get("entity_id", "Unknown")
+                                "name",
+                                entity.get("entity_id", "Unknown"),
                             ),
                         }
                         for entity in related_entities
@@ -98,7 +103,9 @@ async def search(
                     enhanced_result[relation_type] = related_entities_names
                 except ValueError as e:
                     logger.warning(
-                        "Failed to get related entities for %s: %s", entity_id, e
+                        "Failed to get related entities for %s: %s",
+                        entity_id,
+                        e,
                     )
                     # Continue without related entities
 
@@ -116,7 +123,7 @@ def create_search(memory: AsyncMemory, bioimage_index: BioimageIndex):
     @schema_function
     async def search_func(
         query_text: str = Field(
-            description="Natural language query to search bioimage data"
+            description="Natural language query to search bioimage data",
         ),
         entity_types: list[str] | None = Field(
             default=None,
@@ -127,7 +134,8 @@ def create_search(memory: AsyncMemory, bioimage_index: BioimageIndex):
             description="Whether to include related entities for each result",
         ),
         limit: int = Field(
-            default=10, description="Maximum number of results to return"
+            default=10,
+            description="Maximum number of results to return",
         ),
         context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
@@ -165,7 +173,7 @@ def create_get_related_entities(bioimage_index: BioimageIndex):
     @schema_function
     async def get_related_entities_func(
         entity_id: str = Field(
-            description="ID of the entity to find related entities for"
+            description="ID of the entity to find related entities for",
         ),
         context: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:

@@ -1,5 +1,4 @@
-"""
-Weaviate service implementation for Hypha.
+"""Weaviate service implementation for Hypha.
 
 This module provides functionality to interface with Weaviate vector database,
 handling collections, data operations, and query functionality with user isolation.
@@ -8,54 +7,57 @@ handling collections, data operations, and query functionality with user isolati
 import logging
 import uuid as uuid_class
 from typing import Any
+
 from weaviate import WeaviateAsyncClient
-from weaviate.collections.classes.internal import QueryReturn, GenerativeReturn
 from weaviate.collections.classes.batch import DeleteManyReturn
-from hypha_startup_services.common.workspace_utils import ws_from_context
+from weaviate.collections.classes.internal import GenerativeReturn, QueryReturn
+
+from hypha_startup_services.common.artifacts import (
+    artifact_edit,
+    artifact_exists,
+    get_artifact,
+)
 from hypha_startup_services.common.chunking import chunk_text
-from hypha_startup_services.weaviate_service.utils.collection_utils import (
-    acquire_collection,
-    objects_part_coll_name,
-    get_short_name,
-    and_app_filter,
-)
-from hypha_startup_services.common.utils import (
-    get_full_collection_name,
-    stringify_keys,
-    get_application_artifact_name,
-)
 from hypha_startup_services.common.permissions import (
     assert_has_collection_permission,
     assert_is_admin_ws,
 )
-from hypha_startup_services.common.artifacts import (
-    get_artifact,
-    artifact_exists,
-    artifact_edit,
+from hypha_startup_services.common.utils import (
+    get_application_artifact_name,
+    get_full_collection_name,
+    stringify_keys,
 )
-from .utils.service_utils import (
-    prepare_application_creation,
-    get_permitted_collection,
-    collection_exists,
-    prepare_tenant_collection,
-    ws_app_exists,
+from hypha_startup_services.common.workspace_utils import ws_from_context
+from hypha_startup_services.weaviate_service.utils.collection_utils import (
+    acquire_collection,
+    and_app_filter,
+    get_short_name,
+    objects_part_coll_name,
+)
+
+from .utils.artifact_utils import (
+    create_application_artifact,
+    create_collection_artifact,
+    delete_application_artifact,
+    delete_collection_artifacts,
 )
 from .utils.collection_utils import (
     add_tenant_if_not_exists,
     is_multitenancy_enabled,
 )
 from .utils.format_utils import (
-    get_full_collection_names,
+    add_app_id,
     collection_to_config_dict,
     config_with_short_name,
-    add_app_id,
+    get_full_collection_names,
     get_settings_full_name,
 )
-from .utils.artifact_utils import (
-    create_collection_artifact,
-    delete_collection_artifacts,
-    create_application_artifact,
-    delete_application_artifact,
+from .utils.service_utils import (
+    collection_exists,
+    get_permitted_collection,
+    prepare_application_creation,
+    prepare_tenant_collection,
+    ws_app_exists,
 )
 
 logger = logging.getLogger(__name__)
@@ -78,6 +80,7 @@ async def collections_exists(
 
     Returns:
         True if the collection exists, False otherwise
+
     """
     return await collection_exists(
         client=client,
@@ -105,6 +108,7 @@ async def collections_create(
 
     Returns:
         The collection configuration with the short collection name
+
     """
     assert (
         context is not None
@@ -123,7 +127,8 @@ async def collections_create(
 
 
 async def collections_list_all(
-    client: WeaviateAsyncClient, context: dict[str, Any] | None = None
+    client: WeaviateAsyncClient,
+    context: dict[str, Any] | None = None,
 ) -> dict[str, dict[str, Any]]:
     """List all collections in the database.
 
@@ -136,6 +141,7 @@ async def collections_list_all(
 
     Returns:
         Dictionary mapping short collection names to their configuration
+
     """
     assert (
         context is not None
@@ -162,6 +168,7 @@ async def collections_get(
 
     Returns:
         The collection configuration with its short collection name.
+
     """
     assert (
         context is not None
@@ -191,6 +198,7 @@ async def collections_delete(
 
     Returns:
         Success dictionary or None if operation fails
+
     """
     assert (
         context is not None
@@ -221,9 +229,12 @@ async def collections_get_artifact(
 
     Returns:
         Dictionary with collection artifact information
+
     """
     assert await collections_exists(
-        client, collection_name, context=context
+        client,
+        collection_name,
+        context=context,
     ), f"Collection '{collection_name}' does not exist."
     return get_full_collection_name(collection_name)
 
@@ -250,6 +261,7 @@ async def applications_create(
 
     Returns:
         Dictionary with application details and artifact information
+
     """
     assert (
         context is not None
@@ -262,7 +274,11 @@ async def applications_create(
     await prepare_application_creation(client, collection_name, user_ws)
 
     result = await create_application_artifact(
-        collection_name, application_id, description, user_ws, caller_ws=caller_ws
+        collection_name,
+        application_id,
+        description,
+        user_ws,
+        caller_ws=caller_ws,
     )
 
     return {
@@ -294,6 +310,7 @@ async def applications_delete(
 
     Returns:
         Dictionary with deletion operation results
+
     """
     await prepare_tenant_collection(
         client,
@@ -353,6 +370,7 @@ async def applications_get(
 
     Returns:
         Dictionary with application artifact information
+
     """
     artifact_name = await applications_get_artifact(
         client,
@@ -381,6 +399,7 @@ async def applications_exists(
 
     Returns:
         Boolean indicating whether the application exists
+
     """
     assert (
         context is not None
@@ -415,6 +434,7 @@ async def applications_get_artifact(
 ) -> str:
     """Get the artifact for an application.
     Retrieves the application artifact using the caller's ID and application ID.
+
     Args:
         collection_name: Name of the collection containing the application
         application_id: ID of the application to retrieve
@@ -422,6 +442,7 @@ async def applications_get_artifact(
         context: Context containing caller information
     Returns:
         Dictionary with application artifact information
+
     """
     if user_ws is None:
         assert (
@@ -439,7 +460,9 @@ async def applications_get_artifact(
 
     full_collection_name = get_full_collection_name(collection_name)
     artifact_name = get_application_artifact_name(
-        full_collection_name, user_ws, application_id
+        full_collection_name,
+        user_ws,
+        application_id,
     )
 
     return artifact_name
@@ -470,8 +493,8 @@ async def applications_set_permissions(
 
     Returns:
         Dictionary with updated application artifact information
-    """
 
+    """
     artifact_name = await applications_get_artifact(
         client,
         collection_name,
@@ -504,7 +527,8 @@ async def applications_set_permissions(
 
     # Use artifact_edit function with config parameter
     await artifact_edit(
-        artifact_id=artifact_name, config={"permissions": updated_permissions}
+        artifact_id=artifact_name,
+        config={"permissions": updated_permissions},
     )
 
 
@@ -540,6 +564,7 @@ async def data_insert_many(
 
     Returns:
         Dictionary with insertion results including UUIDs and any errors
+
     """
     tenant_collection = await prepare_tenant_collection(
         client,
@@ -553,7 +578,7 @@ async def data_insert_many(
     if enable_chunking:
         chunked_objects = []
         for obj in objects:
-            if text_field in obj and obj[text_field]:
+            if obj.get(text_field):
                 text_content: str = obj[text_field]
                 chunks = chunk_text(text_content, chunk_size, chunk_overlap)
 
@@ -617,6 +642,7 @@ async def data_insert(
 
     Returns:
         UUID of the inserted object (or first chunk if chunking enabled)
+
     """
     tenant_collection = await prepare_tenant_collection(
         client,
@@ -643,8 +669,7 @@ async def data_insert(
         # Return the first UUID from the chunked inserts
         if result.get("uuids"):
             return list(result["uuids"].values())[0]
-        else:
-            raise RuntimeError("No UUIDs returned from chunked insert")
+        raise RuntimeError("No UUIDs returned from chunked insert")
 
     app_properties = properties.copy()
     app_properties["application_id"] = application_id
@@ -676,6 +701,7 @@ async def query_near_vector(
 
     Returns:
         Dictionary containing objects with shortened collection names
+
     """
     tenant_collection = await prepare_tenant_collection(
         client,
@@ -718,6 +744,7 @@ async def query_fetch_objects(
 
     Returns:
         Dictionary containing objects with shortened collection names
+
     """
     tenant_collection = await prepare_tenant_collection(
         client,
@@ -760,6 +787,7 @@ async def query_hybrid(
 
     Returns:
         Dictionary containing objects with shortened collection names
+
     """
     tenant_collection = await prepare_tenant_collection(
         client,
@@ -802,6 +830,7 @@ async def generate_near_text(
 
     Returns:
         Dictionary containing objects with shortened collection names and generated content
+
     """
     tenant_collection = await prepare_tenant_collection(
         client,
@@ -844,6 +873,7 @@ async def data_update(
 
     Returns:
         None
+
     """
     tenant_collection = await prepare_tenant_collection(
         client,
@@ -879,6 +909,7 @@ async def data_delete_by_id(
 
     Returns:
         True if deletion was successful (implicitly, as no error is raised)
+
     """
     tenant_collection = await prepare_tenant_collection(
         client,
@@ -916,6 +947,7 @@ async def data_delete_many(
 
     Returns:
         Dictionary with deletion operation results including match counts
+
     """
     tenant_collection = await prepare_tenant_collection(
         client,
@@ -960,6 +992,7 @@ async def data_exists(
 
     Returns:
         Boolean indicating whether the object exists
+
     """
     tenant_collection = await prepare_tenant_collection(
         client,

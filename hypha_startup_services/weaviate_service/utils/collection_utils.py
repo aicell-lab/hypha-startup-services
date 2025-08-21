@@ -1,12 +1,14 @@
 """Utility functions for managing Weaviate collections."""
 
 from collections.abc import Sequence
+
 from weaviate import WeaviateAsyncClient
-from weaviate.collections import CollectionAsync
-from weaviate.classes.tenants import Tenant
 from weaviate.classes.query import Filter
-from weaviate.collections.classes.internal import Object, GenerativeObject
+from weaviate.classes.tenants import Tenant
+from weaviate.collections import CollectionAsync
 from weaviate.collections.classes.filters import _Filters
+from weaviate.collections.classes.internal import GenerativeObject, Object
+
 from .format_utils import (
     get_full_collection_name,
     get_short_name,
@@ -14,7 +16,8 @@ from .format_utils import (
 
 
 def acquire_collection(
-    client: WeaviateAsyncClient, collection_name: str
+    client: WeaviateAsyncClient,
+    collection_name: str,
 ) -> CollectionAsync:
     """Acquire a collection from the client."""
     collection_name = get_full_collection_name(collection_name)
@@ -47,6 +50,7 @@ def and_app_filter(
 
     Returns:
         Combined filter with application_id condition
+
     """
     app_filter = create_application_filter(application_id)
     if current_filter is None:

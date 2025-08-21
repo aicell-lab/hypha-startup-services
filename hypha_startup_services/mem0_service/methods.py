@@ -1,29 +1,32 @@
-from typing import Any
 import logging
+from typing import Any
 
 # Apply patches before importing AsyncMemory to ensure they take effect
 from hypha_startup_services.mem0_service.weaviate_patches import apply_all_patches
 
 apply_all_patches()
 
-from mem0 import AsyncMemory
 from hypha_rpc.utils import ObjectProxy
+from mem0 import AsyncMemory
+
 from hypha_startup_services.common.artifacts import (
-    create_artifact,
-    artifact_exists,
     artifact_edit,
+    artifact_exists,
+    create_artifact,
     get_artifact,
 )
 from hypha_startup_services.common.permissions import (
-    require_permission,
     AgentPermissionParams,
+    require_permission,
 )
-from hypha_startup_services.common.utils import proxy_to_dict
-from hypha_startup_services.common.workspace_utils import ws_from_context
-from hypha_startup_services.common.workspace_utils import validate_workspace
 from hypha_startup_services.common.run_utils import validate_run_id
-from .utils.models import AgentArtifactParams
+from hypha_startup_services.common.utils import proxy_to_dict
+from hypha_startup_services.common.workspace_utils import (
+    validate_workspace,
+    ws_from_context,
+)
 
+from .utils.models import AgentArtifactParams
 
 logger = logging.getLogger(__name__)
 
@@ -35,8 +38,7 @@ async def init_agent(
     metadata: dict[str, Any] | None = None,
     context: dict[str, Any],
 ) -> None:
-    """
-    Initialize an agent by creating an artifact for the agent in the workspace.
+    """Initialize an agent by creating an artifact for the agent in the workspace.
 
     This creates a base artifact for the agent in the workspace.
 
@@ -45,6 +47,7 @@ async def init_agent(
         description: Optional description for the artifact
         metadata: Optional metadata for the artifact
         context: Context from Hypha-rpc for permissions
+
     """
     accessor_ws = ws_from_context(context)
 
@@ -71,8 +74,7 @@ async def init_run(
     metadata: dict[str, Any] | None = None,
     context: dict[str, Any],
 ) -> None:
-    """
-    Initialize a run by creating artifacts for the agent and the specific run.
+    """Initialize a run by creating artifacts for the agent and the specific run.
 
     This creates two artifacts:
     1. A base artifact for the agent in the workspace
@@ -85,6 +87,7 @@ async def init_run(
         metadata: Optional metadata for the artifacts
         memory: The AsyncMemory instance (currently unused)
         context: Context from Hypha-rpc for permissions
+
     """
     accessor_ws = ws_from_context(context)
 
@@ -130,8 +133,7 @@ async def mem0_add(
     run_id: str | None = None,
     **kwargs,
 ) -> dict[str, Any] | list[Any]:
-    """
-    Add a new item to the memory service.
+    """Add a new item to the memory service.
 
     Args:
         messages: The item to add, typically a list of messages or a single message.
@@ -145,8 +147,8 @@ async def mem0_add(
     Raises:
         HyphaPermissionError: If the user does not have permission to add items to the memory.
         ValueError: If the permission parameters are invalid.
-    """
 
+    """
     accessor_ws = ws_from_context(context)
 
     if workspace is None:
@@ -175,7 +177,11 @@ async def mem0_add(
     converted_kwargs = proxy_to_dict(kwargs)
 
     add_result = await memory.add(
-        converted_messages, user_id=workspace, agent_id=agent_id, run_id=run_id, **converted_kwargs  # type: ignore
+        converted_messages,
+        user_id=workspace,
+        agent_id=agent_id,
+        run_id=run_id,
+        **converted_kwargs,  # type: ignore
     )
     logger.info("Added messages to memory: %s", add_result)
     return add_result
@@ -191,8 +197,7 @@ async def mem0_search(
     run_id: str | None = None,
     **kwargs,
 ) -> dict[str, Any]:
-    """
-    Search for memories based on a query.
+    """Search for memories based on a query.
 
     Args:
         query: Query to search for.
@@ -211,8 +216,8 @@ async def mem0_search(
         A dictionary containing the search results, typically under a "results" key,
         and potentially "relations" if graph store is enabled.
         Example for v1.1+: `{"results": [{"id": "...", "memory": "...", "score": 0.8, ...}]}`
-    """
 
+    """
     accessor_ws = ws_from_context(context)
 
     if workspace is None:
@@ -257,8 +262,7 @@ async def mem0_delete_all(
     run_id: str | None = None,
     **kwargs,
 ) -> dict[str, Any]:
-    """
-    Delete all memories for a specific agent and workspace.
+    """Delete all memories for a specific agent and workspace.
 
     Args:
         agent_id: ID of the agent whose memories to delete.
@@ -274,6 +278,7 @@ async def mem0_delete_all(
 
     Returns:
         A dictionary containing the deletion result, typically with a "message" key.
+
     """
     accessor_ws = ws_from_context(context)
 
@@ -318,8 +323,7 @@ async def mem0_get_all(
     run_id: str | None = None,
     **kwargs,
 ) -> dict[str, Any]:
-    """
-    Get all memories for a specific agent and workspace.
+    """Get all memories for a specific agent and workspace.
 
     Args:
         agent_id: ID of the agent whose memories to get.
@@ -331,6 +335,7 @@ async def mem0_get_all(
 
     Returns:
         A dictionary containing all memories.
+
     """
     accessor_ws = ws_from_context(context)
 
@@ -365,8 +370,7 @@ async def mem0_set_permissions(
     merge: bool = True,
     context: dict[str, Any],
 ) -> None:
-    """
-    Set permissions for an agent in the memory service.
+    """Set permissions for an agent in the memory service.
 
     Args:
         agent_id: ID of the agent to set permissions for.
@@ -378,6 +382,7 @@ async def mem0_set_permissions(
     Raises:
         HyphaPermissionError: If the user does not have permission to set permissions.
         ValueError: If the permission parameters are invalid.
+
     """
     accessor_ws = ws_from_context(context)
 

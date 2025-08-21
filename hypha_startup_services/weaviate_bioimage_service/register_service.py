@@ -1,26 +1,29 @@
 """Service registration for the Weaviate BioImage service."""
 
 import logging
+
 from hypha_rpc.rpc import RemoteService
 from weaviate import WeaviateAsyncClient
 
 from hypha_startup_services.common.constants import DEFAULT_WEAVIATE_BIOIMAGE_SERVICE_ID
-from hypha_startup_services.weaviate_service.client import instantiate_and_connect
 from hypha_startup_services.common.data_index import (
     load_external_data,
 )
+from hypha_startup_services.weaviate_service.client import instantiate_and_connect
+
 from .methods import (
-    create_query,
     create_get_entity,
-    create_search,
     create_get_related,
+    create_query,
+    create_search,
 )
 
 logger = logging.getLogger(__name__)
 
 
 async def register_weaviate_bioimage(
-    server: RemoteService, service_id: str = DEFAULT_WEAVIATE_BIOIMAGE_SERVICE_ID
+    server: RemoteService,
+    service_id: str = DEFAULT_WEAVIATE_BIOIMAGE_SERVICE_ID,
 ) -> None:
     """Register the Weaviate BioImage service with the Hypha server.
 
@@ -30,6 +33,7 @@ async def register_weaviate_bioimage(
     Args:
         server: RemoteService instance for service registration
         service_id: Unique identifier for the service
+
     """
     # Create Weaviate client
     weaviate_client = await instantiate_and_connect()
@@ -47,13 +51,13 @@ async def register_weaviate_bioimage_service(
     weaviate_client: WeaviateAsyncClient,
     service_id: str = DEFAULT_WEAVIATE_BIOIMAGE_SERVICE_ID,
 ) -> None:
-    """
-    Register the Weaviate BioImage service with the Hypha server.
+    """Register the Weaviate BioImage service with the Hypha server.
 
     Args:
         server: RemoteService instance for service registration
         weaviate_client: Weaviate client instance
         service_id: Unique identifier for the service
+
     """
     logger.info("Loading bioimage data and creating service functions")
 
@@ -80,7 +84,7 @@ async def register_weaviate_bioimage_service(
             "get_related": get_related_func,
             "get": get_entity_func,
             "search": search_func,
-        }
+        },
     )
 
     logger.info(

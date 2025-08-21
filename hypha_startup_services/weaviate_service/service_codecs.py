@@ -6,23 +6,23 @@ allowing them to be serialized and transferred through Hypha RPC.
 
 import uuid
 from dataclasses import asdict
-from weaviate.collections.classes.internal import Object
-from weaviate.collections.classes.filters import _FilterValue, _Operator
+
 from hypha_rpc.rpc import RemoteService  # type: ignore
 from hypha_rpc.utils.pydantic import create_model_from_schema
 from pydantic import BaseModel
+from weaviate.collections.classes.filters import _FilterValue, _Operator
+from weaviate.collections.classes.internal import Object
 
 
 def register_weaviate_codecs(server: RemoteService) -> None:
     """Register all Weaviate codecs with the Hypha server."""
-
     server.register_codec(
         {
             "name": "uuid-uuid",
             "type": uuid.UUID,
             "encoder": lambda obj: obj.hex,
             "decoder": uuid.UUID,
-        }
+        },
     )
 
     # Override the built-in Pydantic codec to handle _FilterValue specially
@@ -61,7 +61,7 @@ def register_weaviate_codecs(server: RemoteService) -> None:
             "type": BaseModel,
             "encoder": custom_pydantic_encoder,
             "decoder": custom_pydantic_decoder,
-        }
+        },
     )
 
     server.register_codec(
@@ -75,5 +75,5 @@ def register_weaviate_codecs(server: RemoteService) -> None:
                 "metadata": obj.metadata and asdict(obj.metadata),
                 "collection": obj.collection,
             },
-        }
+        },
     )

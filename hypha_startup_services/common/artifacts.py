@@ -1,7 +1,9 @@
-from typing import Any
-from abc import ABC, abstractmethod
 import logging
+from abc import ABC, abstractmethod
+from typing import Any
+
 from hypha_rpc.rpc import RemoteException
+
 from hypha_startup_services.common.server_utils import get_server
 
 # from .server_utils import get_server
@@ -10,8 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class BaseArtifactParams(ABC):
-    """
-    Abstract base class for artifact parameters.
+    """Abstract base class for artifact parameters.
 
     This class defines the interface that all artifact parameter classes must implement
     to be compatible with the create_artifact function.
@@ -45,8 +46,7 @@ class BaseArtifactParams(ABC):
 async def get_artifact(
     artifact_id: str,
 ) -> dict[str, Any]:
-    """
-    Get an artifact from the artifact manager.
+    """Get an artifact from the artifact manager.
 
     Args:
         server: The RemoteService instance
@@ -57,6 +57,7 @@ async def get_artifact(
 
     Raises:
         RemoteException: If there's a server communication error
+
     """
     async with get_server("https://hypha.aicell.io") as server:
         artifact_manager = await server.get_service("public/artifact-manager")
@@ -68,7 +69,6 @@ async def create_artifact(
     artifact_params: BaseArtifactParams,
 ) -> dict[str, Any]:
     """Create a new artifact using the model-based approach."""
-
     if await artifact_exists(
         artifact_id=artifact_params.artifact_id,
     ):

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Test the bioimage service with the new EuroBioImaging data.
+"""Test the bioimage service with the new EuroBioImaging data.
 
 This script tests various queries against the bioimage service to ensure
 the data is properly loaded and searchable.
@@ -38,7 +37,7 @@ async def test_bioimage_service():
             "server_url": DEFAULT_SERVER_URL,
             "token": token,
             "method_timeout": 30,
-        }
+        },
     )
 
     try:
@@ -50,7 +49,8 @@ async def test_bioimage_service():
         logger.info("\n🔍 Test 1: Search for nodes")
         try:
             result = await bioimage_service.search_nodes(
-                query="microscopy nodes in Netherlands", limit=5
+                query="microscopy nodes in Netherlands",
+                limit=5,
             )
             logger.info("Found %d nodes", len(result.get("nodes", [])))
             for node in result.get("nodes", [])[:3]:  # Show first 3
@@ -62,7 +62,8 @@ async def test_bioimage_service():
         logger.info("\n🔍 Test 2: Search for technologies")
         try:
             result = await bioimage_service.search_technologies(
-                query="electron microscopy", limit=5
+                query="electron microscopy",
+                limit=5,
             )
             logger.info("Found %d technologies", len(result.get("technologies", [])))
             for tech in result.get("technologies", [])[:3]:  # Show first 3
@@ -74,7 +75,8 @@ async def test_bioimage_service():
         logger.info("\n🔍 Test 3: Get nodes by country")
         try:
             result = await bioimage_service.get_nodes_by_country(
-                country="NETHERLANDS", limit=5
+                country="NETHERLANDS",
+                limit=5,
             )
             logger.info("Found %d nodes in Netherlands", len(result.get("nodes", [])))
             for node in result.get("nodes", [])[:3]:  # Show first 3
@@ -86,10 +88,12 @@ async def test_bioimage_service():
         logger.info("\n🔍 Test 4: Get technologies by category")
         try:
             result = await bioimage_service.get_technologies_by_category(
-                category="Microscopy", limit=5
+                category="Microscopy",
+                limit=5,
             )
             logger.info(
-                "Found %d microscopy technologies", len(result.get("technologies", []))
+                "Found %d microscopy technologies",
+                len(result.get("technologies", [])),
             )
             for tech in result.get("technologies", [])[:3]:  # Show first 3
                 logger.info("  - %s", tech.get("name"))
@@ -100,7 +104,8 @@ async def test_bioimage_service():
         logger.info("\n🔍 Test 5: General search")
         try:
             result = await bioimage_service.search(
-                query="super resolution microscopy", limit=5
+                query="super resolution microscopy",
+                limit=5,
             )
             logger.info("Found %d total results", len(result.get("results", [])))
             for item in result.get("results", [])[:3]:  # Show first 3

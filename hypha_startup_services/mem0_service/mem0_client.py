@@ -1,14 +1,15 @@
-from mem0 import AsyncMemory
-from dotenv import load_dotenv
-from .weaviate_patches import apply_all_patches
 import logging
+
+from dotenv import load_dotenv
+from mem0 import AsyncMemory
+
+from .weaviate_patches import apply_all_patches
 
 logger = logging.getLogger(__name__)
 
 
 async def get_mem0() -> AsyncMemory:
-    """
-    Register the memory service with the Hypha server.
+    """Register the memory service with the Hypha server.
     Sets up all service endpoints for collections, data operations, and queries.
     """
     load_dotenv()

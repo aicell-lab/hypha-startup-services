@@ -4,17 +4,19 @@ import argparse
 import asyncio
 import logging
 from argparse import Namespace
-from typing import Callable
+from collections.abc import Callable
+
 from hypha_rpc.rpc import RemoteException, RemoteService
+
 from .common.constants import (
+    DEFAULT_LOCAL_EXISTING_HOST,
     DEFAULT_LOCAL_HOST,
     DEFAULT_LOCAL_PORT,
     DEFAULT_REMOTE_URL,
-    DEFAULT_LOCAL_EXISTING_HOST,
 )
-from .common.server_utils import get_server, run_local_services
-from .common.service_registry import service_registry, register_services
 from .common.probes import add_probes
+from .common.server_utils import get_server, run_local_services
+from .common.service_registry import register_services, service_registry
 
 
 def setup_logging():
@@ -36,7 +38,8 @@ logger = logging.getLogger(__name__)
 def create_parser() -> argparse.ArgumentParser:
     """Create the main argument parser."""
     parser = argparse.ArgumentParser(
-        description="Hypha startup services launcher", prog="hypha-startup-services"
+        description="Hypha startup services launcher",
+        prog="hypha-startup-services",
     )
 
     # Services argument - can be one or more
@@ -50,31 +53,45 @@ def create_parser() -> argparse.ArgumentParser:
     # Connection mode
     connection_group = parser.add_mutually_exclusive_group(required=True)
     connection_group.add_argument(
-        "--local", action="store_true", help="Run with local server"
+        "--local",
+        action="store_true",
+        help="Run with local server",
     )
     connection_group.add_argument(
-        "--remote", action="store_true", help="Connect to remote server"
+        "--remote",
+        action="store_true",
+        help="Connect to remote server",
     )
 
     # Common arguments
     parser.add_argument(
-        "--server-url", type=str, help="Server URL (defaults based on local/remote)"
+        "--server-url",
+        type=str,
+        help="Server URL (defaults based on local/remote)",
     )
     parser.add_argument("--port", type=int, help="Port number")
     parser.add_argument(
-        "--service-id", type=str, help="Custom service ID (for single service only)"
+        "--service-id",
+        type=str,
+        help="Custom service ID (for single service only)",
     )
     parser.add_argument(
-        "--client-id", type=str, help="Client ID for the server connection"
+        "--client-id",
+        type=str,
+        help="Client ID for the server connection",
     )
 
     # Service-specific ID overrides (for multiple services)
     parser.add_argument(
-        "--weaviate-service-id", type=str, help="Custom Weaviate service ID"
+        "--weaviate-service-id",
+        type=str,
+        help="Custom Weaviate service ID",
     )
     parser.add_argument("--mem0-service-id", type=str, help="Custom Mem0 service ID")
     parser.add_argument(
-        "--mem0-bioimage-service-id", type=str, help="Custom Mem0-Bioimage service ID"
+        "--mem0-bioimage-service-id",
+        type=str,
+        help="Custom Mem0-Bioimage service ID",
     )
     parser.add_argument(
         "--weaviate-bioimage-service-id",
@@ -100,6 +117,7 @@ def get_service_configurations(
 
     Returns:
         Tuple of (service_ids, startup_function_paths, register_functions)
+
     """
     service_ids = []
     startup_function_paths = []
@@ -137,8 +155,8 @@ async def start_local_server(
 
     Returns:
         Server connection if connected to existing server, None if started new server
-    """
 
+    """
     server_url = args.server_url or DEFAULT_LOCAL_HOST
     for service_id in service_ids:
         logger.info(
@@ -152,7 +170,9 @@ async def start_local_server(
 
 
 async def register_services_to_server(
-    server: RemoteService, register_functions: list[Callable], service_ids: list[str]
+    server: RemoteService,
+    register_functions: list[Callable],
+    service_ids: list[str],
 ) -> None:
     """Register services to an existing server.
 
@@ -160,8 +180,11 @@ async def register_services_to_server(
         server: The server connection
         register_functions: List of registration functions
         service_ids: List of service IDs
+
     """
-    for register_function, service_id in zip(register_functions, service_ids):
+    for register_function, service_id in zip(
+        register_functions, service_ids, strict=False
+    ):
         await register_function(server, service_id)
         logger.info("Registered service %s", service_id)
 
@@ -179,6 +202,7 @@ async def serve_services(
         register_functions: List of registration functions
         service_ids: List of service IDs
         probes_service_id: Custom ID for the probes service (optional)
+
     """
     await register_services_to_server(server, register_functions, service_ids)
 
@@ -214,10 +238,15 @@ async def handle_services(args: Namespace) -> None:
         try:
             async with get_server(server_url, port, client_id=args.client_id) as server:
                 logger.info(
-                    "Connected to existing local server at %s:%s", server_url, port
+                    "Connected to existing local server at %s:%s",
+                    server_url,
+                    port,
                 )
                 await serve_services(
-                    server, register_functions, service_ids, probes_service_id
+                    server,
+                    register_functions,
+                    service_ids,
+                    probes_service_id,
                 )
         except (RemoteException, ValueError, OSError):
             await start_local_server(args, service_ids, startup_function_paths, port)
@@ -226,7 +255,10 @@ async def handle_services(args: Namespace) -> None:
         async with get_server(server_url, client_id=args.client_id) as server:
             logger.info("Connected to remote server at %s", server_url)
             await serve_services(
-                server, register_functions, service_ids, probes_service_id
+                server,
+                register_functions,
+                service_ids,
+                probes_service_id,
             )
 
 

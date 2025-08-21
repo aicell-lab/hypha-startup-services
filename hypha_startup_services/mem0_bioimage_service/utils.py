@@ -1,6 +1,7 @@
 import logging
 import re
-from typing import Dict, Any
+from typing import Any
+
 from mem0 import AsyncMemory
 
 logger = logging.getLogger(__name__)
@@ -13,14 +14,14 @@ EBI_WORKSPACE = "ebi_data"
 
 
 def clean_text_for_json(text: str) -> str:
-    """
-    Clean text to prevent JSON parsing issues.
+    """Clean text to prevent JSON parsing issues.
 
     Args:
         text: The text to clean
 
     Returns:
         Cleaned text safe for JSON encoding
+
     """
     if not isinstance(text, str):
         text = str(text)
@@ -44,7 +45,7 @@ def clean_text_for_json(text: str) -> str:
     return text
 
 
-def create_node_content(node: Dict[str, Any]) -> str:
+def create_node_content(node: dict[str, Any]) -> str:
     """Create content string for a node."""
     name = clean_text_for_json(node.get("name", "Unknown"))
     description = clean_text_for_json(node.get("description", ""))
@@ -61,7 +62,7 @@ def create_node_content(node: Dict[str, Any]) -> str:
     return f"Bioimaging node: {name} in {country}. Description: {description}. Technologies: {technologies}"
 
 
-def create_node_metadata(node: Dict[str, Any]) -> Dict[str, Any]:
+def create_node_metadata(node: dict[str, Any]) -> dict[str, Any]:
     """Create flat metadata for a node."""
     country_info = node.get("country", {})
     metadata = {
@@ -81,7 +82,7 @@ def create_node_metadata(node: Dict[str, Any]) -> Dict[str, Any]:
         "description": clean_text_for_json(node.get("description", "")),
         "technologies": (
             ",".join(
-                [clean_text_for_json(tech) for tech in node.get("technologies", [])]
+                [clean_text_for_json(tech) for tech in node.get("technologies", [])],
             )
             if node.get("technologies")
             else None
@@ -91,7 +92,7 @@ def create_node_metadata(node: Dict[str, Any]) -> Dict[str, Any]:
     return {k: v for k, v in metadata.items() if v is not None and v != ""}
 
 
-def create_technology_content(tech: Dict[str, Any]) -> str:
+def create_technology_content(tech: dict[str, Any]) -> str:
     """Create content string for a technology."""
     name = clean_text_for_json(tech.get("name", "Unknown"))
     description = clean_text_for_json(tech.get("description", ""))
@@ -104,7 +105,7 @@ def create_technology_content(tech: Dict[str, Any]) -> str:
     return f"Bioimaging technology: {name} ({abbr}). Category: {category}. Description: {description}"
 
 
-def create_technology_metadata(tech: Dict[str, Any]) -> Dict[str, Any]:
+def create_technology_metadata(tech: dict[str, Any]) -> dict[str, Any]:
     """Create flat metadata for a technology."""
     category_info = tech.get("category", {})
     metadata = {
@@ -128,9 +129,8 @@ async def semantic_bioimage_search(
     search_query: str,
     entity_types: list[str] | None = None,
     limit: int = 10,
-) -> Dict[str, Any]:
-    """
-    Perform semantic search on the bioimage database using specialized agents.
+) -> dict[str, Any]:
+    """Perform semantic search on the bioimage database using specialized agents.
 
     Args:
         memory: AsyncMemory instance
@@ -140,6 +140,7 @@ async def semantic_bioimage_search(
 
     Returns:
         Dictionary with search results and metadata
+
     """
     logger.info("Performing semantic search for: '%s'", search_query)
 
@@ -181,7 +182,7 @@ async def semantic_bioimage_search(
                     "memory": memory_item.get("memory", ""),
                     "score": memory_item.get("score", 0.0),
                     "metadata": metadata,
-                }
+                },
             )
 
     # Sort by score and limit results

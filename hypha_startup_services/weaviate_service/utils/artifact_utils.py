@@ -1,5 +1,6 @@
 import logging
 from typing import Any
+
 from hypha_startup_services.common.artifacts import (
     create_artifact,
     delete_artifact,
@@ -7,15 +8,16 @@ from hypha_startup_services.common.artifacts import (
 from hypha_startup_services.common.utils import (
     get_application_artifact_name,
 )
-from .models import (
-    CollectionArtifactParams,
-    ApplicationArtifactParams,
-)
+
 from .constants import (
     ADMIN_WORKSPACES,
 )
 from .format_utils import (
     get_full_collection_name,
+)
+from .models import (
+    ApplicationArtifactParams,
+    CollectionArtifactParams,
 )
 
 logger = logging.getLogger(__name__)
@@ -34,10 +36,11 @@ def make_artifact_permissions(owners: str | list[str]) -> dict[str, str]:
 
     Returns:
         A permissions dictionary with read, write, and admin keys
+
     """
     if isinstance(owners, str):
         owners = [owners]
-    return {owner: "*" for owner in owners}
+    return dict.fromkeys(owners, "*")
 
 
 async def delete_collection_artifact(
@@ -47,6 +50,7 @@ async def delete_collection_artifact(
 
     Args:
         collection_name: The name of the collection to delete the artifact for
+
     """
     full_name = get_collection_artifact_name(collection_name)
     await delete_artifact(
@@ -59,6 +63,7 @@ async def delete_collection_artifacts(short_names: list[str]) -> None:
 
     Args:
         names: List of collection names to delete artifacts for
+
     """
     for coll_name in short_names:
         await delete_collection_artifact(
@@ -107,6 +112,7 @@ async def create_application_artifact(
 
     Returns:
         Result of artifact creation
+
     """
     # Create artifact parameters using the model
     artifact_params = ApplicationArtifactParams(
@@ -136,7 +142,9 @@ async def create_application_artifact(
 
 
 async def delete_application_artifact(
-    full_collection_name: str, application_id: str, user_ws: str
+    full_collection_name: str,
+    application_id: str,
+    user_ws: str,
 ) -> None:
     """Delete an application artifact.
 
@@ -144,9 +152,12 @@ async def delete_application_artifact(
         full_collection_name: Full collection name
         application_id: str,
         user_ws: str
+
     """
     artifact_name = get_application_artifact_name(
-        full_collection_name, user_ws, application_id
+        full_collection_name,
+        user_ws,
+        application_id,
     )
     await delete_artifact(
         artifact_name,

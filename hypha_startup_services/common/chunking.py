@@ -1,6 +1,7 @@
 """Text chunking utilities."""
 
 from typing import Any
+
 import tiktoken
 
 
@@ -10,8 +11,7 @@ def chunk_text(
     chunk_overlap: int = 50,
     encoding_name: str = "cl100k_base",
 ) -> list[str]:
-    """
-    Chunk text into smaller pieces using tiktoken encoding.
+    """Chunk text into smaller pieces using tiktoken encoding.
 
     Args:
         text: The text to chunk (can be None)
@@ -24,6 +24,7 @@ def chunk_text(
 
     Raises:
         ValueError: If chunk_size <= 0, chunk_overlap < 0, or chunk_overlap >= chunk_size
+
     """
     # Validate parameters
     if chunk_size <= 0:
@@ -67,8 +68,7 @@ def chunk_documents(
     chunk_overlap: int = 50,
     encoding_name: str = "cl100k_base",
 ) -> list[dict[str, Any]]:
-    """
-    Chunk multiple documents and return with metadata.
+    """Chunk multiple documents and return with metadata.
 
     Args:
         documents: List of document dictionaries (must have 'text' key)
@@ -78,6 +78,7 @@ def chunk_documents(
 
     Returns:
         List of document chunks with preserved metadata and chunk information
+
     """
     chunked_docs = []
 

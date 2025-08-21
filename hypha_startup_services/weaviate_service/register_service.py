@@ -1,40 +1,40 @@
-"""
-Helper functions to register the Weaviate service with proper API endpoints.
-"""
+"""Helper functions to register the Weaviate service with proper API endpoints."""
 
 import logging
 from functools import partial
+
 from hypha_rpc.rpc import RemoteService
 from weaviate import WeaviateAsyncClient
-from .service_codecs import (
-    register_weaviate_codecs,
-)
+
 from .client import (
     instantiate_and_connect,
 )
 from .methods import (
-    collections_create,
-    collections_delete,
-    collections_list_all,
-    collections_get,
-    collections_exists,
     applications_create,
     applications_delete,
-    applications_get,
     applications_exists,
-    data_insert_many,
-    data_insert,
-    data_update,
+    applications_get,
+    applications_get_artifact,
+    applications_set_permissions,
+    collections_create,
+    collections_delete,
+    collections_exists,
+    collections_get,
+    collections_get_artifact,
+    collections_list_all,
     data_delete_by_id,
     data_delete_many,
     data_exists,
-    query_near_vector,
+    data_insert,
+    data_insert_many,
+    data_update,
+    generate_near_text,
     query_fetch_objects,
     query_hybrid,
-    generate_near_text,
-    collections_get_artifact,
-    applications_get_artifact,
-    applications_set_permissions,
+    query_near_vector,
+)
+from .service_codecs import (
+    register_weaviate_codecs,
 )
 from .utils.constants import DEFAULT_SERVICE_ID
 
@@ -42,7 +42,8 @@ logger = logging.getLogger(__name__)
 
 
 async def register_weaviate(
-    server: RemoteService, service_id: str = DEFAULT_SERVICE_ID
+    server: RemoteService,
+    service_id: str = DEFAULT_SERVICE_ID,
 ) -> None:
     """Register the Weaviate service with the Hypha server.
 
@@ -55,13 +56,14 @@ async def register_weaviate(
 
 
 async def register_weaviate_service(
-    server: RemoteService, client: WeaviateAsyncClient, service_id: str
+    server: RemoteService,
+    client: WeaviateAsyncClient,
+    service_id: str,
 ) -> None:
     """Register the Weaviate service with the Hypha server.
 
     Sets up all service endpoints for collections, data operations, and queries.
     """
-
     await server.register_service(
         {
             "name": "Hypha Weaviate Service",
@@ -102,7 +104,7 @@ async def register_weaviate_service(
             "generate": {
                 "near_text": partial(generate_near_text, client),
             },
-        }
+        },
     )
 
     logger.info(

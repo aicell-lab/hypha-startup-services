@@ -1,31 +1,32 @@
-"""
-Helper functions to register the BioImage service with proper API endpoints.
-"""
+"""Helper functions to register the BioImage service with proper API endpoints."""
 
 import logging
+
 from hypha_rpc.rpc import RemoteService
+
 from hypha_startup_services.common.data_index import (
     load_external_data,
 )
 from hypha_startup_services.mem0_service.mem0_client import get_mem0
+
 from .methods import (
-    create_search,
     create_get_entity_details,
     create_get_related_entities,
+    create_search,
 )
 
 logger = logging.getLogger(__name__)
 
 
 async def register_mem0_bioimage_service(
-    server: RemoteService, service_id: str = "bioimage"
+    server: RemoteService,
+    service_id: str = "bioimage",
 ) -> None:
     """Register the Mem0-BioImage service with entity-agnostic methods.
 
     Sets up all service endpoints with both traditional exact matching and semantic search.
     The query method supports filtering by entity types through the entity_types parameter.
     """
-
     bioimage_index = load_external_data()
 
     memory = await get_mem0()
@@ -46,7 +47,7 @@ async def register_mem0_bioimage_service(
             "get": get_entity_details_func,
             "get_related": get_related_entities_func,
             "search": search_func,
-        }
+        },
     )
 
     logger.info(

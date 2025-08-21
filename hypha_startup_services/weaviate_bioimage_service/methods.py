@@ -3,23 +3,22 @@
 import logging
 from typing import Any
 
+from hypha_rpc.utils.schema import schema_function
+from pydantic import Field
 from weaviate import WeaviateAsyncClient
 from weaviate.classes.query import Filter
 
-from hypha_rpc.utils.schema import schema_function
-from pydantic import Field
-
-from hypha_startup_services.common.data_index import get_related_entities
-from hypha_startup_services.weaviate_service.methods import (
-    generate_near_text,
-    query_fetch_objects,
-    query_hybrid,
-    applications_exists,
-    applications_create,
-)
 from hypha_startup_services.common.data_index import (
     BioimageIndex,
     add_related_entities,
+    get_related_entities,
+)
+from hypha_startup_services.weaviate_service.methods import (
+    applications_create,
+    applications_exists,
+    generate_near_text,
+    query_fetch_objects,
+    query_hybrid,
 )
 
 logger = logging.getLogger(__name__)
@@ -31,7 +30,8 @@ SHARED_APPLICATION_DESCRIPTION = "Shared EuroBioImaging nodes and technologies d
 
 
 async def ensure_shared_application_exists(
-    client: WeaviateAsyncClient, context: dict[str, Any] | None = None
+    client: WeaviateAsyncClient,
+    context: dict[str, Any] | None = None,
 ) -> None:
     exists = await applications_exists(
         client=client,
@@ -72,6 +72,7 @@ async def query(
 
     Returns:
         Dictionary with query results and generated response
+
     """
     # Ensure the shared application exists before querying
     await ensure_shared_application_exists(client=client, context=context)
@@ -82,7 +83,7 @@ async def query(
         invalid_types = set(entity_types) - valid_types
         if invalid_types:
             raise ValueError(
-                f"Invalid entity types: {invalid_types}. Must be 'node' or 'technology'"
+                f"Invalid entity types: {invalid_types}. Must be 'node' or 'technology'",
             )
 
     where_filter = None
@@ -131,6 +132,7 @@ async def search(
 
     Returns:
         Dictionary with search results and generated response
+
     """
     # Ensure the shared application exists before querying
     await ensure_shared_application_exists(client=client, context=context)
@@ -141,7 +143,7 @@ async def search(
         invalid_types = set(entity_types) - valid_types
         if invalid_types:
             raise ValueError(
-                f"Invalid entity types: {invalid_types}. Must be 'node' or 'technology'"
+                f"Invalid entity types: {invalid_types}. Must be 'node' or 'technology'",
             )
 
     where_filter = None
@@ -198,6 +200,7 @@ async def get_entity(
 
     Returns:
         Dictionary with entity details
+
     """
     # Ensure the shared application exists before querying
     await ensure_shared_application_exists(client=client, context=context)
@@ -218,14 +221,15 @@ def create_query(client: WeaviateAsyncClient):
     @schema_function
     async def query_func(
         query_text: str = Field(
-            description="Natural language query to search bioimage data"
+            description="Natural language query to search bioimage data",
         ),
         entity_types: list[str] | None = Field(
             default=None,
             description="Filter by entity types: 'node', 'technology', or both. Defaults to both if not specified.",
         ),
         limit: int = Field(
-            default=10, description="Maximum number of results to return"
+            default=10,
+            description="Maximum number of results to return",
         ),
         context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
@@ -260,10 +264,12 @@ def create_search(client: WeaviateAsyncClient, bioimage_index: BioimageIndex):
             description="Filter by entity types: 'node', 'technology', or both. Defaults to both if not specified.",
         ),
         include_related: bool = Field(
-            default=True, description="Include related entities in results"
+            default=True,
+            description="Include related entities in results",
         ),
         limit: int = Field(
-            default=10, description="Maximum number of results to return"
+            default=10,
+            description="Maximum number of results to return",
         ),
         context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
@@ -287,7 +293,7 @@ def create_get_related(bioimage_index: BioimageIndex):
     @schema_function
     async def get_related_func(
         entity_id: str = Field(
-            description="ID of the entity to find related entities for"
+            description="ID of the entity to find related entities for",
         ),
         context: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:

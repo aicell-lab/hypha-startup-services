@@ -1,15 +1,13 @@
 from dotenv import load_dotenv
+from weaviate import WeaviateAsyncClient
 from weaviate.classes.init import AdditionalConfig
 from weaviate.connect import ConnectionParams
-from weaviate import WeaviateAsyncClient
 
 load_dotenv()
 
 
 async def instantiate_and_connect() -> WeaviateAsyncClient:
-    """
-    Instantiate and connect to Weaviate client.
-    """
+    """Instantiate and connect to Weaviate client."""
     client = WeaviateAsyncClient(
         connection_params=ConnectionParams.from_params(
             http_host="hypha-weaviate.scilifelab-2-dev.sys.kth.se",

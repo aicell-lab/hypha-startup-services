@@ -1,13 +1,26 @@
 from typing import Any, Literal
+
 from pydantic import BaseModel, Field
+
 from hypha_startup_services.common.artifacts import BaseArtifactParams
 from hypha_startup_services.common.permissions import BasePermissionParams
-from .constants import ARTIFACT_DELIMITER
 
+from .constants import ARTIFACT_DELIMITER
 
 # Type alias for permission operations
 PermissionOperation = Literal[
-    "n", "l", "l+", "lv", "lv+", "lf", "lf+", "r", "r+", "rw", "rw+", "*"
+    "n",
+    "l",
+    "l+",
+    "lv",
+    "lv+",
+    "lf",
+    "lf+",
+    "r",
+    "r+",
+    "rw",
+    "rw+",
+    "*",
 ]
 
 
@@ -15,16 +28,16 @@ class HyphaPermissionError(Exception):
     """Custom exception for permission-related errors."""
 
     def __init__(
-        self, message: str, permission_params: "PermissionParams | None" = None
+        self,
+        message: str,
+        permission_params: "PermissionParams | None" = None,
     ):
         self.permission_params = permission_params
         super().__init__(message)
 
 
 class PermissionParams(BasePermissionParams):
-    """
-    Model for permission parameters with validation and computed properties.
-    """
+    """Model for permission parameters with validation and computed properties."""
 
     accessor_workspace: str = Field(
         description="The workspace of the user accessing the artifact",
@@ -55,8 +68,7 @@ class PermissionParams(BasePermissionParams):
 
     @property
     def artifact_id(self) -> str:
-        """
-        Returns the artifact ID based on agent_id, workspace, and run_id.
+        """Returns the artifact ID based on agent_id, workspace, and run_id.
 
         Format: {agent_id}:{workspace} or {agent_id}:{workspace}:{run_id}
         """
@@ -70,14 +82,11 @@ class PermissionParams(BasePermissionParams):
         """Return a human-readable description of the resource being accessed."""
         if self.run_id:
             return f"mem0 memories for agent '{self.agent_id}' in workspace '{self.accessed_workspace}' (run: {self.run_id})"
-        else:
-            return f"mem0 memories for agent '{self.agent_id}' in workspace '{self.accessed_workspace}'"
+        return f"mem0 memories for agent '{self.agent_id}' in workspace '{self.accessed_workspace}'"
 
 
 class AgentArtifactParams(BaseModel, BaseArtifactParams):
-    """
-    Model for artifact parameters with validation and computed properties.
-    """
+    """Model for artifact parameters with validation and computed properties."""
 
     agent_id: str = Field(
         description="The agent ID associated with this artifact",
@@ -110,8 +119,7 @@ class AgentArtifactParams(BaseModel, BaseArtifactParams):
 
     @property
     def artifact_id(self) -> str:
-        """
-        Returns the artifact ID based on agent_id, workspace, and run_id.
+        """Returns the artifact ID based on agent_id, workspace, and run_id.
 
         Format: {agent_id}:{workspace} or {agent_id}:{workspace}:{run_id}
         """
@@ -124,9 +132,7 @@ class AgentArtifactParams(BaseModel, BaseArtifactParams):
 
     @property
     def parent_id(self) -> str | None:
-        """
-        Returns the parent artifact ID if it exists, otherwise None.
-        """
+        """Returns the parent artifact ID if it exists, otherwise None."""
         parent_id = None
         if self._workspace:
             parent_id = self.agent_id
@@ -136,9 +142,7 @@ class AgentArtifactParams(BaseModel, BaseArtifactParams):
 
     @property
     def description(self) -> str:
-        """
-        Returns the description of the artifact.
-        """
+        """Returns the description of the artifact."""
         if self.desc:
             return self.desc
 
@@ -151,9 +155,7 @@ class AgentArtifactParams(BaseModel, BaseArtifactParams):
 
     @property
     def manifest(self) -> dict[str, Any]:
-        """
-        Returns the artifact manifest as a dictionary.
-        """
+        """Returns the artifact manifest as a dictionary."""
         return {
             "name": f"Artifact for agent {self.agent_id}",
             "description": self.description or "",
@@ -163,11 +165,11 @@ class AgentArtifactParams(BaseModel, BaseArtifactParams):
 
     @property
     def creation_dict(self) -> dict[str, Any]:
-        """
-        Convert the ArtifactParams instance to a dictionary suitable for artifact creation.
+        """Convert the ArtifactParams instance to a dictionary suitable for artifact creation.
 
         Returns:
             A dictionary representation of the ArtifactParams instance.
+
         """
         permission_dict = {self.creator_id: "*", "*": self.general_permission or "r"}
         if self._workspace:
@@ -184,10 +186,11 @@ class AgentArtifactParams(BaseModel, BaseArtifactParams):
         }
 
     def for_workspace(
-        self, workspace: str, operation: PermissionOperation = "*"
+        self,
+        workspace: str,
+        operation: PermissionOperation = "*",
     ) -> "AgentArtifactParams":
-        """
-        Create a new ArtifactParams instance with a workspace added.
+        """Create a new ArtifactParams instance with a workspace added.
 
         This updates the artifact_id to include the workspace and creates a new instance.
 
@@ -197,12 +200,13 @@ class AgentArtifactParams(BaseModel, BaseArtifactParams):
 
         Returns:
             A new ArtifactParams instance with the workspace included
+
         """
         return self.model_copy(
             update={
                 "_workspace": workspace,
                 "workspace_permission": operation,
-            }
+            },
         )
 
     def for_run(
@@ -211,8 +215,7 @@ class AgentArtifactParams(BaseModel, BaseArtifactParams):
         workspace: str | None = None,
         operation: PermissionOperation = "*",
     ) -> "AgentArtifactParams":
-        """
-        Create a new ArtifactParams instance with a run_id added.
+        """Create a new ArtifactParams instance with a run_id added.
 
         This updates the artifact_id to include the run_id and creates a new instance.
 
@@ -223,12 +226,12 @@ class AgentArtifactParams(BaseModel, BaseArtifactParams):
 
         Returns:
             A new ArtifactParams instance with the run_id included
-        """
 
+        """
         return self.model_copy(
             update={
                 "_workspace": workspace or self._workspace,
                 "_run_id": run_id,
                 "workspace_permission": operation,
-            }
+            },
         )

@@ -1,12 +1,13 @@
 """Common server management utilities for hypha startup services."""
 
+import logging
+import os
+import subprocess
+import sys
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-import os
-import sys
-import subprocess
-import logging
 from typing import Any
+
 from hypha_rpc import connect_to_server
 from hypha_rpc.rpc import RemoteService
 
@@ -27,6 +28,7 @@ async def get_server(
 
     Returns:
         The server connection
+
     """
     server_url = provided_url if port is None else f"{provided_url}:{port}"
     token = os.environ.get("HYPHA_TOKEN")
@@ -56,6 +58,7 @@ async def run_local_services(
         server_url: The URL of the server to connect to
         port: The port of the server
         startup_function_paths: List of paths to startup functions
+
     """
     # Join all startup function paths with spaces
     startup_functions_arg = [

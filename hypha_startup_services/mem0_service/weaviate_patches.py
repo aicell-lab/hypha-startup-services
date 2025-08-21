@@ -1,11 +1,8 @@
-"""
-Monkey patch for mem0's Weaviate integration to fix metadata and score issues.
-"""
+"""Monkey patch for mem0's Weaviate integration to fix metadata and score issues."""
 
 import json
 import logging
 import math
-from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +34,7 @@ MEM0_SYSTEM_FIELDS = {
 }
 
 
-def parse_metadata_field(payload: Dict) -> Dict:
+def parse_metadata_field(payload: dict) -> dict:
     """Parse JSON metadata field if it's a string."""
     if "metadata" in payload and isinstance(payload["metadata"], str):
         try:
@@ -49,23 +46,19 @@ def parse_metadata_field(payload: Dict) -> Dict:
 
 
 def patch_weaviate_search():
-    """
-    Monkey patch the Weaviate.search method to fix metadata and score issues.
-    """
+    """Monkey patch the Weaviate.search method to fix metadata and score issues."""
     try:
-        from mem0.vector_stores.weaviate import Weaviate, OutputData
+        from mem0.vector_stores.weaviate import OutputData, Weaviate
         from weaviate.classes.query import Filter, MetadataQuery
 
         def patched_search(
             self,
             query: str,
-            vectors: List[float],
+            vectors: list[float],
             limit: int = 5,
-            filters: Optional[Dict] = None,
-        ) -> List[OutputData]:
-            """
-            Patched search method with proper metadata and score handling.
-            """
+            filters: dict | None = None,
+        ) -> list[OutputData]:
+            """Patched search method with proper metadata and score handling."""
             del query  # Unused in hybrid search, but keep for API compatibility
 
             collection = self.client.collections.get(str(self.collection_name))
@@ -135,7 +128,7 @@ def patch_weaviate_search():
                         id=str(obj.uuid),
                         score=score,
                         payload=payload,
-                    )
+                    ),
                 )
 
             return results
@@ -154,19 +147,15 @@ def patch_weaviate_search():
 
 
 def patch_weaviate_insert():
-    """
-    Monkey patch the Weaviate.insert method to handle metadata JSON conversion.
-    """
+    """Monkey patch the Weaviate.insert method to handle metadata JSON conversion."""
     try:
-        from mem0.vector_stores.weaviate import Weaviate
         import uuid as uuid_module
+
+        from mem0.vector_stores.weaviate import Weaviate
         from weaviate.util import get_valid_uuid
 
         def patched_insert(self, vectors, payloads=None, ids=None):
-            """
-            Patched insert method that converts dict metadata to JSON string.
-            """
-
+            """Patched insert method that converts dict metadata to JSON string."""
             with self.client.batch.fixed_size(batch_size=100) as batch:
                 for idx, vector in enumerate(vectors):
                     object_id = (
@@ -210,7 +199,7 @@ def patch_weaviate_insert():
                             # If existing metadata is not a dict (e.g., JSON string),
                             # log a warning but don't overwrite it
                             logger.warning(
-                                "Found both existing metadata and custom fields, preserving existing metadata"
+                                "Found both existing metadata and custom fields, preserving existing metadata",
                             )
                     # If no custom metadata but existing metadata exists, just leave it alone
 
@@ -235,17 +224,13 @@ def patch_weaviate_insert():
 
 
 def patch_weaviate_get():
-    """
-    Monkey patch the Weaviate.get method to fix metadata handling.
-    """
+    """Monkey patch the Weaviate.get method to fix metadata handling."""
     try:
-        from mem0.vector_stores.weaviate import Weaviate, OutputData
+        from mem0.vector_stores.weaviate import OutputData, Weaviate
         from weaviate.util import get_valid_uuid
 
         def patched_get(self, vector_id):
-            """
-            Patched get method with proper metadata handling.
-            """
+            """Patched get method with proper metadata handling."""
             vector_id = get_valid_uuid(vector_id)
             collection = self.client.collections.get(str(self.collection_name))
 
@@ -295,19 +280,17 @@ def patch_weaviate_get():
 
 
 def patch_weaviate_list():
-    """
-    Monkey patch the Weaviate.list method to fix metadata handling.
-    """
+    """Monkey patch the Weaviate.list method to fix metadata handling."""
     try:
-        from mem0.vector_stores.weaviate import Weaviate, OutputData
+        from mem0.vector_stores.weaviate import OutputData, Weaviate
         from weaviate.classes.query import Filter
 
         def patched_list(self, filters=None, limit=100):
-            """
-            Patched list method with proper metadata handling.
-            """
+            """Patched list method with proper metadata handling."""
             logger.info(
-                "Weaviate.list called with filters=%s, limit=%s", filters, limit
+                "Weaviate.list called with filters=%s, limit=%s",
+                filters,
+                limit,
             )
 
             collection = self.client.collections.get(str(self.collection_name))
@@ -365,7 +348,7 @@ def patch_weaviate_list():
                         id=str(obj.uuid),
                         score=1.0,  # Default score for list operations
                         payload=payload,
-                    )
+                    ),
                 )
 
             # Return wrapped in a list to match original Weaviate.list behavior
@@ -387,31 +370,29 @@ def patch_weaviate_list():
 
 
 def patch_mem0_get_all():
-    """
-    Monkey patch mem0's AsyncMemory.get_all method to fix the coroutine issue.
+    """Monkey patch mem0's AsyncMemory.get_all method to fix the coroutine issue.
 
     The issue is that AsyncMemory.get_all uses executor.submit() to call
     self._get_all_from_vector_store, but that method is async and creates
     a coroutine that never gets awaited.
     """
     try:
-        from mem0.memory.main import AsyncMemory
         import concurrent.futures
         import warnings
+
+        from mem0.memory.main import AsyncMemory
         from mem0.memory.telemetry import capture_event
 
         async def patched_get_all(
             self,
             *,
-            user_id: Optional[str] = None,
-            agent_id: Optional[str] = None,
-            run_id: Optional[str] = None,
-            filters: Optional[Dict] = None,
+            user_id: str | None = None,
+            agent_id: str | None = None,
+            run_id: str | None = None,
+            filters: dict | None = None,
             limit: int = 100,
         ):
-            """
-            Patched get_all method that properly awaits async operations.
-            """
+            """Patched get_all method that properly awaits async operations."""
             # Build filters manually since _build_filters_and_metadata might not be importable
             effective_filters = {}
             if user_id:
@@ -428,7 +409,7 @@ def patch_mem0_get_all():
             ):
                 raise ValueError(
                     "When 'conversation_id' is not provided (classic mode), "
-                    "at least one of 'user_id', 'agent_id', or 'run_id' must be specified for get_all."
+                    "at least one of 'user_id', 'agent_id', or 'run_id' must be specified for get_all.",
                 )
 
             capture_event(
@@ -443,15 +424,18 @@ def patch_mem0_get_all():
 
             # FIX: Properly await the async operations instead of using executor.submit
             all_memories_result = await self._get_all_from_vector_store(
-                effective_filters, limit
-            )  # noqa: SLF001
+                effective_filters,
+                limit,
+            )
             graph_entities_result = None
 
             if self.enable_graph:
                 # For graph operations, we can still use executor if needed
                 with concurrent.futures.ThreadPoolExecutor() as executor:
                     future_graph_entities = executor.submit(
-                        self.graph.get_all, effective_filters, limit
+                        self.graph.get_all,
+                        effective_filters,
+                        limit,
                     )
                     graph_entities_result = future_graph_entities.result()
 
@@ -470,8 +454,7 @@ def patch_mem0_get_all():
                     stacklevel=2,
                 )
                 return all_memories_result
-            else:
-                return {"results": all_memories_result}
+            return {"results": all_memories_result}
 
         # Apply the patch
         AsyncMemory.get_all = patched_get_all
@@ -487,20 +470,18 @@ def patch_mem0_get_all():
 
 
 def patch_mem0_get_all_from_vector_store():
-    """
-    Monkey patch mem0's AsyncMemory._get_all_from_vector_store method to handle list results.
+    """Monkey patch mem0's AsyncMemory._get_all_from_vector_store method to handle list results.
 
     The async version only checks for tuple but the sync version checks for (tuple, list).
     This makes them consistent.
     """
     try:
-        from mem0.memory.main import AsyncMemory
         import asyncio
 
+        from mem0.memory.main import AsyncMemory
+
         async def patched_get_all_from_vector_store(self, filters, limit):
-            """
-            Patched _get_all_from_vector_store method that handles list results correctly.
-            """
+            """Patched _get_all_from_vector_store method that handles list results correctly."""
             logger.info(
                 "DEBUG: get_all_from_vector_store called with filters=%s, limit=%s",
                 filters,
@@ -508,7 +489,9 @@ def patch_mem0_get_all_from_vector_store():
             )
 
             memories_result = await asyncio.to_thread(
-                self.vector_store.list, filters=filters, limit=limit
+                self.vector_store.list,
+                filters=filters,
+                limit=limit,
             )
             logger.info(
                 "DEBUG: vector_store.list returned type=%s, content=%s",
@@ -616,35 +599,33 @@ def patch_mem0_get_all_from_vector_store():
         # Apply the patch
         AsyncMemory._get_all_from_vector_store = patched_get_all_from_vector_store
         logger.info(
-            "Successfully patched AsyncMemory._get_all_from_vector_store method"
+            "Successfully patched AsyncMemory._get_all_from_vector_store method",
         )
         return True
 
     except ImportError as e:
         logger.warning(
-            "Could not patch AsyncMemory._get_all_from_vector_store: %s", str(e)
+            "Could not patch AsyncMemory._get_all_from_vector_store: %s",
+            str(e),
         )
         return False
     except (AttributeError, TypeError) as e:
         logger.error(
-            "Error patching AsyncMemory._get_all_from_vector_store: %s", str(e)
+            "Error patching AsyncMemory._get_all_from_vector_store: %s",
+            str(e),
         )
         return False
 
 
 def patch_ollama_embedding():
-    """
-    Patch Ollama embedding model to handle list inputs gracefully.
-    """
+    """Patch Ollama embedding model to handle list inputs gracefully."""
     try:
         from mem0.embeddings.ollama import OllamaEmbedding
 
         original_embed = OllamaEmbedding.embed
 
         def patched_embed(self, text, memory_action=None):
-            """
-            Patched embed method that handles both string and list inputs.
-            """
+            """Patched embed method that handles both string and list inputs."""
             # If text is a list, join it into a single string
             if isinstance(text, list):
                 text = " ".join(str(item) for item in text)
@@ -663,8 +644,7 @@ def patch_ollama_embedding():
 
 
 def patch_mem0_fact_extraction():
-    """
-    Patch to fix the 'unhashable type: list' error in mem0's fact extraction.
+    """Patch to fix the 'unhashable type: list' error in mem0's fact extraction.
 
     This patch intercepts at the exact point where the error occurs and converts
     list content to strings before they're used as dictionary keys.
@@ -689,7 +669,8 @@ def patch_mem0_fact_extraction():
                     key = " ".join(str(item) for item in key)
                     logger.warning(f"Converted list key to string: {key}")
                 elif not isinstance(
-                    key, (str, int, float, tuple, frozenset, bool, type(None))
+                    key,
+                    (str, int, float, tuple, frozenset, bool, type(None)),
                 ):
                     # Convert other unhashable types to string
                     key = str(key)
@@ -702,7 +683,8 @@ def patch_mem0_fact_extraction():
                 if isinstance(key, list):
                     key = " ".join(str(item) for item in key)
                 elif not isinstance(
-                    key, (str, int, float, tuple, frozenset, bool, type(None))
+                    key,
+                    (str, int, float, tuple, frozenset, bool, type(None)),
                 ):
                     key = str(key)
 
@@ -715,10 +697,13 @@ def patch_mem0_fact_extraction():
             original_add_to_vector_store = AsyncMemory._add_to_vector_store
 
             async def safe_add_to_vector_store(
-                self, messages, metadata, effective_filters, infer
+                self,
+                messages,
+                metadata,
+                effective_filters,
+                infer,
             ):
                 """Wrapper that uses ListSafeDict for the problematic operation."""
-
                 # Temporarily replace dict with our safe version in the local scope
                 # This is a bit hacky but should work for this specific issue
                 original_locals = {}
@@ -727,13 +712,17 @@ def patch_mem0_fact_extraction():
                     # Call the original function, but if it fails with the list error,
                     # we'll catch it and try a workaround
                     return await original_add_to_vector_store(
-                        self, messages, metadata, effective_filters, infer
+                        self,
+                        messages,
+                        metadata,
+                        effective_filters,
+                        infer,
                     )
 
                 except TypeError as e:
                     if "unhashable type: 'list'" in str(e):
                         logger.warning(
-                            "Caught unhashable list error, applying emergency workaround..."
+                            "Caught unhashable list error, applying emergency workaround...",
                         )
 
                         # The error is happening because new_mem_content is a list
@@ -748,29 +737,34 @@ def patch_mem0_fact_extraction():
                                 if isinstance(memory, dict):
                                     # Check if 'data' field is a list
                                     if "data" in memory and isinstance(
-                                        memory["data"], list
+                                        memory["data"],
+                                        list,
                                     ):
                                         memory["data"] = " ".join(
                                             str(item) for item in memory["data"]
                                         )
                                         logger.info(
-                                            "Converted list data to string in memory"
+                                            "Converted list data to string in memory",
                                         )
                                 elif isinstance(memory, list):
                                     # If the entire memory is a list, this is problematic
                                     logger.warning(
-                                        "Found memory that is entirely a list - this may cause issues"
+                                        "Found memory that is entirely a list - this may cause issues",
                                     )
 
                         # Try again with cleaned data
                         try:
                             return await original_add_to_vector_store(
-                                self, messages, metadata, effective_filters, infer
+                                self,
+                                messages,
+                                metadata,
+                                effective_filters,
+                                infer,
                             )
                         except:
                             # If it still fails, return an empty result to prevent crash
                             logger.error(
-                                "Memory operation failed even after list conversion, returning empty result"
+                                "Memory operation failed even after list conversion, returning empty result",
                             )
                             return []
                     else:
@@ -779,7 +773,7 @@ def patch_mem0_fact_extraction():
 
             AsyncMemory._add_to_vector_store = safe_add_to_vector_store
             logger.info(
-                "Successfully patched AsyncMemory._add_to_vector_store with list handling"
+                "Successfully patched AsyncMemory._add_to_vector_store with list handling",
             )
 
         return True
@@ -812,12 +806,11 @@ def apply_all_patches():
             mem0_get_all_from_vector_store_patched,
             ollama_embedding_patched,
             fact_extraction_patched,
-        ]
+        ],
     )
 
     if success_count == 8:
         logger.info("All essential Weaviate and mem0 patches applied successfully")
         return True
-    else:
-        logger.warning("Some patches failed to apply: %d/8", success_count)
-        return False
+    logger.warning("Some patches failed to apply: %d/8", success_count)
+    return False

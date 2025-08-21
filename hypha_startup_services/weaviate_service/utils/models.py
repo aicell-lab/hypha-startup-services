@@ -1,22 +1,33 @@
 from typing import Any, Literal
+
 from pydantic import BaseModel, Field
-from hypha_startup_services.common.constants import ARTIFACT_DELIMITER
+
 from hypha_startup_services.common.artifacts import BaseArtifactParams
+from hypha_startup_services.common.constants import ARTIFACT_DELIMITER
+
 from .format_utils import (
     get_full_collection_name,
 )
 
-
 # Type alias for permission operations
 PermissionOperation = Literal[
-    "n", "l", "l+", "lv", "lv+", "lf", "lf+", "r", "r+", "rw", "rw+", "*"
+    "n",
+    "l",
+    "l+",
+    "lv",
+    "lv+",
+    "lf",
+    "lf+",
+    "r",
+    "r+",
+    "rw",
+    "rw+",
+    "*",
 ]
 
 
 class WeaviateArtifactParams(BaseModel, BaseArtifactParams):
-    """
-    Model for Weaviate artifact parameters with validation and computed properties.
-    """
+    """Model for Weaviate artifact parameters with validation and computed properties."""
 
     artifact_name: str = Field(
         description="The name/ID of the artifact",
@@ -79,9 +90,7 @@ class WeaviateArtifactParams(BaseModel, BaseArtifactParams):
 
 
 class CollectionArtifactParams(WeaviateArtifactParams):
-    """
-    Model for collection artifact parameters.
-    """
+    """Model for collection artifact parameters."""
 
     collection_name: str = Field(
         description="The short name of the collection",
@@ -96,7 +105,6 @@ class CollectionArtifactParams(WeaviateArtifactParams):
     @property
     def manifest(self) -> dict[str, Any]:
         """Returns the artifact manifest as a dictionary."""
-
         return {
             "name": self.artifact_name,
             "description": self.description,
@@ -106,9 +114,7 @@ class CollectionArtifactParams(WeaviateArtifactParams):
 
 
 class ApplicationArtifactParams(WeaviateArtifactParams):
-    """
-    Model for application artifact parameters.
-    """
+    """Model for application artifact parameters."""
 
     collection_name: str = Field(
         description="The short name of the collection",
@@ -143,7 +149,7 @@ class ApplicationArtifactParams(WeaviateArtifactParams):
             {
                 "application_id": self.application_id,
                 "short_collection_name": self.collection_name,
-            }
+            },
         )
 
         return {

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Populate the shared bioimage application with EuroBioImaging data.
+"""Populate the shared bioimage application with EuroBioImaging data.
 
 This script uses the Weaviate service directly to insert nodes and technologies data
 into the shared application that was created by the bioimage service.
@@ -44,12 +43,12 @@ async def load_data_files() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]
 
     # Load nodes data
     nodes_file = script_dir / "common" / "assets" / "ebi-nodes.json"
-    with open(nodes_file, "r", encoding="utf-8") as f:
+    with open(nodes_file, encoding="utf-8") as f:
         nodes_data = json.load(f)
 
     # Load technologies data
     tech_file = script_dir / "common" / "assets" / "ebi-tech.json"
-    with open(tech_file, "r", encoding="utf-8") as f:
+    with open(tech_file, encoding="utf-8") as f:
         tech_data = json.load(f)
 
     logger.info("Loaded %d nodes and %d technologies", len(nodes_data), len(tech_data))
@@ -139,7 +138,7 @@ async def get_weaviate_service(server_url: str):
             "server_url": server_url,
             "token": token,
             "method_timeout": 60,
-        }
+        },
     )
 
     # Get the Weaviate service
@@ -229,7 +228,7 @@ async def ensure_collection_exists(
                     "text2vec-ollama": {
                         "model": ollama_model,
                         "apiEndpoint": ollama_endpoint,
-                    }
+                    },
                 },
                 "sourceProperties": ["text", "name"],
                 "vectorIndexType": "hnsw",
@@ -240,7 +239,7 @@ async def ensure_collection_exists(
                     "text2vec-ollama": {
                         "model": ollama_model,
                         "apiEndpoint": ollama_endpoint,
-                    }
+                    },
                 },
                 "sourceProperties": ["description"],
                 "vectorIndexType": "hnsw",
@@ -251,7 +250,7 @@ async def ensure_collection_exists(
             "generative-ollama": {
                 "model": ollama_llm_model,
                 "apiEndpoint": ollama_endpoint,
-            }
+            },
         },
     }
 
@@ -332,7 +331,9 @@ async def insert_data_in_batches(
 
             if result.get("has_errors"):
                 logger.warning(
-                    "Batch %d had errors: %s", batch_num, result.get("errors")
+                    "Batch %d had errors: %s",
+                    batch_num,
+                    result.get("errors"),
                 )
                 total_results["has_errors"] = True
                 total_results["errors"].extend(result.get("errors", []))
@@ -345,7 +346,7 @@ async def insert_data_in_batches(
             logger.error("Failed to insert batch %d: %s", batch_num, e)
             total_results["has_errors"] = True
             total_results["failed"] += len(batch)
-            total_results["errors"].append(f"Batch {batch_num}: {str(e)}")
+            total_results["errors"].append(f"Batch {batch_num}: {e!s}")
 
     logger.info(
         "Batch insertion completed: %d successful, %d failed",
@@ -359,7 +360,7 @@ async def main():
     """Main function to populate shared bioimage application with data."""
     # Parse command line arguments
     parser = argparse.ArgumentParser(
-        description="Populate shared bioimage application with data"
+        description="Populate shared bioimage application with data",
     )
     parser.add_argument(
         "--ollama-model",
@@ -423,10 +424,14 @@ async def main():
         # Insert data in batches
         logger.info("📥 Inserting bioimage data into shared application...")
         nodes_result = await insert_data_in_batches(
-            weaviate_service, node_objects, "nodes"
+            weaviate_service,
+            node_objects,
+            "nodes",
         )
         tech_result = await insert_data_in_batches(
-            weaviate_service, tech_objects, "technologies"
+            weaviate_service,
+            tech_objects,
+            "technologies",
         )
 
         # Summary
@@ -444,7 +449,8 @@ async def main():
             logger.warning("⚠️ Some errors occurred during data insertion:")
             if nodes_errors:
                 logger.warning(
-                    "- Node insertion errors: %s", nodes_result.get("errors", "Unknown")
+                    "- Node insertion errors: %s",
+                    nodes_result.get("errors", "Unknown"),
                 )
             if tech_errors:
                 logger.warning(
