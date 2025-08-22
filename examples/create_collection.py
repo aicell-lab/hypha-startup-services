@@ -9,7 +9,7 @@ from typing import Any
 
 from dotenv import load_dotenv
 from hypha_rpc import connect_to_server
-from hypha_rpc.rpc import RemoteService, ServiceProxy
+from hypha_rpc.rpc import RemoteService
 
 from hypha_startup_services.weaviate_service.register_service import register_weaviate
 
@@ -41,14 +41,14 @@ async def get_server(server_url: str) -> AsyncGenerator[RemoteService, Any]:
 
 
 async def create_document_collection(
-    weaviate_service: ServiceProxy,
+    weaviate_service: RemoteService,
     ollama_model: str,
     ollama_endpoint: str,
 ):
     """Create a document collection in Weaviate.
 
     Args:
-        weaviate_service (ServiceProxy): The Weaviate service
+        weaviate_service (RemoteService): The Weaviate service
         ollama_model (str): The Ollama model to use
         ollama_endpoint (str): The Ollama API endpoint
 

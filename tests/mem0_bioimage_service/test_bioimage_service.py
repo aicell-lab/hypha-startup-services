@@ -2,13 +2,13 @@
 
 import pytest
 import pytest_asyncio
-from tests.conftest import get_user_server
+
 from hypha_startup_services.common.data_index import (
     BioimageIndex,
     get_entity_details,
     get_related_entities,
 )
-
+from tests.conftest import get_user_server
 
 # Sample EBI data - in a real implementation this would be loaded from external sources
 EBI_NODES_DATA = [
@@ -80,7 +80,7 @@ EBI_TECHNOLOGIES_DATA = [
 async def mem0_live_service():
     """Mem0 BioImage service fixture for live (admin) environment."""
     server = await get_user_server("HYPHA_TOKEN")
-    service = await server.get_service("aria-agents/mem0")
+    service = await server.get_service("public/mem0")
     yield service
     await server.disconnect()
 
@@ -88,7 +88,6 @@ async def mem0_live_service():
 @pytest.fixture
 def bioimage_index():
     """Create a fresh bioimage index for testing."""
-
     index = BioimageIndex()
     index.load_data(EBI_NODES_DATA, EBI_TECHNOLOGIES_DATA)
     return index
@@ -142,7 +141,8 @@ async def test_get_nodes_by_technology_id_not_found(bioimage_index):
     # Should raise ValueError for non-existent technology ID
     with pytest.raises(ValueError, match="Entity not found"):
         get_related_entities(
-            bioimage_index=bioimage_index, entity_id="nonexistent-tech-id"
+            bioimage_index=bioimage_index,
+            entity_id="nonexistent-tech-id",
         )
 
 
@@ -172,7 +172,8 @@ async def test_get_technologies_by_node_id_not_found(bioimage_index):
     # Should raise ValueError for non-existent node ID
     with pytest.raises(ValueError, match="Entity not found"):
         get_related_entities(
-            bioimage_index=bioimage_index, entity_id="nonexistent-node-id"
+            bioimage_index=bioimage_index,
+            entity_id="nonexistent-node-id",
         )
 
 
@@ -194,7 +195,8 @@ async def test_get_node_details(bioimage_index):
     # Test with non-existent node ID - should raise ValueError
     with pytest.raises(ValueError, match="Entity not found"):
         await get_entity_details(
-            bioimage_index=bioimage_index, entity_id="nonexistent-node-id"
+            bioimage_index=bioimage_index,
+            entity_id="nonexistent-node-id",
         )
 
 
@@ -216,7 +218,8 @@ async def test_get_technology_details(bioimage_index):
     # Test with non-existent technology ID - should raise ValueError
     with pytest.raises(ValueError, match="Entity not found"):
         await get_entity_details(
-            bioimage_index=bioimage_index, entity_id="nonexistent-tech-id"
+            bioimage_index=bioimage_index,
+            entity_id="nonexistent-tech-id",
         )
 
 
@@ -322,7 +325,7 @@ async def test_synthetic_technology_handling(bioimage_index):
 
     # Check that synthetic technologies exist for string references
     synthetic_tech = bioimage_index.get_technology_by_id(
-        "synthetic-correlative-microscopy"
+        "synthetic-correlative-microscopy",
     )
     assert synthetic_tech is not None
     assert synthetic_tech.get("synthetic") is True
@@ -366,7 +369,7 @@ async def test_mem0_bioimage_integration(mem0_bioimage_live_service, mem0_live_s
         # Test bioimage service with known IDs (deterministic)
         # Test with known technology ID
         tech_result = await mem0_bioimage_live_service.get(
-            "660fd1fc-a138-5740-b298-14b0c3b24fb9"  # 3D-CLEM
+            "660fd1fc-a138-5740-b298-14b0c3b24fb9",  # 3D-CLEM
         )
 
         # Validate bioimage service technology lookup
@@ -379,7 +382,7 @@ async def test_mem0_bioimage_integration(mem0_bioimage_live_service, mem0_live_s
 
         # Test with known node ID
         node_result = await mem0_bioimage_live_service.get(
-            "660fd1fc-a138-5740-b298-14b0c3b24fb9"  # Italian node
+            "660fd1fc-a138-5740-b298-14b0c3b24fb9",  # Italian node
         )
 
         # Validate bioimage service node lookup
@@ -394,8 +397,7 @@ async def test_mem0_bioimage_integration(mem0_bioimage_live_service, mem0_live_s
 # Fixtures for test and live/prod mem0_bioimage services (mirroring test_bioimage_service_unit.py)
 @pytest_asyncio.fixture
 async def mem0_bioimage_test_service():
-    """Mem0 BioImage service fixture for test instance."""
-
+    """Mem0 BioImage service fixture forpublicnce."""
     server = await get_user_server("PERSONAL_TOKEN")
     service = await server.get_service("aria-agents/mem0-bioimage-test")
     yield service
@@ -406,7 +408,7 @@ async def mem0_bioimage_test_service():
 async def mem0_bioimage_live_service():
     """Mem0 BioImage service fixture for live/prod instance."""
     server = await get_user_server("PERSONAL_TOKEN")
-    service = await server.get_service("aria-agents/mem0-bioimage")
+    service = await server.get_service("public/mem0-bioimage")
     yield service
     await server.disconnect()
 

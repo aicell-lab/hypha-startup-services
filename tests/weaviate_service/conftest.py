@@ -1,12 +1,13 @@
 """Common test fixtures for weaviate tests."""
 
 import pytest_asyncio
-from hypha_rpc.rpc import RemoteService, RemoteException
+from hypha_rpc.rpc import RemoteException, RemoteService
+
 from hypha_startup_services.weaviate_service.service_codecs import (
     register_weaviate_codecs,
 )
-from tests.weaviate_service.utils import APP_ID
 from tests.conftest import get_user_server
+from tests.weaviate_service.utils import APP_ID
 
 
 async def cleanup_weaviate_service(service: RemoteService):
@@ -15,7 +16,8 @@ async def cleanup_weaviate_service(service: RemoteService):
         # Try to delete test applications first
         try:
             await service.applications.delete(
-                collection_name="Movie", application_id=APP_ID
+                collection_name="Movie",
+                application_id=APP_ID,
             )
         except RemoteException as e:
             print("Error deleting test application:", e)

@@ -1,6 +1,7 @@
 # All imports at the top for clarity and PEP8 compliance
 import pytest
 import pytest_asyncio
+
 from tests.conftest import get_user_server
 
 
@@ -16,7 +17,7 @@ async def weaviate_bioimage_test_service():
 @pytest_asyncio.fixture
 async def weaviate_bioimage_live_service():
     server = await get_user_server("PERSONAL_TOKEN")
-    service = await server.get_service("aria-agents/weaviate-bioimage")
+    service = await server.get_service("public/weaviate-bioimage")
     yield service
     await server.disconnect()
 
@@ -50,7 +51,7 @@ async def test_weaviate_bioimage_get_nodes_by_technology_id_test(
     weaviate_bioimage_test_service,
 ):
     result = await weaviate_bioimage_test_service.get_related(
-        entity_id="660fd1fc-a138-5740-b298-14b0c3b24fb9"
+        entity_id="660fd1fc-a138-5740-b298-14b0c3b24fb9",
     )
     assert len(result) > 0
     assert "name" in result[0]
@@ -61,7 +62,7 @@ async def test_weaviate_bioimage_get_technologies_by_node_id_test(
     weaviate_bioimage_test_service,
 ):
     result = await weaviate_bioimage_test_service.get_related(
-        entity_id="1dc91e38-8234-5b08-ad4f-a162da9486f6"
+        entity_id="1dc91e38-8234-5b08-ad4f-a162da9486f6",
     )
     assert len(result) > 0
     assert "name" in result[0]
@@ -97,7 +98,7 @@ async def test_weaviate_bioimage_get_nodes_by_technology_id_live(
     weaviate_bioimage_live_service,
 ):
     result = await weaviate_bioimage_live_service.get_related(
-        entity_id="660fd1fc-a138-5740-b298-14b0c3b24fb9"
+        entity_id="660fd1fc-a138-5740-b298-14b0c3b24fb9",
     )
     assert len(result) > 0
     assert "name" in result[0]
@@ -108,7 +109,7 @@ async def test_weaviate_bioimage_get_technologies_by_node_id_live(
     weaviate_bioimage_live_service,
 ):
     result = await weaviate_bioimage_live_service.get_related(
-        entity_id="1dc91e38-8234-5b08-ad4f-a162da9486f6"
+        entity_id="1dc91e38-8234-5b08-ad4f-a162da9486f6",
     )
     assert len(result) > 0
     assert "name" in result[0]
@@ -170,7 +171,7 @@ def mock_bioimage_service_fixture():
 @pytest.mark.asyncio
 async def test_local_integration_weaviate_bioimage(weaviate_bioimage_test_service):
     result = await weaviate_bioimage_test_service.get_related(
-        entity_id="94c38160-4e93-5bc1-b2bc-1d5c86bb1d87"
+        entity_id="94c38160-4e93-5bc1-b2bc-1d5c86bb1d87",
     )
     assert len(result) > 0
     assert "id" in result[0]
@@ -180,7 +181,7 @@ async def test_local_integration_weaviate_bioimage(weaviate_bioimage_test_servic
 @pytest.mark.asyncio
 async def test_remote_integration_weaviate_bioimage(weaviate_bioimage_live_service):
     result = await weaviate_bioimage_live_service.get_related(
-        entity_id="660fd1fc-a138-5740-b298-14b0c3b24fb9"
+        entity_id="660fd1fc-a138-5740-b298-14b0c3b24fb9",
     )
     assert len(result) > 0
     assert "id" in result[0]
@@ -192,7 +193,6 @@ async def test_remote_integration_weaviate_bioimage(weaviate_bioimage_live_servi
 @pytest.mark.asyncio
 async def test_diagnose_bioimage_service_state(weaviate_bioimage_test_service):
     """Diagnostic test to understand the state of the bioimage service."""
-
     # Test 1: Check if we can get service info
     try:
         # Try to get some basic info about the service
@@ -225,7 +225,8 @@ async def test_diagnose_bioimage_service_state(weaviate_bioimage_test_service):
     # Test 4: Try a simple search first
     try:
         search_result = await weaviate_bioimage_test_service.search(
-            query_text="microscopy", limit=1
+            query_text="microscopy",
+            limit=1,
         )
         print(f"Search result structure: {type(search_result)}")
         if isinstance(search_result, dict):
@@ -234,7 +235,7 @@ async def test_diagnose_bioimage_service_state(weaviate_bioimage_test_service):
                 print(f"Number of search objects: {len(search_result['objects'])}")
                 if len(search_result["objects"]) > 0:
                     print(
-                        f"First search object keys: {search_result['objects'][0].keys()}"
+                        f"First search object keys: {search_result['objects'][0].keys()}",
                     )
         else:
             print(f"Unexpected search result type: {search_result}")
@@ -244,7 +245,8 @@ async def test_diagnose_bioimage_service_state(weaviate_bioimage_test_service):
     # Test 5: Try the query that's failing
     try:
         query_result = await weaviate_bioimage_test_service.query(
-            query_text="microscopy", limit=1
+            query_text="microscopy",
+            limit=1,
         )
         print(f"Query result structure: {type(query_result)}")
         if isinstance(query_result, dict):
@@ -253,7 +255,7 @@ async def test_diagnose_bioimage_service_state(weaviate_bioimage_test_service):
                 print(f"Number of query objects: {len(query_result['objects'])}")
                 if len(query_result["objects"]) > 0:
                     print(
-                        f"First query object keys: {query_result['objects'][0].keys()}"
+                        f"First query object keys: {query_result['objects'][0].keys()}",
                     )
         else:
             print(f"Unexpected query result type: {query_result}")
@@ -265,7 +267,8 @@ async def test_diagnose_bioimage_service_state(weaviate_bioimage_test_service):
     for test_query in test_queries:
         try:
             result = await weaviate_bioimage_test_service.query(
-                query_text=test_query, limit=1
+                query_text=test_query,
+                limit=1,
             )
             if isinstance(result, dict) and "objects" in result:
                 count = len(result["objects"])
@@ -284,12 +287,11 @@ async def test_diagnose_bioimage_service_state(weaviate_bioimage_test_service):
 @pytest.mark.asyncio
 async def test_check_bioimage_application_exists(weaviate_bioimage_test_service):
     """Check if the bioimage application/collection exists and has data."""
-
     # Test 7: Try to get entity details to see if any data exists
     try:
         # Try a known entity ID from other tests
         result = await weaviate_bioimage_test_service.get_related(
-            entity_id="660fd1fc-a138-5740-b298-14b0c3b24fb9"
+            entity_id="660fd1fc-a138-5740-b298-14b0c3b24fb9",
         )
         print(f"get_related result: {len(result)} entities found")
         if len(result) > 0:
@@ -303,7 +305,7 @@ async def test_check_bioimage_application_exists(weaviate_bioimage_test_service)
     # Test 8: Try another known entity ID
     try:
         result = await weaviate_bioimage_test_service.get_related(
-            entity_id="1dc91e38-8234-5b08-ad4f-a162da9486f6"
+            entity_id="1dc91e38-8234-5b08-ad4f-a162da9486f6",
         )
         print(f"get_related result for second entity: {len(result)} entities found")
     except Exception as e:
@@ -315,7 +317,6 @@ async def test_check_bioimage_application_exists(weaviate_bioimage_test_service)
 @pytest.mark.asyncio
 async def test_bioimage_service_methods_available(weaviate_bioimage_test_service):
     """Check what methods are available on the bioimage service."""
-
     # List all available methods
     available_methods = [
         attr for attr in dir(weaviate_bioimage_test_service) if not attr.startswith("_")
@@ -336,12 +337,11 @@ async def test_bioimage_service_methods_available(weaviate_bioimage_test_service
 @pytest.mark.asyncio
 async def test_check_if_population_needed(weaviate_bioimage_test_service):
     """Check if the bioimage service needs to be populated with data."""
-
     # Test different entity types to understand the data structure
     try:
         # Try get_entity method with a known ID
         entity_result = await weaviate_bioimage_test_service.get(
-            entity_id="660fd1fc-a138-5740-b298-14b0c3b24fb9"
+            entity_id="660fd1fc-a138-5740-b298-14b0c3b24fb9",
         )
         print(f"get_entity result type: {type(entity_result)}")
         print(f"get_entity result: {entity_result}")
@@ -351,20 +351,24 @@ async def test_check_if_population_needed(weaviate_bioimage_test_service):
     # Check if search works with entity_types parameter
     try:
         result = await weaviate_bioimage_test_service.search(
-            query_text="microscopy", entity_types=["node"], limit=5
+            query_text="microscopy",
+            entity_types=["node"],
+            limit=5,
         )
         print(
-            f"Search with entity_types=['node']: {len(result.get('objects', []))} results"
+            f"Search with entity_types=['node']: {len(result.get('objects', []))} results",
         )
     except Exception as e:
         print(f"Search with entity_types failed: {e}")
 
     try:
         result = await weaviate_bioimage_test_service.search(
-            query_text="microscopy", entity_types=["technology"], limit=5
+            query_text="microscopy",
+            entity_types=["technology"],
+            limit=5,
         )
         print(
-            f"Search with entity_types=['technology']: {len(result.get('objects', []))} results"
+            f"Search with entity_types=['technology']: {len(result.get('objects', []))} results",
         )
     except Exception as e:
         print(f"Search with entity_types=['technology'] failed: {e}")
@@ -372,7 +376,9 @@ async def test_check_if_population_needed(weaviate_bioimage_test_service):
     # Try query with entity_types
     try:
         result = await weaviate_bioimage_test_service.query(
-            query_text="microscopy", entity_types=["node", "technology"], limit=5
+            query_text="microscopy",
+            entity_types=["node", "technology"],
+            limit=5,
         )
         print(f"Query with entity_types: {len(result.get('objects', []))} results")
         if "generated" in result:
@@ -402,7 +408,7 @@ async def test_populate_bioimage_test_service(weaviate_bioimage_test_service):
 
         # Try to get the weaviate service for data population
         try:
-            weaviate_service = await server.get_service("aria-agents/weaviate")
+            weaviate_service = await server.get_service("public/weaviate")
             print("Found weaviate service for population")
 
             # Check if the bioimage_data collection exists
@@ -496,12 +502,14 @@ async def test_populate_bioimage_test_service(weaviate_bioimage_test_service):
     # Now test if the bioimage service can find the data
     try:
         result = await weaviate_bioimage_test_service.search(
-            query_text="microscopy", limit=5
+            query_text="microscopy",
+            limit=5,
         )
         print(f"After population - Search results: {len(result.get('objects', []))}")
 
         result = await weaviate_bioimage_test_service.query(
-            query_text="microscopy", limit=5
+            query_text="microscopy",
+            limit=5,
         )
         print(f"After population - Query results: {len(result.get('objects', []))}")
 
@@ -520,7 +528,7 @@ async def test_check_and_populate_eurobioimaging_shared_app(
 
     try:
         server = await get_user_server("PERSONAL_TOKEN")
-        weaviate_service = await server.get_service("aria-agents/weaviate")
+        weaviate_service = await server.get_service("public/weaviate")
 
         # Check if the eurobioimaging-shared application exists
         collection_name = "bioimage_data"
@@ -529,7 +537,8 @@ async def test_check_and_populate_eurobioimaging_shared_app(
         try:
             # Try to check if the application exists using the applications.exists method
             app_exists = await weaviate_service.applications.exists(
-                collection_name=collection_name, application_id=application_id
+                collection_name=collection_name,
+                application_id=application_id,
             )
             print(f"Application {application_id} exists: {app_exists}")
 
@@ -545,7 +554,8 @@ async def test_check_and_populate_eurobioimaging_shared_app(
             # Check how many objects are in the application
             try:
                 objects_count = await weaviate_service.data.count(
-                    collection_name=collection_name, application_id=application_id
+                    collection_name=collection_name,
+                    application_id=application_id,
                 )
                 print(f"Objects in {application_id}: {objects_count}")
 
@@ -582,14 +592,15 @@ async def test_check_and_populate_eurobioimaging_shared_app(
                                 properties=obj,
                             )
                             print(
-                                f"Inserted: {obj['name']} (UUID: {result.get('uuid', 'unknown')})"
+                                f"Inserted: {obj['name']} (UUID: {result.get('uuid', 'unknown')})",
                             )
                         except Exception as e:
                             print(f"Failed to insert {obj['name']}: {e}")
 
                     # Check count again
                     new_count = await weaviate_service.data.count(
-                        collection_name=collection_name, application_id=application_id
+                        collection_name=collection_name,
+                        application_id=application_id,
                     )
                     print(f"New object count: {new_count}")
 
@@ -605,14 +616,16 @@ async def test_check_and_populate_eurobioimaging_shared_app(
         print("\nTesting bioimage service after population...")
 
         search_result = await weaviate_bioimage_test_service.search(
-            query_text="microscopy", limit=5
+            query_text="microscopy",
+            limit=5,
         )
         print(
-            f"Search for 'microscopy': {len(search_result.get('objects', []))} results"
+            f"Search for 'microscopy': {len(search_result.get('objects', []))} results",
         )
 
         query_result = await weaviate_bioimage_test_service.query(
-            query_text="microscopy", limit=5
+            query_text="microscopy",
+            limit=5,
         )
         print(f"Query for 'microscopy': {len(query_result.get('objects', []))} results")
 
@@ -620,7 +633,8 @@ async def test_check_and_populate_eurobioimaging_shared_app(
         for term in ["imaging", "analysis", "bioimage"]:
             try:
                 result = await weaviate_bioimage_test_service.search(
-                    query_text=term, limit=3
+                    query_text=term,
+                    limit=3,
                 )
                 print(f"Search for '{term}': {len(result.get('objects', []))} results")
             except Exception as e:
@@ -643,7 +657,7 @@ async def test_investigate_eurobioimaging_shared_app_contents(
 
     try:
         server = await get_user_server("PERSONAL_TOKEN")
-        weaviate_service = await server.get_service("aria-agents/weaviate")
+        weaviate_service = await server.get_service("public/weaviate")
 
         collection_name = "bioimage_data"
         application_id = "eurobioimaging-shared"
@@ -652,7 +666,9 @@ async def test_investigate_eurobioimaging_shared_app_contents(
         try:
             print("Trying to fetch objects from the application...")
             objects = await weaviate_service.query.fetch_objects(
-                collection_name=collection_name, application_id=application_id, limit=10
+                collection_name=collection_name,
+                application_id=application_id,
+                limit=10,
             )
             print(f"fetch_objects returned: {type(objects)}")
             if isinstance(objects, dict):
@@ -692,7 +708,9 @@ async def test_investigate_eurobioimaging_shared_app_contents(
 
             # Try fetching again after insert
             objects = await weaviate_service.query.fetch_objects(
-                collection_name=collection_name, application_id=application_id, limit=5
+                collection_name=collection_name,
+                application_id=application_id,
+                limit=5,
             )
             if isinstance(objects, dict) and "objects" in objects:
                 print(f"After insert - Number of objects: {len(objects['objects'])}")
@@ -711,14 +729,16 @@ async def test_investigate_eurobioimaging_shared_app_contents(
         print("\nTesting bioimage service after investigation...")
 
         search_result = await weaviate_bioimage_test_service.search(
-            query_text="microscopy", limit=5
+            query_text="microscopy",
+            limit=5,
         )
         print(
-            f"Bioimage service search: {len(search_result.get('objects', []))} results"
+            f"Bioimage service search: {len(search_result.get('objects', []))} results",
         )
 
         query_result = await weaviate_bioimage_test_service.query(
-            query_text="test", limit=5
+            query_text="test",
+            limit=5,
         )
         print(f"Bioimage service query: {len(query_result.get('objects', []))} results")
 

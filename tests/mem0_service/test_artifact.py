@@ -122,7 +122,9 @@ class TestCreateArtifact:
             await create_artifact(sample_artifact_params)
 
             mock_get_server.assert_called_once_with("https://hypha.aicell.io")
-            mock_server.get_service.assert_called_once_with("public/artifact-manager")
+            mock_server.get_service.assert_called_once_with(
+                "public/artifact-manager",
+            )
             mock_exists.assert_called_once_with(
                 artifact_id=sample_artifact_params.artifact_id,
             )

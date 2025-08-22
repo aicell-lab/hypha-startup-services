@@ -1,5 +1,6 @@
 import pytest
 import pytest_asyncio
+
 from tests.conftest import get_user_server
 
 
@@ -60,7 +61,7 @@ def test_get_technologies_by_node_id_unit(mock_mem0_bioimage_service):
 @pytest.mark.asyncio
 async def test_local_integration_mem0_bioimage(mem0_bioimage_test_service):
     result = await mem0_bioimage_test_service.get_related(
-        entity_id="660fd1fc-a138-5740-b298-14b0c3b24fb9"
+        entity_id="660fd1fc-a138-5740-b298-14b0c3b24fb9",
     )
     assert len(result) > 0
     assert "name" in result[0]
@@ -71,7 +72,7 @@ async def test_local_integration_mem0_bioimage(mem0_bioimage_test_service):
 async def mem0_bioimage_live_service():
     """Mem0 BioImage live service fixture."""
     server = await get_user_server("PERSONAL_TOKEN")
-    service = await server.get_service("aria-agents/mem0-bioimage")
+    service = await server.get_service("public/mem0-bioimage")
     yield service
     await server.disconnect()
 
@@ -79,7 +80,7 @@ async def mem0_bioimage_live_service():
 @pytest.mark.asyncio
 async def test_remote_integration_mem0_bioimage(mem0_bioimage_live_service):
     result = await mem0_bioimage_live_service.get_related(
-        entity_id="660fd1fc-a138-5740-b298-14b0c3b24fb9"
+        entity_id="660fd1fc-a138-5740-b298-14b0c3b24fb9",
     )
 
     for item in result:

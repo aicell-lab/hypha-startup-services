@@ -14,7 +14,7 @@ Usage:
 
     # Use remote Hypha service (requires HYPHA_TOKEN environment variable)
     python scripts/build_bioimage_index_deduplicated.py --remote
-        [--service-id aria-agents/mem0]
+        [--service-id <workspace>/mem0]
 """
 
 import argparse
@@ -27,7 +27,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from hypha_rpc.rpc import RemoteException, ServiceProxy
+from hypha_rpc.rpc import RemoteException, RemoteService
 
 # Add the project root to Python path
 project_root = Path(__file__).parent.parent
@@ -98,11 +98,11 @@ def create_content_hash(content: str) -> str:
 class RemoteMemoryServiceWrapper:
     """Wrapper to match remote Hypha mem0 service API w/ local AsyncMemory interface."""
 
-    def __init__(self, service: ServiceProxy) -> None:
+    def __init__(self, service: RemoteService) -> None:
         """Initialize the RemoteMemoryServiceWrapper.
 
         Args:
-            service (ServiceProxy): The remote service instance to wrap.
+            service (RemoteService): The remote service instance to wrap.
 
         """
         self.service = service
@@ -205,7 +205,7 @@ class RemoteMemoryServiceWrapper:
 
 
 async def get_memory_service(
-    service_id: str = "aria-agents/mem0",
+    service_id: str = "public/mem0",
     *,
     use_remote: bool = False,
 ) -> AsyncMemory | RemoteMemoryServiceWrapper:
@@ -449,7 +449,7 @@ async def initialize_bioimage_database_deduplicated(
 async def build_bioimage_index_deduplicated(
     nodes_file: str | None = None,
     technologies_file: str | None = None,
-    service_id: str = "aria-agents/mem0",
+    service_id: str = "public/mem0",
     *,
     force_rebuild: bool = False,
     use_remote: bool = False,
@@ -593,8 +593,8 @@ def main() -> None:
     parser.add_argument(
         "--service-id",
         type=str,
-        default="aria-agents/mem0",
-        help="Remote Hypha service ID to connect to (default: aria-agents/mem0)",
+        default="public/mem0",
+        help="Remote Hypha service ID to connect to (default: public/mem0)",
     )
 
     parser.add_argument(

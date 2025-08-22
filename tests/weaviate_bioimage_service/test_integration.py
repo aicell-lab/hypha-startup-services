@@ -1,6 +1,6 @@
 """Integration tests for the Weaviate BioImage service.
 
-These tests call the actual remote service 'aria-agents/weaviate-bioimage'
+These tests call the actual remote service 'public/weaviate-bioimage'
 and test real functionality without mocks.
 """
 
@@ -30,7 +30,7 @@ async def remote_service():
         },
     )
 
-    service = await server.get_service("aria-agents/weaviate-bioimage")
+    service = await server.get_service("public/weaviate-bioimage")
 
     yield service
 

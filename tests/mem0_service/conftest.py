@@ -13,7 +13,7 @@ from tests.mem0_service.utils import (
 async def mem0_live_service():
     """Mem0 BioImage service fixture for live (admin) environment."""
     server = await get_user_server("HYPHA_TOKEN")
-    service = await server.get_service("aria-agents/mem0")
+    service = await server.get_service("public/mem0")
     yield service
     await server.disconnect()
 

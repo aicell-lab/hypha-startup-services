@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 from hypha_rpc import connect_to_server
 
 if TYPE_CHECKING:
-    from hypha_rpc.rpc import RemoteService, ServiceProxy
+    from hypha_rpc.rpc import RemoteService
 
 
 async def main():
@@ -34,7 +34,7 @@ async def main():
     )
 
     # Get the Weaviate service
-    weaviate_service: ServiceProxy = await server.get_service("weaviate")
+    weaviate_service: RemoteService = await server.get_service("public/weaviate")
 
     try:
         # 1. Create a Movie Collection

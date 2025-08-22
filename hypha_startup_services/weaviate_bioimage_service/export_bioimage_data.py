@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 COLLECTION_NAME = "bioimage_data"
 SHARED_APPLICATION_ID = "eurobioimaging-shared"
 DEFAULT_SERVER_URL = "https://hypha.aicell.io"
-WEAVIATE_SERVICE_ID = "aria-agents/weaviate-test"
+WEAVIATE_SERVICE_ID = "public/weaviate-test"
 OUTPUT_FILE = "bioimage_data_export.json"
 
 logger = logging.getLogger(__name__)

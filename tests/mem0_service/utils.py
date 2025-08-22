@@ -4,7 +4,7 @@ import time
 import uuid
 from typing import Any
 
-from hypha_rpc.rpc import ServiceProxy
+from hypha_rpc.rpc import RemoteService
 
 # Test agent and run IDs
 TEST_AGENT_ID = "test-agent-123"
@@ -82,7 +82,7 @@ SEARCH_QUERY_PREFERENCES = "What kind of movies do I like?"
 
 
 async def cleanup_mem0_memories(
-    service: ServiceProxy,
+    service: RemoteService,
     agent_id: str,
     workspace: str,
     run_id: str | None = None,
@@ -108,7 +108,7 @@ async def cleanup_mem0_memories(
 
 
 async def init_user(
-    service: ServiceProxy,
+    service: RemoteService,
     agent_id: str,
     workspace: str,
     description: str | None = None,
@@ -131,7 +131,7 @@ async def init_user(
 
 
 async def init_run(
-    service: ServiceProxy,
+    service: RemoteService,
     agent_id: str,
     run_id: str,
     workspace: str,

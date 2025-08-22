@@ -27,7 +27,7 @@ from hypha_rpc import connect_to_server
 
 async def bioimage_search():
     server = await connect_to_server({"server_url": "https://hypha.aicell.io"})
-    bioimage = await server.get_service("mem0-bioimage")
+    bioimage = await server.get_service("public/mem0-bioimage")
     
     result = await bioimage.search(
         query_text="European facilities offering correlative microscopy for protein research",

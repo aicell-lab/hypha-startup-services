@@ -2,12 +2,13 @@
 
 import pytest
 from hypha_rpc.rpc import RemoteException
+
+from tests.conftest import USER2_WS
 from tests.weaviate_service.utils import (
-    create_test_collection,
     USER1_APP_ID,
     USER2_APP_ID,
+    create_test_collection,
 )
-from tests.conftest import USER2_WS
 
 
 @pytest.mark.asyncio
@@ -38,7 +39,9 @@ async def test_admin_access_to_other_users_data(weaviate_service, weaviate_servi
     }
 
     user2_uuid = await weaviate_service2.data.insert(
-        collection_name="Movie", application_id=USER2_APP_ID, properties=test_object
+        collection_name="Movie",
+        application_id=USER2_APP_ID,
+        properties=test_object,
     )
 
     # Admin (User 1) should be able to access User 2's data with user_ws parameter
@@ -90,7 +93,7 @@ async def test_admin_only_collection_creation(weaviate_service, weaviate_service
                     "name": "name",
                     "dataType": ["text"],
                     "description": "The name of the test item",
-                }
+                },
             ],
         }
 
@@ -100,7 +103,7 @@ async def test_admin_only_collection_creation(weaviate_service, weaviate_service
         # Expected error for non-admin user
         assert (
             "admin" in str(e).lower() or "permission" in str(e).lower()
-        ), f"Error should mention admin permissions, but got: {str(e)}"
+        ), f"Error should mention admin permissions, but got: {e!s}"
 
 
 @pytest.mark.asyncio
@@ -117,7 +120,7 @@ async def test_admin_only_collection_deletion(weaviate_service, weaviate_service
         # Expected error for non-admin user
         assert (
             "admin" in str(e).lower() or "permission" in str(e).lower()
-        ), f"Error should mention admin permissions, but got: {str(e)}"
+        ), f"Error should mention admin permissions, but got: {e!s}"
 
     collections = await weaviate_service.collections.list_all()
     assert any(coll_name == "Movie" for coll_name in collections.keys())
@@ -155,7 +158,7 @@ async def test_admin_only_collection_list(weaviate_service, weaviate_service2):
                 "name": "name",
                 "dataType": ["text"],
                 "description": "The name of the test item",
-            }
+            },
         ],
     }
 
@@ -175,7 +178,7 @@ async def test_admin_only_collection_list(weaviate_service, weaviate_service2):
         # Expected error for non-admin user
         assert (
             "admin" in str(e).lower() or "permission" in str(e).lower()
-        ), f"Error should mention admin permissions, but got: {str(e)}"
+        ), f"Error should mention admin permissions, but got: {e!s}"
 
     # Clean up
     await weaviate_service.collections.delete("Movie")
