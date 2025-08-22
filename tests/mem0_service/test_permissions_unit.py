@@ -114,11 +114,10 @@ class TestGetUserPermissions:
             result = await get_user_permissions(permission_params)
 
             assert result == {}
-            mock_logger.error.assert_called_once_with(
-                "Failed to retrieve artifact %s: %s",
-                permission_params.artifact_id,
-                error,
+            error_msg = (
+                f"Failed to retrieve artifact {permission_params.artifact_id}: {error}"
             )
+            mock_logger.exception.assert_called_once_with(error_msg)
 
     @pytest.mark.asyncio
     async def test_get_user_permissions_no_config(self, patch_get_artifact):
