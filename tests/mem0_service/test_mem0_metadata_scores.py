@@ -1,15 +1,17 @@
 """Tests for metadata preservation and score variances in mem0 search results."""
 
-import uuid
 import asyncio
 import time
+import uuid
+
 import pytest
+
+from tests.conftest import USER1_WS
 from tests.mem0_service.utils import (
     TEST_AGENT_ID,
     TEST_RUN_ID,
     cleanup_mem0_memories,
 )
-from tests.conftest import USER1_WS
 
 
 def generate_unique_id() -> str:
@@ -20,7 +22,6 @@ def generate_unique_id() -> str:
 @pytest.mark.asyncio
 async def test_metadata_preservation(mem0_service):
     """Test that metadata is correctly preserved in search results."""
-
     # Clean up and create test agent
     await cleanup_mem0_memories(mem0_service, TEST_AGENT_ID, USER1_WS)
     test_run_id = f"{TEST_RUN_ID}-metadata-{generate_unique_id()}"
@@ -147,7 +148,6 @@ async def test_metadata_preservation(mem0_service):
 @pytest.mark.asyncio
 async def test_score_variance(mem0_service):
     """Test that search scores have variance and aren't all 1.000."""
-
     # Clean up and create test agent
     await cleanup_mem0_memories(mem0_service, TEST_AGENT_ID, USER1_WS)
     test_run_id = f"{TEST_RUN_ID}-scores-{generate_unique_id()}"
@@ -216,13 +216,13 @@ async def test_score_variance(mem0_service):
             score = result.get("score", 0)
             all_scores.append(score)
             print(
-                f"Query: '{query}', Content: '{result.get('memory', '')[:30]}...', Score: {score}"
+                f"Query: '{query}', Content: '{result.get('memory', '')[:30]}...', Score: {score}",
             )
 
     # Verify score diversity
     print(f"Score range: {min(all_scores)} to {max(all_scores)}")
     print(
-        f"Number of unique scores: {len(set(all_scores))} out of {len(all_scores)} results"
+        f"Number of unique scores: {len(set(all_scores))} out of {len(all_scores)} results",
     )
 
     # Assert that there are different scores (not all 1.000)

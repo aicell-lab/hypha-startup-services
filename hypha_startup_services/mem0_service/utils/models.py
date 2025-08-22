@@ -1,3 +1,5 @@
+"""Mem0 service models."""
+
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -31,7 +33,15 @@ class HyphaPermissionError(Exception):
         self,
         message: str,
         permission_params: "PermissionParams | None" = None,
-    ):
+    ) -> None:
+        """Initialize HyphaPermissionError.
+
+        Args:
+            message (str): Error message.
+            permission_params (PermissionParams | None, optional):
+                Permission parameters associated with the error. Defaults to None.
+
+        """
         self.permission_params = permission_params
         super().__init__(message)
 
@@ -56,7 +66,8 @@ class PermissionParams(BasePermissionParams):
             "  lv+: List, list vectors, create, and commit access\n"
             "  lf: List and list files access (includes list and list_files)\n"
             "  lf+: List, list files, create, and commit access\n"
-            "  r: Read-only access (includes read, get_file, list_files, list, search_vectors, and get_vector)\n"
+            "  r: Read-only access (includes read, get_file, list_files, list,"
+            "     search_vectors, and get_vector)\n"
             "  r+: Read, write, and create access"
             " (includes read, get_file, put_file, list_files, list, search_vectors, "
             " get_vector, create, commit, add_vectors, and add_documents)\n"
@@ -81,8 +92,14 @@ class PermissionParams(BasePermissionParams):
     def resource_description(self) -> str:
         """Return a human-readable description of the resource being accessed."""
         if self.run_id:
-            return f"mem0 memories for agent '{self.agent_id}' in workspace '{self.accessed_workspace}' (run: {self.run_id})"
-        return f"mem0 memories for agent '{self.agent_id}' in workspace '{self.accessed_workspace}'"
+            return (
+                f"mem0 memories for agent '{self.agent_id}'"
+                f" in workspace '{self.accessed_workspace}' (run: {self.run_id})"
+            )
+        return (
+            f"mem0 memories for agent '{self.agent_id}'"
+            f" in workspace '{self.accessed_workspace}'"
+        )
 
 
 class AgentArtifactParams(BaseModel, BaseArtifactParams):
@@ -102,11 +119,15 @@ class AgentArtifactParams(BaseModel, BaseArtifactParams):
     )
     general_permission: PermissionOperation | None = Field(
         default=None,
-        description="Permissions for the artifact, mapping user IDs to permission levels",
+        description=(
+            "Permissions for the artifact, mapping user IDs to permission levels"
+        ),
     )
     workspace_permission: PermissionOperation | None = Field(
         default=None,
-        description="Permissions for the workspace, mapping user IDs to permission levels",
+        description=(
+            "Permissions for the workspace, mapping user IDs to permission levels"
+        ),
     )
     metadata: dict[str, Any] | None = Field(
         default=None,
@@ -165,7 +186,7 @@ class AgentArtifactParams(BaseModel, BaseArtifactParams):
 
     @property
     def creation_dict(self) -> dict[str, Any]:
-        """Convert the ArtifactParams instance to a dictionary suitable for artifact creation.
+        """Convert ArtifactParams instance to dictionary suitable for artifact creation.
 
         Returns:
             A dictionary representation of the ArtifactParams instance.
@@ -192,7 +213,8 @@ class AgentArtifactParams(BaseModel, BaseArtifactParams):
     ) -> "AgentArtifactParams":
         """Create a new ArtifactParams instance with a workspace added.
 
-        This updates the artifact_id to include the workspace and creates a new instance.
+        This updates the artifact_id to include the workspace and
+        creates a new instance.
 
         Args:
             workspace: The workspace to add

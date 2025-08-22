@@ -1,3 +1,5 @@
+"""Instantiate and connect to Weaviate client."""
+
 from dotenv import load_dotenv
 from weaviate import WeaviateAsyncClient
 from weaviate.classes.init import AdditionalConfig

@@ -1,26 +1,38 @@
-import os
+"""Example create collection script."""
+
 import asyncio
-from typing import Any, AsyncGenerator
-from dotenv import load_dotenv
+import logging
+import os
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import Any
+
+from dotenv import load_dotenv
 from hypha_rpc import connect_to_server
-from hypha_rpc.rpc import RemoteService
+from hypha_rpc.rpc import RemoteService, ServiceProxy
+
 from hypha_startup_services.weaviate_service.register_service import register_weaviate
 
 load_dotenv()
 SERVICE_NAME = "weaviate-test"
 
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def get_server(server_url: str) -> AsyncGenerator[RemoteService, Any]:
+    """Get Hypha server."""
     token = os.environ.get("HYPHA_TOKEN")
-    assert token is not None, "HYPHA_TOKEN environment variable is not set"
+    if token is None:
+        error_msg = "HYPHA_TOKEN environment variable is not set"
+        raise ValueError(error_msg)
+
     server: RemoteService = await connect_to_server(
         {
             "server_url": server_url,
             "token": token,
-        }
-    )  # type: ignore
+        },
+    )
     await register_weaviate(server, SERVICE_NAME)
     try:
         yield server
@@ -29,10 +41,18 @@ async def get_server(server_url: str) -> AsyncGenerator[RemoteService, Any]:
 
 
 async def create_document_collection(
-    weaviate_service,
+    weaviate_service: ServiceProxy,
     ollama_model: str,
     ollama_endpoint: str,
 ):
+    """Create a document collection in Weaviate.
+
+    Args:
+        weaviate_service (ServiceProxy): The Weaviate service
+        ollama_model (str): The Ollama model to use
+        ollama_endpoint (str): The Ollama API endpoint
+
+    """
     await weaviate_service.collections.delete("Document")
 
     class_obj = {
@@ -92,12 +112,12 @@ async def create_document_collection(
                     "text2vec-ollama": {
                         "model": ollama_model,
                         "apiEndpoint": ollama_endpoint,
-                    }
+                    },
                 },
                 "sourceProperties": ["title"],
                 "vectorIndexType": "hnsw",  # Added this line
                 "vectorIndexConfig": {  # Optional but recommended for completeness
-                    "distance": "cosine"
+                    "distance": "cosine",
                 },
             },
             "description_vector": {
@@ -105,12 +125,12 @@ async def create_document_collection(
                     "text2vec-ollama": {
                         "model": ollama_model,
                         "apiEndpoint": ollama_endpoint,
-                    }
+                    },
                 },
                 "sourceProperties": ["description"],
                 "vectorIndexType": "hnsw",  # Added this line
                 "vectorIndexConfig": {  # Optional but recommended for completeness
-                    "distance": "cosine"
+                    "distance": "cosine",
                 },
             },
         },
@@ -118,7 +138,7 @@ async def create_document_collection(
             "generative-ollama": {
                 "model": ollama_model,
                 "apiEndpoint": ollama_endpoint,
-            }
+            },
         },
     }
 

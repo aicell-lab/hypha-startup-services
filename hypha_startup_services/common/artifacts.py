@@ -1,3 +1,5 @@
+"""Common artifact manager functions."""
+
 import logging
 from abc import ABC, abstractmethod
 from typing import Any
@@ -5,8 +7,6 @@ from typing import Any
 from hypha_rpc.rpc import RemoteException
 
 from hypha_startup_services.common.server_utils import get_server
-
-# from .server_utils import get_server
 
 logger = logging.getLogger(__name__)
 
@@ -61,8 +61,7 @@ async def get_artifact(
     """
     async with get_server("https://hypha.aicell.io") as server:
         artifact_manager = await server.get_service("public/artifact-manager")
-        artifact = await artifact_manager.read(artifact_id=artifact_id)
-        return artifact
+        return await artifact_manager.read(artifact_id=artifact_id)
 
 
 async def create_artifact(
@@ -114,17 +113,18 @@ async def artifact_exists(
         await get_artifact(
             artifact_id=artifact_id,
         )
-        return True
     except RemoteException:
         logger.debug("Artifact '%s' does not exist.", artifact_id)
         return False
+    else:
+        return True
 
 
 async def artifact_edit(
     artifact_id: str,
     manifest: dict[str, Any] | None = None,
     config: dict[str, Any] | None = None,
-    **kwargs,
+    **kwargs: Any,
 ) -> None:
     """Edit an existing artifact's manifest, config, or other properties."""
     edit_params: dict[str, Any] = {"artifact_id": artifact_id}
@@ -135,7 +135,8 @@ async def artifact_edit(
     edit_params.update(kwargs)
 
     if not await artifact_exists(artifact_id):
-        raise ValueError(f"Artifact '{artifact_id}' does not exist.")
+        error_msg = f"Artifact '{artifact_id}' does not exist."
+        raise ValueError(error_msg)
 
     async with get_server("https://hypha.aicell.io") as server:
         artifact_manager = await server.get_service("public/artifact-manager")

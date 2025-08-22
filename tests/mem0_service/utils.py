@@ -3,7 +3,8 @@
 import time
 import uuid
 from typing import Any
-from hypha_rpc.rpc import RemoteService
+
+from hypha_rpc.rpc import ServiceProxy
 
 # Test agent and run IDs
 TEST_AGENT_ID = "test-agent-123"
@@ -13,7 +14,8 @@ TEST_RUN_ID2 = "test-run-101112"
 
 
 def generate_unique_test_messages(
-    test_name: str = "default", iteration: int = 0
+    test_name: str = "default",
+    iteration: int = 0,
 ) -> list[dict[str, str]]:
     """Generate unique test messages that won't be deduplicated by mem0."""
     timestamp = int(time.time() * 1000)  # milliseconds for uniqueness
@@ -36,7 +38,9 @@ def generate_unique_test_messages(
 
 
 def generate_unique_simple_message(
-    content_base: str, test_name: str = "default", iteration: int = 0
+    content_base: str,
+    test_name: str = "default",
+    iteration: int = 0,
 ) -> list[dict[str, str]]:
     """Generate a unique simple message that won't be deduplicated."""
     timestamp = int(time.time() * 1000)
@@ -46,7 +50,7 @@ def generate_unique_simple_message(
         {
             "role": "user",
             "content": f"{content_base} (Test: {test_name}, iteration: {iteration}, timestamp: {timestamp}, ID: {unique_id})",
-        }
+        },
     ]
 
 
@@ -60,13 +64,16 @@ TEST_MESSAGES3 = generate_unique_test_messages("horror_test")
 
 # Completely different topic messages for testing
 SPORTS_MESSAGES = generate_unique_simple_message(
-    "I love playing basketball and tennis", "sports_test"
+    "I love playing basketball and tennis",
+    "sports_test",
 )
 FOOD_MESSAGES = generate_unique_simple_message(
-    "My favorite cuisine is Italian food", "food_test"
+    "My favorite cuisine is Italian food",
+    "food_test",
 )
 TRAVEL_MESSAGES = generate_unique_simple_message(
-    "I want to visit Japan and learn about their culture", "travel_test"
+    "I want to visit Japan and learn about their culture",
+    "travel_test",
 )
 
 # Search queries
@@ -75,28 +82,33 @@ SEARCH_QUERY_PREFERENCES = "What kind of movies do I like?"
 
 
 async def cleanup_mem0_memories(
-    service: RemoteService, agent_id: str, workspace: str, run_id: str | None = None
+    service: ServiceProxy,
+    agent_id: str,
+    workspace: str,
+    run_id: str | None = None,
 ):
     """Clean up memories for a specific agent and workspace."""
     try:
         # Delete all memories for this workspace/agent combination
         delete_result = await service.delete_all(
-            agent_id=agent_id, workspace=workspace, run_id=run_id
+            agent_id=agent_id,
+            workspace=workspace,
+            run_id=run_id,
         )
         print(
-            f"Cleaned up memories for agent {agent_id}, workspace {workspace}: {delete_result}"
+            f"Cleaned up memories for agent {agent_id}, workspace {workspace}: {delete_result}",
         )
         return delete_result
     except Exception as e:
         print(
-            f"Failed to cleanup memories for agent {agent_id}, workspace {workspace}: {e}"
+            f"Failed to cleanup memories for agent {agent_id}, workspace {workspace}: {e}",
         )
         # Don't fail the test if cleanup fails - just continue
         return None
 
 
 async def init_user(
-    service: RemoteService,
+    service: ServiceProxy,
     agent_id: str,
     workspace: str,
     description: str | None = None,
@@ -119,7 +131,7 @@ async def init_user(
 
 
 async def init_run(
-    service: RemoteService,
+    service: ServiceProxy,
     agent_id: str,
     run_id: str,
     workspace: str,
@@ -141,5 +153,5 @@ async def init_run(
         metadata=metadata,
     )
     print(
-        f"IN TEST UTILS: Initialized run {run_id} for agent {agent_id} in workspace {workspace}"
+        f"IN TEST UTILS: Initialized run {run_id} for agent {agent_id} in workspace {workspace}",
     )

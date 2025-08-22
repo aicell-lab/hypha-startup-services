@@ -1,7 +1,8 @@
 """Tests for the chunking utility module."""
 
 import pytest
-from hypha_startup_services.common.chunking import chunk_text, chunk_documents
+
+from hypha_startup_services.common.chunking import chunk_documents, chunk_text
 
 
 class TestChunkText:
@@ -136,7 +137,7 @@ class TestChunkDocuments:
                 "author": "Test Author",
                 "category": "Test Category",
                 "score": 0.95,
-            }
+            },
         ]
         result = chunk_documents(documents, chunk_size=100, chunk_overlap=10)
 

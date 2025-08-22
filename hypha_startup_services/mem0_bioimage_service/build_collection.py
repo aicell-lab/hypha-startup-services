@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-"""Improved script to build the bioimage index with deduplication and character cleaning.
+"""Script to build the bioimage index with deduplication and character cleaning.
 
 This script:
 1. Loads EBI nodes and technologies data from JSON files
@@ -10,10 +9,12 @@ This script:
 
 Usage:
     # Use local mem0 service
-    python scripts/build_bioimage_index_deduplicated.py [--nodes-file path] [--tech-file path] [--force-rebuild]
+    python scripts/build_bioimage_index_deduplicated.py
+        [--nodes-file path] [--tech-file path] [--force-rebuild]
 
     # Use remote Hypha service (requires HYPHA_TOKEN environment variable)
-    python scripts/build_bioimage_index_deduplicated.py --remote [--service-id aria-agents/mem0]
+    python scripts/build_bioimage_index_deduplicated.py --remote
+        [--service-id aria-agents/mem0]
 """
 
 import argparse
@@ -24,6 +25,9 @@ import os
 import re
 import sys
 from pathlib import Path
+from typing import Any
+
+from hypha_rpc.rpc import RemoteException, ServiceProxy
 
 # Add the project root to Python path
 project_root = Path(__file__).parent.parent
@@ -31,6 +35,7 @@ sys.path.insert(0, str(project_root))
 
 from dotenv import load_dotenv
 from hypha_rpc import connect_to_server
+from mem0 import AsyncMemory
 
 from hypha_startup_services.common.data_index import load_external_data
 from hypha_startup_services.mem0_bioimage_service.utils import (
@@ -56,7 +61,7 @@ EBI_WORKSPACE = "ebi_data"
 
 
 def clean_text(text: str) -> str:
-    """Clean text by removing problematic characters like null bytes and control characters.
+    """Remove problematic characters like null bytes and control characters.
 
     Args:
         text: The text to clean
@@ -65,17 +70,12 @@ def clean_text(text: str) -> str:
         Cleaned text
 
     """
-    if not isinstance(text, str):
-        return str(text)
-
     # Remove null bytes and other problematic control characters
     # Keep only printable characters, spaces, tabs, and newlines
     cleaned = re.sub(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]", "", text)
 
     # Normalize whitespace
-    cleaned = re.sub(r"\s+", " ", cleaned).strip()
-
-    return cleaned
+    return re.sub(r"\s+", " ", cleaned).strip()
 
 
 def create_content_hash(content: str) -> str:
@@ -95,10 +95,120 @@ def create_content_hash(content: str) -> str:
     return hashlib.sha256(cleaned_content.encode("utf-8")).hexdigest()
 
 
+class RemoteMemoryServiceWrapper:
+    """Wrapper to match remote Hypha mem0 service API w/ local AsyncMemory interface."""
+
+    def __init__(self, service: ServiceProxy) -> None:
+        """Initialize the RemoteMemoryServiceWrapper.
+
+        Args:
+            service (ServiceProxy): The remote service instance to wrap.
+
+        """
+        self.service = service
+        self._initialized = False
+
+    async def _ensure_initialized(self, agent_id: str = EBI_AGENT_ID) -> None:
+        """Ensure the remote service is properly initialized before any operations."""
+        if not self._initialized:
+            logger.info("Initializing remote service agent and workspace...")
+            try:
+                description = (
+                    "EBI BioImage Assistant for loading and searching bioimage data"
+                )
+                await self.service.init_agent(
+                    agent_id=agent_id,
+                    description=description,
+                    metadata={"service": "bioimage", "data_source": "ebi"},
+                )
+
+                # Initialize workspace/run
+                await self.service.init(agent_id=agent_id)
+                self._initialized = True
+                logger.info("✅ Remote service initialized successfully")
+            except RemoteException as e:
+                logger.warning("Remote service initialization warning: %s", e)
+                # Continue anyway, the service might already be initialized
+                self._initialized = True
+
+    async def init_agent(self, agent_id: str = EBI_AGENT_ID, **kwargs: Any) -> None:
+        """Initialize agent via remote service."""
+        await self._ensure_initialized(agent_id)
+        await self.service.init_agent(agent_id=agent_id, **kwargs)
+
+    async def init(self, agent_id: str = EBI_AGENT_ID, **kwargs: Any) -> None:
+        """Initialize run via remote service."""
+        await self._ensure_initialized(agent_id)
+        await self.service.init(agent_id=agent_id, **kwargs)
+
+    async def add(
+        self,
+        messages: dict[str, Any] | list[dict[str, Any]] | str,
+        agent_id: str = EBI_AGENT_ID,
+        *,
+        infer: bool = True,
+        **kwargs: Any,
+    ) -> dict[str, Any] | list[Any]:
+        """Add memories via remote service."""
+        await self._ensure_initialized(agent_id)
+        return await self.service.add(
+            messages=messages,
+            agent_id=agent_id,
+            infer=infer,
+            **kwargs,
+        )
+
+    async def search(
+        self,
+        query: str,
+        agent_id: str = EBI_AGENT_ID,
+        limit: int = 10,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        """Search memories via remote service."""
+        await self._ensure_initialized(agent_id)
+        return await self.service.search(
+            query=query,
+            agent_id=agent_id,
+            limit=limit,
+            **kwargs,
+        )
+
+    async def delete(self, memory_id: str, **kwargs: Any) -> None:  # noqa: ARG002
+        """Delete single memory via remote service (not directly supported)."""
+        warning_msg = (
+            "Individual memory deletion not supported by remote service API."
+            " Use delete_all() instead."
+        )
+        logger.warning(warning_msg)
+        error_msg = "Single memory deletion not supported by remote service API"
+        raise NotImplementedError(error_msg)
+
+    async def get_all(
+        self,
+        agent_id: str = EBI_AGENT_ID,
+        limit: int = 10000,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        """Get all memories via remote service."""
+        await self._ensure_initialized(agent_id)
+        return await self.service.get_all(agent_id=agent_id, limit=limit, **kwargs)
+
+    async def delete_all(
+        self,
+        agent_id: str = EBI_AGENT_ID,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        """Delete all memories via remote service."""
+        await self._ensure_initialized(agent_id)
+        return await self.service.delete_all(agent_id=agent_id, **kwargs)
+
+
 async def get_memory_service(
-    use_remote: bool = False,
     service_id: str = "aria-agents/mem0",
-):
+    *,
+    use_remote: bool = False,
+) -> AsyncMemory | RemoteMemoryServiceWrapper:
     """Get the memory service - either local mem0 or remote Hypha service.
 
     Args:
@@ -113,15 +223,16 @@ async def get_memory_service(
         # Get the HYPHA_TOKEN from environment
         token = os.environ.get("HYPHA_TOKEN")
         if not token:
-            raise ValueError(
-                "HYPHA_TOKEN environment variable is required for remote connections",
+            error_msg = (
+                "HYPHA_TOKEN environment variable is required for remote connections"
             )
+            raise ValueError(error_msg)
 
         logger.info("🌐 Connecting to remote Hypha service...")
 
         # Connect to Hypha server
         server = await connect_to_server(
-            {  # type: ignore
+            {
                 "server_url": "https://hypha.aicell.io",
                 "token": token,
             },
@@ -129,104 +240,25 @@ async def get_memory_service(
 
         # Get the remote service
         try:
-            service = await server.get_service(service_id)  # type: ignore
+            service = await server.get_service(service_id)
             logger.info("✅ Connected to remote service: %s", service_id)
             return RemoteMemoryServiceWrapper(service)
         except Exception as e:
-            await server.disconnect()  # type: ignore
-            raise RuntimeError(
-                f"Failed to connect to remote service {service_id}: {e}",
-            ) from e
+            await server.disconnect()
+            error_msg = f"Failed to connect to remote service {service_id}: {e}"
+            raise RuntimeError(error_msg) from e
         finally:
-            await server.disconnect()  # type: ignore
+            await server.disconnect()
     else:
         logger.info("🔌 Using local mem0 service...")
         return await get_mem0()
 
 
-class RemoteMemoryServiceWrapper:
-    """Wrapper to adapt the remote Hypha mem0 service API to match local AsyncMemory interface."""
-
-    def __init__(self, service):
-        self.service = service
-        self._initialized = False
-
-    async def _ensure_initialized(self, agent_id: str = EBI_AGENT_ID):
-        """Ensure the remote service is properly initialized before any operations."""
-        if not self._initialized:
-            logger.info("Initializing remote service agent and workspace...")
-            try:
-                # Initialize agent first
-                await self.service.init_agent(
-                    agent_id=agent_id,
-                    description="EBI BioImage Assistant for loading and searching bioimage data",
-                    metadata={"service": "bioimage", "data_source": "ebi"},
-                )
-
-                # Initialize workspace/run
-                await self.service.init(agent_id=agent_id)
-                self._initialized = True
-                logger.info("✅ Remote service initialized successfully")
-            except Exception as e:
-                logger.warning("Remote service initialization warning: %s", e)
-                # Continue anyway, the service might already be initialized
-                self._initialized = True
-
-    async def init_agent(self, agent_id: str = EBI_AGENT_ID, **kwargs):
-        """Initialize agent via remote service."""
-        await self._ensure_initialized(agent_id)
-        return await self.service.init_agent(agent_id=agent_id, **kwargs)
-
-    async def init(self, agent_id: str = EBI_AGENT_ID, **kwargs):
-        """Initialize run via remote service."""
-        await self._ensure_initialized(agent_id)
-        return await self.service.init(agent_id=agent_id, **kwargs)
-
-    async def add(self, messages, agent_id: str = EBI_AGENT_ID, **kwargs):
-        """Add memories via remote service."""
-        await self._ensure_initialized(agent_id)
-        return await self.service.add(messages=messages, agent_id=agent_id, **kwargs)
-
-    async def search(
-        self,
-        query: str,
-        agent_id: str = EBI_AGENT_ID,
-        limit: int = 10,
-        **kwargs,
-    ):
-        """Search memories via remote service."""
-        await self._ensure_initialized(agent_id)
-        return await self.service.search(
-            query=query,
-            agent_id=agent_id,
-            limit=limit,
-            **kwargs,
-        )
-
-    async def delete(self, memory_id: str, **kwargs):
-        """Delete single memory via remote service (not directly supported)."""
-        logger.warning(
-            "Individual memory deletion not supported by remote service API. Use delete_all() instead.",
-        )
-        raise NotImplementedError(
-            "Single memory deletion not supported by remote service API",
-        )
-
-    async def get_all(self, agent_id: str = EBI_AGENT_ID, limit: int = 10000, **kwargs):
-        """Get all memories via remote service."""
-        await self._ensure_initialized(agent_id)
-        return await self.service.get_all(agent_id=agent_id, limit=limit, **kwargs)
-
-    async def delete_all(self, agent_id: str = EBI_AGENT_ID, **kwargs):
-        """Delete all memories via remote service."""
-        await self._ensure_initialized(agent_id)
-        return await self.service.delete_all(agent_id=agent_id, **kwargs)
-
-
 async def initialize_bioimage_database_deduplicated(
-    memory,
+    memory: AsyncMemory | RemoteMemoryServiceWrapper,
     nodes_data: list,
     technologies_data: list,
+    *,
     force_rebuild: bool = False,
 ) -> None:
     """Initialize the mem0 database with bioimage data, ensuring no duplicates."""
@@ -260,11 +292,12 @@ async def initialize_bioimage_database_deduplicated(
                 if isinstance(memory, RemoteMemoryServiceWrapper):
                     try:
                         result = await memory.delete_all(agent_id=EBI_AGENT_ID)
-                        logger.info(
-                            "Cleared all existing bioimage memories via remote service: %s",
-                            result,
+                        info_msg = (
+                            f"Cleared all existing bioimage memories via"
+                            f" remote service: {result}"
                         )
-                    except Exception as e:
+                        logger.info(info_msg)
+                    except RemoteException as e:
                         logger.warning(
                             "Failed to clear memories via remote service: %s",
                             e,
@@ -334,7 +367,8 @@ async def initialize_bioimage_database_deduplicated(
                 )
 
         except (KeyError, ValueError, RuntimeError) as e:
-            logger.error("Failed to add node %s: %s", node.get("id", "unknown"), e)
+            error_msg = f"Failed to add node {node.get('id', 'unknown')}: {e}"
+            logger.exception(error_msg)
             continue
 
     logger.info(
@@ -378,20 +412,15 @@ async def initialize_bioimage_database_deduplicated(
             tech_added += 1
 
             if i % 25 == 0:  # Log progress every 25 technologies
-                logger.info(
-                    "Processed %d/%d technologies (added: %d, skipped duplicates: %d)...",
-                    i,
-                    len(technologies_data),
-                    tech_added,
-                    tech_skipped,
+                info_msg = (
+                    f"Processed {i}/{len(technologies_data)} technologies"
+                    f" (added: {tech_added}, skipped duplicates: {tech_skipped})..."
                 )
+                logger.info(info_msg)
 
         except (KeyError, ValueError, RuntimeError) as e:
-            logger.error(
-                "Failed to add technology %s: %s",
-                tech.get("id", "unknown"),
-                e,
-            )
+            error_msg = f"Failed to add technology {tech.get('id', 'unknown')}: {e}"
+            logger.exception(error_msg)
             continue
 
     logger.info(
@@ -400,7 +429,7 @@ async def initialize_bioimage_database_deduplicated(
         tech_skipped,
     )
 
-    # Skip relationship creation - relationships are handled by the Python bioimage index
+    # Skip relationship creation - relationships are handled by Python bioimage index
     logger.info("⏭️  Skipping relationship creation - handled by bioimage index")
 
     # Final summary
@@ -420,11 +449,12 @@ async def initialize_bioimage_database_deduplicated(
 async def build_bioimage_index_deduplicated(
     nodes_file: str | None = None,
     technologies_file: str | None = None,
+    service_id: str = "aria-agents/mem0",
+    *,
     force_rebuild: bool = False,
     use_remote: bool = False,
-    service_id: str = "aria-agents/mem0",
 ) -> bool:
-    """Main function to build the bioimage index and database with deduplication."""
+    """Build the bioimage index and database with deduplication."""
     logger.info("🔬 Starting deduplicated bioimage index and database build...")
 
     # Step 1: Load data and build Python index
@@ -439,14 +469,15 @@ async def build_bioimage_index_deduplicated(
         logger.info("   - Relationships: %d", stats["total_relationships"])
 
     except (OSError, ValueError, KeyError) as e:
-        logger.error("❌ Failed to build Python index: %s", e)
+        error_msg = f"❌ Failed to build Python index: {e}"
+        logger.exception(error_msg)
         return False
 
     # Step 2: Initialize memory database with deduplication
     service_type = "remote Hypha service" if use_remote else "local mem0"
     logger.info("🧠 Initializing %s database with deduplication...", service_type)
     try:
-        memory = await get_memory_service(use_remote=use_remote, service_id=service_id)
+        memory = await get_memory_service(service_id=service_id, use_remote=use_remote)
 
         # Get the processed data from the index
         nodes_data = bioimage_index.get_all_nodes()
@@ -456,11 +487,12 @@ async def build_bioimage_index_deduplicated(
             memory,
             nodes_data,
             technologies_data,
-            force_rebuild,
+            force_rebuild=force_rebuild,
         )
 
     except (ConnectionError, RuntimeError, ValueError) as e:
-        logger.error("❌ Failed to initialize mem0 database: %s", e)
+        error_msg = f"Failed to initialize mem0 database: {e}"
+        logger.exception(error_msg)
         return False
 
     # Step 3: Verify the setup and check for duplicates
@@ -504,27 +536,34 @@ async def build_bioimage_index_deduplicated(
         else:
             logger.warning("⚠️  Found %d duplicates in test results", duplicate_count)
 
+        num_samples = 3
+        num_sample_chars = 80
         # Show some sample results
-        for i, mem in enumerate(test_memories[:3], 1):
+        for i, mem in enumerate(test_memories[:num_samples], 1):
             content = (
-                mem.get("memory", "")[:80] + "..."
-                if len(mem.get("memory", "")) > 80
+                mem.get("memory", "")[:num_sample_chars] + "..."
+                if len(mem.get("memory", "")) > num_sample_chars
                 else mem.get("memory", "")
             )
             logger.info("   %d. %s", i, content)
 
     except (ConnectionError, RuntimeError, ValueError) as e:
-        logger.error("❌ Verification failed: %s", e)
+        error_msg = f"❌ Verification failed: {e}"
+        logger.exception(error_msg)
         return False
 
     logger.info("🎉 Bioimage index and database build completed successfully!")
     return True
 
 
-def main():
-    """Main CLI entry point."""
+def main() -> None:
+    """Create main CLI entry point."""
+    parser_desc = (
+        "Build bioimage Python index and memory database (local mem0 or remote Hypha)"
+        " with deduplication"
+    )
     parser = argparse.ArgumentParser(
-        description="Build bioimage Python index and memory database (local mem0 or remote Hypha) with deduplication",
+        description=parser_desc,
     )
 
     parser.add_argument(
@@ -593,7 +632,8 @@ def main():
         logger.info("🛑 Build process interrupted by user")
         sys.exit(1)
     except (RuntimeError, ValueError, OSError) as e:
-        logger.error("❌ Unexpected error: %s", e)
+        error_msg = f"❌ Unexpected error occurred: {e}"
+        logger.exception(error_msg)
         sys.exit(1)
 
 

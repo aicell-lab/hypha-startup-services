@@ -1,18 +1,21 @@
 """Test that schema information is preserved when using factory functions."""
 
 from unittest.mock import Mock
-from hypha_startup_services.weaviate_bioimage_service.methods import (
-    create_query,
-    create_search,
-    create_get_entity,
-    create_get_related,
-)
+
+from hypha_startup_services.common.data_index import load_external_data
 from hypha_startup_services.mem0_bioimage_service.methods import (
-    create_search as create_mem0_search,
     create_get_entity_details,
     create_get_related_entities,
 )
-from hypha_startup_services.common.data_index import load_external_data
+from hypha_startup_services.mem0_bioimage_service.methods import (
+    create_search as create_mem0_search,
+)
+from hypha_startup_services.weaviate_bioimage_service.methods import (
+    create_get_entity,
+    create_get_related,
+    create_query,
+    create_search,
+)
 
 
 class TestFactoryFunctionSchemas:
@@ -32,30 +35,32 @@ class TestFactoryFunctionSchemas:
 
         # Test that created functions have schemas
         assert hasattr(
-            query_func, "__schema__"
+            query_func,
+            "__schema__",
         ), "query_func should have __schema__ attribute"
         assert hasattr(
-            search_func, "__schema__"
+            search_func,
+            "__schema__",
         ), "search_func should have __schema__ attribute"
         assert hasattr(
-            get_entity_func, "__schema__"
+            get_entity_func,
+            "__schema__",
         ), "get_entity_func should have __schema__ attribute"
         assert hasattr(
-            get_related_func, "__schema__"
+            get_related_func,
+            "__schema__",
         ), "get_related_func should have __schema__ attribute"
 
         # Check that schemas are not None
+        assert query_func.__schema__ is not None, "query_func schema should not be None"
         assert (
-            getattr(query_func, "__schema__") is not None
-        ), "query_func schema should not be None"
-        assert (
-            getattr(search_func, "__schema__") is not None
+            search_func.__schema__ is not None
         ), "search_func schema should not be None"
         assert (
-            getattr(get_entity_func, "__schema__") is not None
+            get_entity_func.__schema__ is not None
         ), "get_entity_func schema should not be None"
         assert (
-            getattr(get_related_func, "__schema__") is not None
+            get_related_func.__schema__ is not None
         ), "get_related_func schema should not be None"
 
     def test_mem0_factory_functions_create_schemas(self):
@@ -71,24 +76,27 @@ class TestFactoryFunctionSchemas:
 
         # Test that created functions have schemas
         assert hasattr(
-            search_func, "__schema__"
+            search_func,
+            "__schema__",
         ), "mem0 search_func should have __schema__ attribute"
         assert hasattr(
-            get_entity_details_func, "__schema__"
+            get_entity_details_func,
+            "__schema__",
         ), "get_entity_details_func should have __schema__ attribute"
         assert hasattr(
-            get_related_entities_func, "__schema__"
+            get_related_entities_func,
+            "__schema__",
         ), "get_related_entities_func should have __schema__ attribute"
 
         # Check that schemas are not None
         assert (
-            getattr(search_func, "__schema__") is not None
+            search_func.__schema__ is not None
         ), "mem0 search_func schema should not be None"
         assert (
-            getattr(get_entity_details_func, "__schema__") is not None
+            get_entity_details_func.__schema__ is not None
         ), "get_entity_details_func schema should not be None"
         assert (
-            getattr(get_related_entities_func, "__schema__") is not None
+            get_related_entities_func.__schema__ is not None
         ), "get_related_entities_func schema should not be None"
 
     def test_factory_functions_have_correct_parameters(self):
@@ -99,7 +107,7 @@ class TestFactoryFunctionSchemas:
 
         # Create query function
         query_func = create_query(mock_client)
-        schema = getattr(query_func, "__schema__")
+        schema = query_func.__schema__
 
         # Check basic schema structure
         assert isinstance(schema, dict), "Schema should be a dictionary"
@@ -142,20 +150,23 @@ class TestFactoryFunctionSchemas:
 
         # Raw function should NOT have schema
         assert not hasattr(
-            raw_query, "__schema__"
+            raw_query,
+            "__schema__",
         ), "Raw function should not have __schema__ attribute"
 
         # Factory-created function should have schema
         mock_client = Mock()
         query_func = create_query(mock_client)
         assert hasattr(
-            query_func, "__schema__"
+            query_func,
+            "__schema__",
         ), "Factory-created function should have __schema__ attribute"
 
         # The factory function should have proper schema structure
-        schema = getattr(query_func, "__schema__")
+        schema = query_func.__schema__
         assert isinstance(
-            schema, dict
+            schema,
+            dict,
         ), "Factory function schema should be a dictionary"
         assert "parameters" in schema, "Factory function schema should have parameters"
 
@@ -176,9 +187,9 @@ class TestFactoryFunctionSchemas:
         get_entity_func = create_get_entity(mock_client)
 
         # Get their schemas
-        query_schema = getattr(query_func, "__schema__")
-        search_schema = getattr(search_func, "__schema__")
-        get_entity_schema = getattr(get_entity_func, "__schema__")
+        query_schema = query_func.__schema__
+        search_schema = search_func.__schema__
+        get_entity_schema = get_entity_func.__schema__
 
         # They should have different names/descriptions
         assert (

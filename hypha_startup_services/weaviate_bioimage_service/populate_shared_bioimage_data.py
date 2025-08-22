@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Populate the shared bioimage application with EuroBioImaging data.
 
 This script uses the Weaviate service directly to insert nodes and technologies data
@@ -24,7 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from hypha_rpc import connect_to_server
-from hypha_rpc.rpc import RemoteService
+from hypha_rpc.rpc import RemoteException, RemoteService
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -43,12 +42,12 @@ async def load_data_files() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]
 
     # Load nodes data
     nodes_file = script_dir / "common" / "assets" / "ebi-nodes.json"
-    with open(nodes_file, encoding="utf-8") as f:
+    with Path(nodes_file).open(encoding="utf-8") as f:
         nodes_data = json.load(f)
 
     # Load technologies data
     tech_file = script_dir / "common" / "assets" / "ebi-tech.json"
-    with open(tech_file, encoding="utf-8") as f:
+    with Path(tech_file).open(encoding="utf-8") as f:
         tech_data = json.load(f)
 
     logger.info("Loaded %d nodes and %d technologies", len(nodes_data), len(tech_data))
@@ -130,7 +129,8 @@ async def get_weaviate_service(server_url: str):
     # Get token from environment
     token = os.environ.get("HYPHA_TOKEN")
     if not token:
-        raise ValueError("HYPHA_TOKEN environment variable is required")
+        error_msg = "HYPHA_TOKEN environment variable is required"
+        raise ValueError(error_msg)
 
     server: RemoteService = await connect_to_server(  # type: ignore
         {
@@ -162,7 +162,7 @@ async def ensure_collection_exists(
         if exists:
             logger.info("Collection %s already exists", COLLECTION_NAME)
             return
-    except Exception as e:
+    except RemoteException as e:
         logger.warning("Error checking if collection exists: %s", e)
 
     logger.info("Creating collection %s...", COLLECTION_NAME)
@@ -357,7 +357,7 @@ async def insert_data_in_batches(
 
 
 async def main():
-    """Main function to populate shared bioimage application with data."""
+    """Ppopulate shared bioimage application with data."""
     # Parse command line arguments
     parser = argparse.ArgumentParser(
         description="Populate shared bioimage application with data",

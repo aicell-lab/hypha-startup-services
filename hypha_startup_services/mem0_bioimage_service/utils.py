@@ -1,3 +1,5 @@
+"""Mem0 bioimage service utilities."""
+
 import logging
 import re
 from typing import Any
@@ -11,6 +13,7 @@ EBI_AGENT_ID = "ebi_bioimage_assistant"
 EBI_NODES_AGENT_ID = "ebi_bioimage_nodes_assistant"
 EBI_TECHNOLOGIES_AGENT_ID = "ebi_bioimage_technologies_assistant"
 EBI_WORKSPACE = "ebi_data"
+MAX_TEXT_LENGTH = 8000
 
 
 def clean_text_for_json(text: str) -> str:
@@ -26,21 +29,13 @@ def clean_text_for_json(text: str) -> str:
     if not isinstance(text, str):
         text = str(text)
 
-    # Remove null bytes and control characters
     text = re.sub(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]", "", text)
-
-    # Replace problematic quotes with safe alternatives
     text = text.replace('"', "'").replace("'", "'")
-
-    # Remove or replace other potentially problematic characters
-    text = re.sub(r"[\\]", "/", text)  # Replace backslashes
-
-    # Normalize whitespace
+    text = re.sub(r"[\\]", "/", text)
     text = re.sub(r"\s+", " ", text).strip()
 
-    # Ensure text is not too long (mem0 might have limits)
-    if len(text) > 8000:
-        text = text[:8000] + "..."
+    if len(text) > MAX_TEXT_LENGTH:
+        text = text[:MAX_TEXT_LENGTH] + "..."
 
     return text
 
@@ -59,7 +54,10 @@ def create_node_content(node: dict[str, Any]) -> str:
         if node.get("technologies")
         else "None"
     )
-    return f"Bioimaging node: {name} in {country}. Description: {description}. Technologies: {technologies}"
+    return (
+        f"Bioimaging node: {name} in {country}. Description: {description}."
+        f" Technologies: {technologies}"
+    )
 
 
 def create_node_metadata(node: dict[str, Any]) -> dict[str, Any]:
@@ -102,7 +100,10 @@ def create_technology_content(tech: dict[str, Any]) -> str:
         else clean_text_for_json(str(tech.get("category", "Unknown")))
     )
     abbr = clean_text_for_json(tech.get("abbr", ""))
-    return f"Bioimaging technology: {name} ({abbr}). Category: {category}. Description: {description}"
+    return (
+        f"Bioimaging technology: {name} ({abbr}). Category: {category}."
+        f" Description: {description}"
+    )
 
 
 def create_technology_metadata(tech: dict[str, Any]) -> dict[str, Any]:
@@ -118,7 +119,7 @@ def create_technology_metadata(tech: dict[str, Any]) -> dict[str, Any]:
             if isinstance(category_info, dict)
             else clean_text_for_json(str(category_info))
         ),
-        # "description": tech.get("description"),
+        # NOTE: "description": tech.get("description"),
     }
     # Remove None values and empty strings to avoid empty metadata fields
     return {k: v for k, v in metadata.items() if v is not None and v != ""}
@@ -135,7 +136,8 @@ async def semantic_bioimage_search(
     Args:
         memory: AsyncMemory instance
         search_query: Natural language query
-        entity_types: Filter by entity types (node, technology, or both). Defaults to both.
+        entity_types: Filter by entity types (node, technology, or both).
+            Defaults to both.
         limit: Maximum number of results
 
     Returns:
@@ -146,9 +148,10 @@ async def semantic_bioimage_search(
 
     # Determine which agent(s) to use based on entity_types
     agent_ids = []
+    valid_entity_types = ["node", "technology"]
     if (
         not entity_types
-        or len(entity_types) == 2
+        or len(entity_types) == len(valid_entity_types)
         or ("node" in entity_types and "technology" in entity_types)
     ):
         # Search both, use the combined agent

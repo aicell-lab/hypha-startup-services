@@ -1,16 +1,16 @@
 """Unit tests for mem0_service permissions module."""
 
 from unittest.mock import AsyncMock, patch
+
 import pytest
 from hypha_rpc.rpc import RemoteException
 
-
 from hypha_startup_services.common.permissions import (
+    HyphaPermissionError,
     get_user_permissions,
-    user_has_operation_permission,
     has_permission,
     require_permission,
-    HyphaPermissionError,
+    user_has_operation_permission,
 )
 from hypha_startup_services.mem0_service.utils.models import (
     PermissionParams,
@@ -22,7 +22,6 @@ from tests.mem0_service.utils import TEST_AGENT_ID
 @pytest.fixture(autouse=True)
 def init_agents():
     """Override the autouse fixture to do nothing for unit tests."""
-    pass
 
 
 @pytest.fixture
@@ -38,7 +37,7 @@ def mock_server_setup():
 def patch_get_artifact():
     """Patch get_artifact for permissions module."""
     with patch(
-        "hypha_startup_services.common.permissions.get_artifact"
+        "hypha_startup_services.common.permissions.get_artifact",
     ) as mock_get_artifact:
         yield mock_get_artifact
 
@@ -61,8 +60,8 @@ class TestGetUserPermissions:
                 "permissions": {
                     USER1_WS: ["r", "rw"],
                     USER2_WS: "*",
-                }
-            }
+                },
+            },
         }
 
         patch_get_artifact.return_value = mock_artifact
@@ -87,8 +86,8 @@ class TestGetUserPermissions:
                 "permissions": {
                     USER1_WS: ["r", "rw"],
                     USER2_WS: "*",
-                }
-            }
+                },
+            },
         }
 
         patch_get_artifact.return_value = mock_artifact
@@ -154,7 +153,7 @@ class TestUserHasOperationPermission:
         )
 
         with patch(
-            "hypha_startup_services.common.permissions.get_user_permissions"
+            "hypha_startup_services.common.permissions.get_user_permissions",
         ) as mock_get:
             mock_get.return_value = ["r", "rw"]
 
@@ -174,7 +173,7 @@ class TestUserHasOperationPermission:
         )
 
         with patch(
-            "hypha_startup_services.common.permissions.get_user_permissions"
+            "hypha_startup_services.common.permissions.get_user_permissions",
         ) as mock_get:
             mock_get.return_value = ["r"]
 
@@ -193,7 +192,7 @@ class TestUserHasOperationPermission:
         )
 
         with patch(
-            "hypha_startup_services.common.permissions.get_user_permissions"
+            "hypha_startup_services.common.permissions.get_user_permissions",
         ) as mock_get:
             mock_get.return_value = "*"
 
@@ -212,7 +211,7 @@ class TestUserHasOperationPermission:
         )
 
         with patch(
-            "hypha_startup_services.common.permissions.get_user_permissions"
+            "hypha_startup_services.common.permissions.get_user_permissions",
         ) as mock_get:
             mock_get.return_value = {}
 
@@ -227,7 +226,6 @@ class TestHasPermission:
     @pytest.mark.asyncio
     async def test_has_permission_admin_workspace(self):
         """Test permission check for admin workspace."""
-
         # Test with admin workspace from constants
         with patch(
             "hypha_startup_services.common.permissions.ADMIN_WORKSPACES",
@@ -256,12 +254,12 @@ class TestHasPermission:
 
         with patch("hypha_startup_services.common.permissions.ADMIN_WORKSPACES", []):
             with patch(
-                "hypha_startup_services.common.permissions.user_has_operation_permission"
+                "hypha_startup_services.common.permissions.user_has_operation_permission",
             ) as mock_user_perm:
                 mock_user_perm.return_value = True
 
                 with patch(
-                    "hypha_startup_services.common.permissions.logger"
+                    "hypha_startup_services.common.permissions.logger",
                 ) as mock_logger:
                     result = await has_permission(permission_params)
 
@@ -285,12 +283,12 @@ class TestHasPermission:
 
         with patch("hypha_startup_services.common.permissions.ADMIN_WORKSPACES", []):
             with patch(
-                "hypha_startup_services.common.permissions.user_has_operation_permission"
+                "hypha_startup_services.common.permissions.user_has_operation_permission",
             ) as mock_user_perm:
                 mock_user_perm.return_value = False
 
                 with patch(
-                    "hypha_startup_services.common.permissions.logger"
+                    "hypha_startup_services.common.permissions.logger",
                 ) as mock_logger:
                     result = await has_permission(permission_params)
 
@@ -317,7 +315,7 @@ class TestRequirePermission:
         )
 
         with patch(
-            "hypha_startup_services.common.permissions.has_permission"
+            "hypha_startup_services.common.permissions.has_permission",
         ) as mock_has:
             mock_has.return_value = True
 
@@ -337,7 +335,7 @@ class TestRequirePermission:
         )
 
         with patch(
-            "hypha_startup_services.common.permissions.has_permission"
+            "hypha_startup_services.common.permissions.has_permission",
         ) as mock_has:
             mock_has.return_value = False
 
@@ -357,7 +355,6 @@ class TestIntegration:
     @pytest.mark.asyncio
     async def test_permission_workflow_admin_user(self):
         """Test complete permission workflow for admin user."""
-
         with patch(
             "hypha_startup_services.common.permissions.ADMIN_WORKSPACES",
             ["admin-ws"],
@@ -390,8 +387,8 @@ class TestIntegration:
             "config": {
                 "permissions": {
                     USER1_WS: ["r", "rw"],
-                }
-            }
+                },
+            },
         }
 
         with patch("hypha_startup_services.common.permissions.ADMIN_WORKSPACES", []):
@@ -418,8 +415,8 @@ class TestIntegration:
             "config": {
                 "permissions": {
                     USER1_WS: ["r"],  # Only read permission, not read-write
-                }
-            }
+                },
+            },
         }
 
         with patch("hypha_startup_services.common.permissions.ADMIN_WORKSPACES", []):

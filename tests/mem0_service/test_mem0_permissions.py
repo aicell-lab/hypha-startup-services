@@ -1,21 +1,22 @@
 """Tests for mem0 permissions and error handling."""
 
+import asyncio
+
 import pytest
 from hypha_rpc.rpc import RemoteException
+
+from tests.conftest import USER1_WS, USER2_WS
 from tests.mem0_service.utils import (
     TEST_AGENT_ID,
-    TEST_RUN_ID,
     TEST_MESSAGES,
+    TEST_RUN_ID,
     cleanup_mem0_memories,
 )
-from tests.conftest import USER1_WS, USER2_WS
-import asyncio
 
 
 @pytest.mark.asyncio
 async def test_invalid_agent_id_format(mem0_service):
     """Test handling of invalid agent ID formats."""
-
     # Clean up any existing memories to ensure test isolation
     await cleanup_mem0_memories(mem0_service, TEST_AGENT_ID, USER1_WS)
     invalid_agent_ids = [
@@ -41,7 +42,6 @@ async def test_invalid_agent_id_format(mem0_service):
 @pytest.mark.asyncio
 async def test_invalid_workspace_format(mem0_service):
     """Test handling of invalid workspace formats."""
-
     # Clean up any existing memories to ensure test isolation
     await cleanup_mem0_memories(mem0_service, TEST_AGENT_ID, USER1_WS)
     invalid_workspaces = [
@@ -60,7 +60,6 @@ async def test_invalid_workspace_format(mem0_service):
 @pytest.mark.asyncio
 async def test_invalid_run_id_format(mem0_service):
     """Test handling of invalid run ID formats."""
-
     # Clean up any existing memories to ensure test isolation
     await cleanup_mem0_memories(mem0_service, TEST_AGENT_ID, USER1_WS)
     invalid_run_ids = [
@@ -83,7 +82,6 @@ async def test_invalid_run_id_format(mem0_service):
 @pytest.mark.asyncio
 async def test_permission_denied_scenarios(mem0_service, mem0_service2):
     """Test various permission denied scenarios."""
-
     # Clean up any existing memories to ensure test isolation
     await cleanup_mem0_memories(mem0_service, TEST_AGENT_ID, USER1_WS)
     # Try to access another user's workspace
@@ -111,7 +109,6 @@ async def test_permission_denied_scenarios(mem0_service, mem0_service2):
 @pytest.mark.asyncio
 async def test_artifact_permission_validation(mem0_service):
     """Test that artifact permissions are properly validated."""
-
     # Clean up any existing memories to ensure test isolation
     await cleanup_mem0_memories(mem0_service, TEST_AGENT_ID, USER1_WS)
     # Initialize a run (creates artifacts)
@@ -149,7 +146,6 @@ async def test_artifact_permission_validation(mem0_service):
 @pytest.mark.asyncio
 async def test_malformed_search_query(mem0_service):
     """Test handling of malformed search queries."""
-
     # Clean up any existing memories to ensure test isolation
     await cleanup_mem0_memories(mem0_service, TEST_AGENT_ID, USER1_WS)
     # Initialize agent first
@@ -199,7 +195,6 @@ async def test_malformed_search_query(mem0_service):
 @pytest.mark.asyncio
 async def test_concurrent_permission_checks(mem0_service, mem0_service2):
     """Test that permission checks work correctly under concurrent access."""
-
     # Clean up any existing memories to ensure test isolation
     await cleanup_mem0_memories(mem0_service, TEST_AGENT_ID, USER1_WS)
     # Initialize agents for both users first
@@ -224,7 +219,7 @@ async def test_concurrent_permission_checks(mem0_service, mem0_service2):
             messages=TEST_MESSAGES,
             agent_id=TEST_AGENT_ID,
             workspace=USER1_WS,
-        )
+        ),
     )
 
     tasks.append(
@@ -232,7 +227,7 @@ async def test_concurrent_permission_checks(mem0_service, mem0_service2):
             messages=TEST_MESSAGES,
             agent_id=TEST_AGENT_ID,
             workspace=USER2_WS,
-        )
+        ),
     )
 
     # Invalid operations (should fail)
@@ -241,7 +236,7 @@ async def test_concurrent_permission_checks(mem0_service, mem0_service2):
             messages=TEST_MESSAGES,
             agent_id=TEST_AGENT_ID,
             workspace=USER1_WS,  # User 2 trying to access User 1's workspace
-        )
+        ),
     )
 
     # Gather results with exception handling
@@ -256,7 +251,6 @@ async def test_concurrent_permission_checks(mem0_service, mem0_service2):
 @pytest.mark.asyncio
 async def test_service_error_recovery(mem0_service):
     """Test that the service can recover from errors."""
-
     # Clean up any existing memories to ensure test isolation
     await cleanup_mem0_memories(mem0_service, TEST_AGENT_ID, USER1_WS)
     # Initialize agent for valid operations

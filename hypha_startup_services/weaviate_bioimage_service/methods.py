@@ -142,9 +142,10 @@ async def search(
         valid_types = {"node", "technology"}
         invalid_types = set(entity_types) - valid_types
         if invalid_types:
-            raise ValueError(
-                f"Invalid entity types: {invalid_types}. Must be 'node' or 'technology'",
+            error_msg = (
+                f"Invalid entity types: {invalid_types}. Must be 'node' or 'technology'"
             )
+            raise ValueError(error_msg)
 
     where_filter = None
     if entity_types:

@@ -6,11 +6,10 @@ and test real functionality without mocks.
 
 import asyncio
 import os
-import pytest
 
+import pytest
 from hypha_rpc import connect_to_server
 from hypha_rpc.rpc import RemoteService
-
 
 # Skip all integration tests if HYPHA_TOKEN is not set
 pytestmark = pytest.mark.skipif(
@@ -28,7 +27,7 @@ async def remote_service():
         {  # type: ignore
             "server_url": "https://hypha.aicell.io",
             "token": token,
-        }
+        },
     )
 
     service = await server.get_service("aria-agents/weaviate-bioimage")
@@ -63,7 +62,8 @@ class TestRemoteBioImageService:
         # Should also have a generated response
         if "generated" in result:
             assert result["generated"] is not None and isinstance(
-                result["generated"], str
+                result["generated"],
+                str,
             )
 
         # Should return some results for a broad query like "microscopy"

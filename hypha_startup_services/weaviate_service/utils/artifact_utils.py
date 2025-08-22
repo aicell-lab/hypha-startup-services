@@ -1,3 +1,5 @@
+"""Artifact util functions."""
+
 import logging
 from typing import Any
 
@@ -62,7 +64,7 @@ async def delete_collection_artifacts(short_names: list[str]) -> None:
     """Delete artifacts for a list of collections.
 
     Args:
-        names: List of collection names to delete artifacts for
+        short_names: List of collection names to delete artifacts for
 
     """
     for coll_name in short_names:
@@ -109,6 +111,7 @@ async def create_application_artifact(
         application_id: Application ID
         description: Application description
         user_ws: User workspace
+        caller_ws: Caller workspace
 
     Returns:
         Result of artifact creation

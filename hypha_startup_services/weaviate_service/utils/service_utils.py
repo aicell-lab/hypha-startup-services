@@ -33,7 +33,8 @@ async def prepare_application_creation(
     collection_name: str,
     user_ws: str,
 ) -> None:
-    """Prepare for application creation by checking collection existence and adding tenant.
+    """Prepare for application creation by checking collection existence and
+            adding tenant.
 
     Args:
         client: WeaviateAsyncClient instance
@@ -49,7 +50,8 @@ async def prepare_application_creation(
     """
     # Make sure the collection exists and the user has the tenant
     if not await collection_exists(client, collection_name):
-        raise ValueError(f"Collection '{collection_name}' does not exist.")
+        error_msg = f"Collection '{collection_name}' does not exist."
+        raise ValueError(error_msg)
 
     if await is_multitenancy_enabled(client, collection_name):
         await add_tenant_if_not_exists(
@@ -76,8 +78,8 @@ async def get_permitted_collection(
         server: RemoteService instance for permission checking
         collection_name: Name of the collection to access
         application_id: ID of the application being accessed
+        caller_ws: Workspace of the caller
         user_ws: Optional user workspace to use as tenant (if different from caller)
-        context: Context containing caller information
 
     Returns:
         Collection object with tenant permissions configured
@@ -104,13 +106,17 @@ async def collection_exists(
     return await client.collections.exists(collection_name)
 
 
-async def ws_app_exists(collection_name: str, application_id: str, workspace: str):
+async def ws_app_exists(
+    collection_name: str,
+    application_id: str,
+    workspace: str,
+) -> bool:
     """Check if an application exists for a specific user workspace.
 
     Args:
         collection_name: Name of the collection to check
         application_id: ID of the application to check
-        user_ws: User workspace to check against
+        workspace: User workspace to check against
 
     Returns:
         Boolean indicating whether the application exists for the user workspace
@@ -134,8 +140,8 @@ async def prepare_tenant_collection(
 ) -> CollectionAsync:
     """Validate that the Weaviate client is properly configured.
 
-    This function checks if the Weaviate client is connected and ready to perform operations.
-    It raises an exception if the client is not properly configured.
+    This function checks if the Weaviate client is connected and ready to perform
+        operations. It raises an exception if the client is not properly configured.
 
     Args:
         client: WeaviateAsyncClient instance
@@ -148,27 +154,30 @@ async def prepare_tenant_collection(
         Exception: If the Weaviate client is not properly configured
 
     """
-    assert (
-        context is not None
-    ), "Context must be provided to determine the tenant workspace"
+    if context is None:
+        error_msg = "Context must be provided to determine the tenant workspace"
+        raise ValueError(error_msg)
 
     caller_ws = ws_from_context(context)
 
     if user_ws is None:
         user_ws = caller_ws
 
-    assert await ws_app_exists(
+    if not await ws_app_exists(
         collection_name,
         application_id,
         workspace=user_ws,
-    ), f"Application {application_id} does not exist in collection {collection_name}"
+    ):
+        error_msg = (
+            f"Application {application_id}"
+            f" does not exist in collection {collection_name}"
+        )
+        raise ValueError(error_msg)
 
-    tenant_collection = await get_permitted_collection(
+    return await get_permitted_collection(
         client,
         collection_name,
         application_id,
         user_ws=user_ws,
         caller_ws=caller_ws,
     )
-
-    return tenant_collection

@@ -1,0 +1,56 @@
+from collections.abc import Callable
+from typing import Any, Literal, Protocol, TypeVar, overload, runtime_checkable
+
+_F = TypeVar("_F", bound=Callable[..., object])
+
+class RemoteException(Exception): ...
+
+@runtime_checkable
+class RemoteServiceConfig(Protocol):
+    client_id: str
+    public_base_url: str
+    workspace: str
+
+@runtime_checkable
+class RemoteService(Protocol):
+    config: RemoteServiceConfig
+
+    def register_codec(self, codec: dict[str, object]) -> None: ...
+    async def register_service(self, service: dict[str, object]) -> Any: ...
+    # Common Hypha built-in services
+    @overload
+    async def get_service(
+        self, service_id: Literal["public/artifact-manager"]
+    ) -> "ArtifactManager": ...
+    @overload
+    async def get_service(self, service_id: str) -> "ServiceProxy": ...
+    async def disconnect(self) -> None: ...
+    async def serve(self) -> None: ...
+
+@overload
+def schema_function(__func: _F, /) -> _F: ...
+@overload
+def schema_function(
+    arbitrary_types_allowed: bool = ..., /, **kwargs: dict[str, object]
+) -> Callable[[_F], _F]: ...
+@overload
+def schema_function(
+    *,
+    arbitrary_types_allowed: bool | None = None,
+    **kwargs: dict[str, object],
+) -> Callable[[_F], _F]: ...
+@runtime_checkable
+class ArtifactManager(Protocol):
+    async def read(self, *, artifact_id: str) -> dict[str, Any]: ...
+    async def create(self, **kwargs: Any) -> Any: ...
+    async def delete(self, *, artifact_id: str, delete_files: bool = ...) -> Any: ...
+    async def edit(self, **kwargs: Any) -> Any: ...
+
+@runtime_checkable
+class ServiceMethod(Protocol):
+    async def __call__(self, *args: Any, **kwargs: Any) -> Any: ...
+    def __getattr__(self, name: str) -> ServiceMethod: ...
+
+@runtime_checkable
+class ServiceProxy(Protocol):
+    def __getattr__(self, name: str) -> ServiceMethod: ...

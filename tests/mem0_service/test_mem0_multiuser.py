@@ -1,27 +1,28 @@
 """Tests for multi-user mem0 functionality."""
 
 import asyncio
+
 import pytest
 from hypha_rpc.rpc import RemoteException
+
 from hypha_startup_services.common.permissions import HyphaPermissionError
+from tests.conftest import USER1_WS, USER2_WS, USER3_WS
 from tests.mem0_service.utils import (
+    SEARCH_QUERY_MOVIES,
     TEST_AGENT_ID,
     TEST_AGENT_ID2,
-    TEST_RUN_ID,
     TEST_MESSAGES,
     TEST_MESSAGES2,
-    SEARCH_QUERY_MOVIES,
+    TEST_RUN_ID,
     cleanup_mem0_memories,
-    generate_unique_test_messages,
     generate_unique_simple_message,
+    generate_unique_test_messages,
 )
-from tests.conftest import USER1_WS, USER2_WS, USER3_WS
 
 
 @pytest.mark.asyncio
 async def test_multi_user_memory_isolation(mem0_service, mem0_service2, mem0_service3):
     """Test that memories are properly isolated between different users."""
-
     # Clean up any existing memories to ensure test isolation for all users
     await cleanup_mem0_memories(mem0_service, TEST_AGENT_ID, USER1_WS)
     await cleanup_mem0_memories(mem0_service2, TEST_AGENT_ID, USER2_WS)
@@ -49,10 +50,14 @@ async def test_multi_user_memory_isolation(mem0_service, mem0_service2, mem0_ser
     # Generate unique messages for each user to avoid deduplication
     user1_messages = generate_unique_test_messages("user1_movies", 1)
     user2_messages = generate_unique_simple_message(
-        "I love playing basketball and soccer regularly", "user2_sports", 1
+        "I love playing basketball and soccer regularly",
+        "user2_sports",
+        1,
     )
     user3_messages = generate_unique_simple_message(
-        "I want to visit Japan and explore their temples", "user3_travel", 1
+        "I want to visit Japan and explore their temples",
+        "user3_travel",
+        1,
     )
 
     add_result1 = await mem0_service.add(
@@ -112,7 +117,6 @@ async def test_multi_user_memory_isolation(mem0_service, mem0_service2, mem0_ser
 @pytest.mark.asyncio
 async def test_user_cannot_access_other_workspace(mem0_service, mem0_service2):
     """Test that regular users cannot access other users' workspaces."""
-
     # Clean up any existing memories to ensure test isolation
     await cleanup_mem0_memories(mem0_service, TEST_AGENT_ID, USER1_WS)
     # User 2 tries to add memories to User 1's workspace (should fail)
@@ -139,7 +143,6 @@ async def test_user_cannot_access_other_workspace(mem0_service, mem0_service2):
 @pytest.mark.asyncio
 async def test_user_cannot_search_other_workspace(mem0_service, mem0_service2):
     """Test that regular users cannot search other users' workspaces."""
-
     # Clean up any existing memories to ensure test isolation
     await cleanup_mem0_memories(mem0_service, TEST_AGENT_ID, USER1_WS)
     # User 2 tries to search User 1's workspace (should fail)
@@ -160,7 +163,6 @@ async def test_user_cannot_search_other_workspace(mem0_service, mem0_service2):
 @pytest.mark.asyncio
 async def test_multi_user_same_agent_different_runs(mem0_service, mem0_service2):
     """Test multiple users using the same agent with different run IDs."""
-
     # Clean up any existing memories to ensure test isolation
     await cleanup_mem0_memories(mem0_service, TEST_AGENT_ID, USER1_WS)
     run_id_1 = f"{TEST_RUN_ID}-user1"
@@ -226,7 +228,6 @@ async def test_multi_user_same_agent_different_runs(mem0_service, mem0_service2)
 @pytest.mark.asyncio
 async def test_concurrent_memory_operations(mem0_service, mem0_service2):
     """Test concurrent memory operations from different users."""
-
     # Clean up any existing memories to ensure test isolation
     await cleanup_mem0_memories(mem0_service, TEST_AGENT_ID, USER1_WS)
     # Initialize agents for both users
@@ -247,14 +248,14 @@ async def test_concurrent_memory_operations(mem0_service, mem0_service2):
         {
             "role": "user",
             "content": "I'm planning a trip to Japan. I love sushi and want to visit Tokyo.",
-        }
+        },
     ]
 
     user2_messages = [
         {
             "role": "user",
             "content": "I'm learning to cook Italian food. Pasta is my favorite dish.",
-        }
+        },
     ]
 
     # Run concurrent add operations
@@ -299,7 +300,6 @@ async def test_concurrent_memory_operations(mem0_service, mem0_service2):
 @pytest.mark.asyncio
 async def test_user_initialization_permissions(mem0_service, mem0_service2):
     """Test that regular users can initialize runs for their own agents."""
-
     # Clean up any existing memories to ensure test isolation
     await cleanup_mem0_memories(mem0_service, TEST_AGENT_ID, USER1_WS)
     # User 2 should be able to initialize runs
@@ -323,7 +323,6 @@ async def test_user_initialization_permissions(mem0_service, mem0_service2):
 @pytest.mark.asyncio
 async def test_workspace_validation(mem0_service):
     """Test that workspace parameter validation works correctly."""
-
     # Clean up any existing memories to ensure test isolation
     await cleanup_mem0_memories(mem0_service, TEST_AGENT_ID, USER1_WS)
     # Initialize agent for valid operations first

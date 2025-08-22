@@ -1,17 +1,18 @@
 """Tests for mem0 data operations and edge cases."""
 
 import pytest
+
+from tests.conftest import USER1_WS
 from tests.mem0_service.utils import (
+    SEARCH_QUERY_MOVIES,
     TEST_AGENT_ID,
     TEST_AGENT_ID2,
-    TEST_RUN_ID,
     TEST_MESSAGES,
     TEST_MESSAGES2,
-    SEARCH_QUERY_MOVIES,
+    TEST_RUN_ID,
     cleanup_mem0_memories,
     generate_unique_simple_message,
 )
-from tests.conftest import USER1_WS
 
 
 @pytest.mark.asyncio
@@ -314,7 +315,7 @@ async def test_rapid_sequential_operations(mem0_service):
             print(f"Iteration {i}: Added {len(add_result['results'])} memories")
         else:
             print(
-                f"Iteration {i}: No memories added (possibly due to deduplication or processing)"
+                f"Iteration {i}: No memories added (possibly due to deduplication or processing)",
             )
 
     # Validate that at least some operations were successful
@@ -326,7 +327,7 @@ async def test_rapid_sequential_operations(mem0_service):
         total_memories_added >= 2
     ), f"Only {total_memories_added} total memories were added"
     print(
-        f"Successfully added memories in {successful_adds}/5 operations, total: {total_memories_added}"
+        f"Successfully added memories in {successful_adds}/5 operations, total: {total_memories_added}",
     )
     # Rapidly search multiple times
     for i in range(3):
@@ -363,14 +364,14 @@ async def test_cross_run_search_isolation(mem0_service):
 
     # Add distinct memories to each run
     run1_messages = [
-        {"role": "user", "content": "Run 1: I love action movies like Die Hard."}
+        {"role": "user", "content": "Run 1: I love action movies like Die Hard."},
     ]
 
     run2_messages = [
         {
             "role": "user",
             "content": "Run 2: I prefer romantic comedies like When Harry Met Sally.",
-        }
+        },
     ]
 
     add_result = await mem0_service.add(
@@ -425,15 +426,15 @@ async def test_memory_search_ranking(mem0_service):
         {
             "role": "user",
             "content": "My absolute favorite science fiction movie is Blade Runner 2049.",
-        }
+        },
     ]
 
     somewhat_relevant = [
-        {"role": "user", "content": "I sometimes watch sci-fi films when I'm bored."}
+        {"role": "user", "content": "I sometimes watch sci-fi films when I'm bored."},
     ]
 
     barely_relevant = [
-        {"role": "user", "content": "I went to the movies last week and got popcorn."}
+        {"role": "user", "content": "I went to the movies last week and got popcorn."},
     ]
 
     # Add all memories

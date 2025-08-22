@@ -11,6 +11,7 @@ Unified query method that combines semantic search with related entity lookup.
 This replaces the separate semantic_query and find_related_entities_semantic methods.
 
 **Parameters:**
+
 - `query_text` (str): Natural language query
 - `entity_types` (list, optional): Filter by entity types ('node', 'technology', or both)
 - `include_related` (bool): Whether to include related entities for each result (default: True)
@@ -19,6 +20,7 @@ This replaces the separate semantic_query and find_related_entities_semantic met
 **Returns:** Dictionary with semantic search results and related entities
 
 **Example:**
+
 ```python
 import asyncio
 from hypha_rpc import connect_to_server
@@ -42,11 +44,13 @@ asyncio.run(bioimage_search())
 Get detailed information about a specific entity.
 
 **Parameters:**
+
 - `entity_id` (str): ID of the entity (node or technology) to retrieve
 
 **Returns:** Dictionary containing the entity details
 
 **Example:**
+
 ```python
 italian_node_id = "7e35b2a1-22ef-58ec-a32b-805e388932ee"
 entity_details = await bioimage.get(entity_id=italian_node_id)
@@ -59,11 +63,13 @@ Get entities related to a specific entity.
 Entity type is inferred if not provided.
 
 **Parameters:**
+
 - `entity_id` (str): ID of the entity to find relationships for
 
 **Returns:** List of related entities
 
 **Example:**
+
 ```python
 related_entities = await bioimage.get_related(entity_id=italian_node_id)
 ```

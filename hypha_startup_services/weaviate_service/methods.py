@@ -6,11 +6,9 @@ handling collections, data operations, and query functionality with user isolati
 
 import logging
 import uuid as uuid_class
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from weaviate import WeaviateAsyncClient
-from weaviate.collections.classes.batch import DeleteManyReturn
-from weaviate.collections.classes.internal import GenerativeReturn, QueryReturn
 
 from hypha_startup_services.common.artifacts import (
     artifact_edit,
@@ -60,13 +58,17 @@ from .utils.service_utils import (
     ws_app_exists,
 )
 
+if TYPE_CHECKING:
+    from weaviate.collections.classes.batch import DeleteManyReturn
+    from weaviate.collections.classes.internal import GenerativeReturn, QueryReturn
+
 logger = logging.getLogger(__name__)
 
 
 async def collections_exists(
     client: WeaviateAsyncClient,
     collection_name: str,
-    context: dict[str, Any] | None = None,  # pylint: disable=W0613
+    context: dict[str, Any] | None = None,  # noqa: ARG001
 ) -> bool:
     """Check if a collection exists by its name.
 
@@ -77,6 +79,7 @@ async def collections_exists(
         client: WeaviateAsyncClient instance
         name: Short collection name to check
         context: Context containing caller information
+        collection_name: Full collection name to check
 
     Returns:
         True if the collection exists, False otherwise
@@ -110,9 +113,10 @@ async def collections_create(
         The collection configuration with the short collection name
 
     """
-    assert (
-        context is not None
-    ), "Context must be provided to determine the tenant workspace"
+    if context is None:
+        error_msg = "Context must be provided to determine the tenant workspace"
+        raise ValueError(error_msg)
+
     caller_ws = ws_from_context(context)
     assert_is_admin_ws(caller_ws)
 
@@ -133,7 +137,8 @@ async def collections_list_all(
     """List all collections in the database.
 
     Verifies that the caller has admin permissions.
-    Retrieves all collections and converts their names to short names (without workspace prefix).
+    Retrieves all collections and converts their names to short names
+    (without workspace prefix).
 
     Args:
         client: WeaviateAsyncClient instance
@@ -143,9 +148,10 @@ async def collections_list_all(
         Dictionary mapping short collection names to their configuration
 
     """
-    assert (
-        context is not None
-    ), "Context must be provided to determine the tenant workspace"
+    if context is None:
+        error_msg = "Context must be provided to determine the tenant workspace"
+        raise ValueError(error_msg)
+
     caller_ws = ws_from_context(context)
     assert_is_admin_ws(caller_ws)
 
@@ -170,9 +176,10 @@ async def collections_get(
         The collection configuration with its short collection name.
 
     """
-    assert (
-        context is not None
-    ), "Context must be provided to determine the tenant workspace"
+    if context is None:
+        error_msg = "Context must be provided to determine the tenant workspace"
+        raise ValueError(error_msg)
+
     caller_ws = ws_from_context(context)
     await assert_has_collection_permission(caller_ws, name)
 
@@ -200,9 +207,10 @@ async def collections_delete(
         Success dictionary or None if operation fails
 
     """
-    assert (
-        context is not None
-    ), "Context must be provided to determine the tenant workspace"
+    if context is None:
+        error_msg = "Context must be provided to determine the tenant workspace"
+        raise ValueError(error_msg)
+
     caller_ws = ws_from_context(context)
 
     short_names = [name] if isinstance(name, str) else name
@@ -226,16 +234,20 @@ async def collections_get_artifact(
     Args:
         collection_name: Name of the collection to retrieve the artifact for
         context: Context containing caller information
+        client: WeaviateAsyncClient instance
 
     Returns:
         Dictionary with collection artifact information
 
     """
-    assert await collections_exists(
+    if not await collections_exists(
         client,
         collection_name,
         context=context,
-    ), f"Collection '{collection_name}' does not exist."
+    ):
+        error_msg = f"Collection '{collection_name}' does not exist."
+        raise ValueError(error_msg)
+
     return get_full_collection_name(collection_name)
 
 
@@ -249,23 +261,24 @@ async def applications_create(
 ) -> dict[str, Any]:
     """Create a new application.
 
-    Prepares the collection by ensuring it exists and adding the user as a tenant if needed.
-    Creates an application artifact as a child of the collection artifact.
+    Prepares the collection by ensuring it exists and adding the user as a tenant if
+    needed. Creates an application artifact as a child of the collection artifact.
 
     Args:
         client: WeaviateAsyncClient instance
         collection_name: Name of the collection for the application
         application_id: ID for the new application
         description: Description of the application
+        user_ws: Workspace ID of the user creating the application
         context: Context containing user information
 
     Returns:
         Dictionary with application details and artifact information
 
     """
-    assert (
-        context is not None
-    ), "Context must be provided to determine the tenant workspace"
+    if context is None:
+        error_msg = "Context must be provided to determine the tenant workspace"
+        raise ValueError(error_msg)
 
     caller_ws = ws_from_context(context)
     if user_ws is None:
@@ -306,6 +319,7 @@ async def applications_delete(
         client: WeaviateAsyncClient instance
         collection_name: Name of the collection containing the application
         application_id: ID of the application to delete
+        user_ws: Workspace ID of the user deleting the application
         context: Context containing user information
 
     Returns:
@@ -321,9 +335,9 @@ async def applications_delete(
     )
 
     if user_ws is None:
-        assert (
-            context is not None
-        ), "Context must be provided to determine the tenant workspace"
+        if context is None:
+            error_msg = "Context must be provided to determine the tenant workspace"
+            raise ValueError(error_msg)
         user_ws = ws_from_context(context)
 
     if await is_multitenancy_enabled(client, collection_name):
@@ -341,9 +355,9 @@ async def applications_delete(
         context=context,
     )
 
-    assert (
-        context is not None
-    ), "Context must be provided to determine the tenant workspace"
+    if context is None:
+        error_msg = "Context must be provided to determine the tenant workspace"
+        raise ValueError(error_msg)
 
     full_collection_name = get_full_collection_name(collection_name)
     caller_ws = ws_from_context(context)
@@ -364,8 +378,10 @@ async def applications_get(
     Retrieves the application artifact using the caller's ID and application ID.
 
     Args:
+        client: WeaviateAsyncClient instance
         collection_name: Name of the collection containing the application
         application_id: ID of the application to retrieve
+        user_ws: Workspace ID of the user retrieving the application
         context: Context containing caller information
 
     Returns:
@@ -393,17 +409,19 @@ async def applications_exists(
     """Check if an application exists by checking if its artifact exists.
 
     Args:
+        client: WeaviateAsyncClient instance
         collection_name: Name of the collection to check
         application_id: ID of the application to check
+        user_ws: Workspace ID of the user checking the application
         context: Context containing caller information
 
     Returns:
         Boolean indicating whether the application exists
 
     """
-    assert (
-        context is not None
-    ), "Context must be provided to determine the tenant workspace"
+    if context is None:
+        error_msg = "Context must be provided to determine the tenant workspace"
+        raise ValueError(error_msg)
 
     caller_ws = ws_from_context(context)
 
@@ -433,9 +451,11 @@ async def applications_get_artifact(
     context: dict[str, Any] | None = None,
 ) -> str:
     """Get the artifact for an application.
+
     Retrieves the application artifact using the caller's ID and application ID.
 
     Args:
+        client: WeaviateAsyncClient instance
         collection_name: Name of the collection containing the application
         application_id: ID of the application to retrieve
         user_ws: Optional user workspace to use as tenant (if different from caller)
@@ -445,9 +465,9 @@ async def applications_get_artifact(
 
     """
     if user_ws is None:
-        assert (
-            context is not None
-        ), "Context must be provided to determine the tenant workspace"
+        if context is None:
+            error_msg = "Context must be provided to determine the tenant workspace"
+            raise ValueError(error_msg)
         user_ws = ws_from_context(context)
 
     await prepare_tenant_collection(
@@ -459,13 +479,11 @@ async def applications_get_artifact(
     )
 
     full_collection_name = get_full_collection_name(collection_name)
-    artifact_name = get_application_artifact_name(
+    return get_application_artifact_name(
         full_collection_name,
         user_ws,
         application_id,
     )
-
-    return artifact_name
 
 
 async def applications_set_permissions(
@@ -474,8 +492,9 @@ async def applications_set_permissions(
     application_id: str,
     permissions: dict[str, Any],
     user_ws: str | None = None,
-    merge: bool = True,
     context: dict[str, Any] | None = None,
+    *,
+    merge: bool = True,
 ) -> None:
     """Set permissions for an application.
 
@@ -505,12 +524,13 @@ async def applications_set_permissions(
 
     artifact_data = await get_artifact(artifact_name)
 
-    logger.info(
-        "Setting permissions for application '%s' in collection '%s' with user workspace '%s'",
-        application_id,
-        collection_name,
-        user_ws or "default",
+    info_msg = (
+        f"Updating permissions for application '{application_id}'"
+        f" in collection '{collection_name}' with"
+        f" user workspace '{user_ws or 'default'}'"
     )
+
+    logger.info(info_msg)
 
     # Get current permissions from config
     current_permissions = artifact_data.get("config", {}).get("permissions", {})
@@ -538,11 +558,12 @@ async def data_insert_many(
     application_id: str,
     objects: list[dict[str, Any]],
     user_ws: str | None = None,
-    enable_chunking: bool = False,
     chunk_size: int = 512,
     chunk_overlap: int = 50,
     text_field: str = "text",
     context: dict[str, Any] | None = None,
+    *,
+    enable_chunking: bool = False,
 ) -> dict[str, Any]:
     """Insert multiple objects into the collection.
 
@@ -613,12 +634,13 @@ async def data_insert(
     application_id: str,
     properties: dict[str, Any],
     user_ws: str | None = None,
-    enable_chunking: bool = False,
     chunk_size: int = 512,
     chunk_overlap: int = 50,
     text_field: str = "text",
     context: dict[str, Any] | None = None,
-    **kwargs,
+    *,
+    enable_chunking: bool = False,
+    **kwargs: Any,
 ) -> uuid_class.UUID:
     """Insert a single object into the collection.
 
@@ -668,8 +690,10 @@ async def data_insert(
         )
         # Return the first UUID from the chunked inserts
         if result.get("uuids"):
-            return list(result["uuids"].values())[0]
-        raise RuntimeError("No UUIDs returned from chunked insert")
+            return next(iter(result["uuids"].values()))
+
+        error_msg = "No UUIDs returned from chunked insert"
+        raise RuntimeError(error_msg)
 
     app_properties = properties.copy()
     app_properties["application_id"] = application_id
@@ -683,13 +707,13 @@ async def query_near_vector(
     application_id: str,
     user_ws: str | None = None,
     context: dict[str, Any] | None = None,
-    **kwargs,
+    **kwargs: Any,
 ) -> dict[str, Any]:
     """Query the collection using vector similarity search.
 
     Gets a tenant-specific collection after verifying permissions.
-    Automatically adds application_id filter to limit results to the specified application.
-    Forwards all kwargs to collection.query.near_vector().
+    Automatically adds application_id filter to limit results to the specified
+    application. Forwards all kwargs to collection.query.near_vector().
 
     Args:
         client: WeaviateAsyncClient instance
@@ -726,13 +750,13 @@ async def query_fetch_objects(
     application_id: str,
     user_ws: str | None = None,
     context: dict[str, Any] | None = None,
-    **kwargs,
+    **kwargs: Any,
 ) -> dict[str, Any]:
     """Query the collection to fetch objects based on filters.
 
     Gets a tenant-specific collection after verifying permissions.
-    Automatically adds application_id filter to limit results to the specified application.
-    Forwards all kwargs to collection.query.fetch_objects().
+    Automatically adds application_id filter to limit results to the specified
+    application. Forwards all kwargs to collection.query.fetch_objects().
 
     Args:
         client: WeaviateAsyncClient instance
@@ -769,12 +793,13 @@ async def query_hybrid(
     application_id: str,
     user_ws: str | None = None,
     context: dict[str, Any] | None = None,
-    **kwargs,
+    **kwargs: Any,
 ) -> dict[str, Any]:
-    """Query the collection using hybrid search (combination of vector and keyword search).
+    """Query collection using hybrid search (combination of vector and keyword search).
 
     Gets a tenant-specific collection after verifying permissions.
-    Automatically adds application_id filter to limit results to the specified application.
+    Automatically adds application_id filter to limit results to the
+    specified application.
     Forwards all kwargs to collection.query.hybrid().
 
     Args:
@@ -812,12 +837,13 @@ async def generate_near_text(
     application_id: str,
     user_ws: str | None = None,
     context: dict[str, Any] | None = None,
-    **kwargs,
+    **kwargs: Any,
 ) -> dict[str, Any]:
     """Generate content based on query text and similar objects in the collection.
 
     Gets a tenant-specific collection after verifying permissions.
-    Automatically adds application_id filter to limit context to the specified application.
+    Automatically adds application_id filter to limit context to the specified
+    application.
     Forwards all kwargs to collection.generate.near_text().
 
     Args:
@@ -829,7 +855,8 @@ async def generate_near_text(
         **kwargs: Additional arguments to pass to near_text()
 
     Returns:
-        Dictionary containing objects with shortened collection names and generated content
+        Dictionary containing objects with shortened collection names and generated
+        content.
 
     """
     tenant_collection = await prepare_tenant_collection(
@@ -856,7 +883,7 @@ async def data_update(
     application_id: str,
     user_ws: str | None = None,
     context: dict[str, Any] | None = None,
-    **kwargs,
+    **kwargs: Any,
 ) -> None:
     """Update an object in the collection.
 
@@ -928,13 +955,13 @@ async def data_delete_many(
     application_id: str,
     user_ws: str | None = None,
     context: dict[str, Any] | None = None,
-    **kwargs,
+    **kwargs: Any,
 ) -> dict[str, Any]:
     """Delete many objects from the collection based on filter criteria.
 
     Gets a tenant-specific collection after verifying permissions.
-    Automatically adds application_id filter to limit deletion to objects in the specified
-    application.
+    Automatically adds application_id filter to limit deletion to objects in the
+    specified application.
     Forwards all kwargs to collection.data.delete_many().
 
     Args:

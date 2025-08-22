@@ -1,3 +1,5 @@
+"""Constants for the Mem0 service."""
+
 from hypha_startup_services.common.constants import (
     DEFAULT_MEM0_SERVICE_ID as DEFAULT_SERVICE_ID,
 )

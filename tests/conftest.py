@@ -1,10 +1,10 @@
 """Shared test fixtures and utilities across all test suites."""
 
 import os
+
 from dotenv import load_dotenv
 from hypha_rpc import connect_to_server
 from hypha_rpc.rpc import RemoteService
-
 
 # Common constants
 SERVER_URL = "https://hypha.aicell.io"
@@ -27,7 +27,7 @@ async def get_user_server(token_env="PERSONAL_TOKEN"):
         {
             "server_url": SERVER_URL,
             "token": token,
-        }
+        },
     )
 
     if not isinstance(server, RemoteService):

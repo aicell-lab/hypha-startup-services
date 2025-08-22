@@ -23,16 +23,20 @@ def chunk_text(
         List of text chunks
 
     Raises:
-        ValueError: If chunk_size <= 0, chunk_overlap < 0, or chunk_overlap >= chunk_size
+        ValueError: If chunk_size <= 0, chunk_overlap < 0,
+            or chunk_overlap >= chunk_size
 
     """
     # Validate parameters
     if chunk_size <= 0:
-        raise ValueError("chunk_size must be greater than 0")
+        error_msg = "chunk_size must be greater than 0"
+        raise ValueError(error_msg)
     if chunk_overlap < 0:
-        raise ValueError("chunk_overlap must be non-negative")
+        error_msg = "chunk_overlap must be non-negative"
+        raise ValueError(error_msg)
     if chunk_overlap >= chunk_size:
-        raise ValueError("chunk_overlap must be less than chunk_size")
+        error_msg = "chunk_overlap must be less than chunk_size"
+        raise ValueError(error_msg)
 
     # Handle None or empty text
     if not text:
@@ -44,7 +48,7 @@ def chunk_text(
     if len(tokens) <= chunk_size:
         return [text]
 
-    chunks = []
+    chunks: list[str] = []
     start = 0
 
     while start < len(tokens):

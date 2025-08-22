@@ -1,15 +1,16 @@
 """Unit tests for mem0_service artifact module."""
 
-from unittest.mock import AsyncMock, patch, MagicMock
 import contextlib
-import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from hypha_rpc.rpc import RemoteException
+
 from hypha_startup_services.common.artifacts import (
-    get_artifact,
+    artifact_exists,
     create_artifact,
     delete_artifact,
-    artifact_exists,
+    get_artifact,
 )
 from hypha_startup_services.mem0_service.utils.models import AgentArtifactParams
 from tests.conftest import USER1_WS
@@ -59,7 +60,7 @@ class TestGetArtifact:
         mock_get_server.assert_called_once_with("https://hypha.aicell.io")
         mock_server.get_service.assert_called_once_with("public/artifact-manager")
         mock_artifact_manager.read.assert_called_once_with(
-            artifact_id="test-artifact-123"
+            artifact_id="test-artifact-123",
         )
         assert result == expected_artifact
 
@@ -82,7 +83,7 @@ class TestGetArtifact:
     async def test_get_artifact_server_error(self):
         """Test artifact retrieval with server connection error."""
         with patch(
-            "hypha_startup_services.common.artifacts.get_server"
+            "hypha_startup_services.common.artifacts.get_server",
         ) as mock_get_server:
             mock_get_server.side_effect = Exception("Server connection failed")
 
@@ -106,13 +107,15 @@ class TestCreateArtifact:
 
     @pytest.mark.asyncio
     async def test_create_artifact_success(
-        self, sample_artifact_params, patch_get_server
+        self,
+        sample_artifact_params,
+        patch_get_server,
     ):
         """Test successful artifact creation."""
         mock_get_server, mock_server, mock_artifact_manager = patch_get_server
 
         with patch(
-            "hypha_startup_services.common.artifacts.artifact_exists"
+            "hypha_startup_services.common.artifacts.artifact_exists",
         ) as mock_exists:
             mock_exists.return_value = False
 
@@ -124,18 +127,20 @@ class TestCreateArtifact:
                 artifact_id=sample_artifact_params.artifact_id,
             )
             mock_artifact_manager.create.assert_called_once_with(
-                **sample_artifact_params.creation_dict
+                **sample_artifact_params.creation_dict,
             )
 
     @pytest.mark.asyncio
     async def test_create_artifact_already_exists(
-        self, sample_artifact_params, patch_get_server
+        self,
+        sample_artifact_params,
+        patch_get_server,
     ):
         """Test artifact creation when artifact already exists."""
         _, _, mock_artifact_manager = patch_get_server
 
         with patch(
-            "hypha_startup_services.common.artifacts.artifact_exists"
+            "hypha_startup_services.common.artifacts.artifact_exists",
         ) as mock_exists:
             mock_exists.return_value = True
 
@@ -150,7 +155,9 @@ class TestCreateArtifact:
 
     @pytest.mark.asyncio
     async def test_create_artifact_remote_exception(
-        self, sample_artifact_params, patch_get_server
+        self,
+        sample_artifact_params,
+        patch_get_server,
     ):
         """Test artifact creation with RemoteException."""
         _, _, mock_artifact_manager = patch_get_server
@@ -159,7 +166,7 @@ class TestCreateArtifact:
         mock_artifact_manager.create.side_effect = RemoteException(error_message)
 
         with patch(
-            "hypha_startup_services.common.artifacts.artifact_exists"
+            "hypha_startup_services.common.artifacts.artifact_exists",
         ) as mock_exists:
             mock_exists.return_value = False
 
@@ -184,7 +191,8 @@ class TestDeleteArtifact:
         mock_get_server.assert_called_once_with("https://hypha.aicell.io")
         mock_server.get_service.assert_called_once_with("public/artifact-manager")
         mock_artifact_manager.delete.assert_called_once_with(
-            artifact_id="test-artifact-123", delete_files=True
+            artifact_id="test-artifact-123",
+            delete_files=True,
         )
 
     @pytest.mark.asyncio
@@ -208,7 +216,7 @@ class TestDeleteArtifact:
     async def test_delete_artifact_server_error(self):
         """Test artifact deletion with server connection error."""
         with patch(
-            "hypha_startup_services.common.artifacts.get_server"
+            "hypha_startup_services.common.artifacts.get_server",
         ) as mock_get_server:
             mock_get_server.side_effect = Exception("Server connection failed")
 
@@ -296,7 +304,7 @@ class TestIntegration:
             mock_get.side_effect = [
                 {"id": artifact_id, "name": "Test"},  # First call - exists
                 RemoteException(
-                    "Artifact not found"
+                    "Artifact not found",
                 ),  # Second call - doesn't exist after deletion
             ]
 
@@ -312,5 +320,6 @@ class TestIntegration:
             assert exists_after is False
 
             mock_artifact_manager.delete.assert_called_once_with(
-                artifact_id=artifact_id, delete_files=True
+                artifact_id=artifact_id,
+                delete_files=True,
             )

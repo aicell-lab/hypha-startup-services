@@ -1,0 +1,5 @@
+select = ["ALL"]
+ignore = ["PLR0913", "ANN401"]
+extend-exclude = [
+	"typings/**",
+]

@@ -3,23 +3,29 @@
 import argparse
 import asyncio
 import logging
+import sys
 from argparse import Namespace
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 
 from hypha_rpc.rpc import RemoteException, RemoteService
 
-from .common.constants import (
+from hypha_startup_services.common.constants import (
     DEFAULT_LOCAL_EXISTING_HOST,
     DEFAULT_LOCAL_HOST,
     DEFAULT_LOCAL_PORT,
     DEFAULT_REMOTE_URL,
 )
-from .common.probes import add_probes
-from .common.server_utils import get_server, run_local_services
-from .common.service_registry import register_services, service_registry
+from hypha_startup_services.common.probes import add_probes
+from hypha_startup_services.common.server_utils import (
+    get_server,
+)
+from hypha_startup_services.common.service_registry import (
+    register_services,
+    service_registry,
+)
 
 
-def setup_logging():
+def setup_logging() -> None:
     """Set up logging configuration."""
     logging.basicConfig(
         level=logging.INFO,
@@ -109,7 +115,11 @@ def create_parser() -> argparse.ArgumentParser:
 
 def get_service_configurations(
     args: Namespace,
-) -> tuple[list[str], list[str], list[Callable]]:
+) -> tuple[
+    list[str],
+    list[str],
+    list[Callable[[RemoteService, str], Awaitable[None]]],
+]:
     """Extract service configurations from arguments.
 
     Args:
@@ -119,9 +129,9 @@ def get_service_configurations(
         Tuple of (service_ids, startup_function_paths, register_functions)
 
     """
-    service_ids = []
-    startup_function_paths = []
-    register_functions = []
+    service_ids: list[str] = []
+    startup_function_paths: list[str] = []
+    register_functions: list[Callable[[RemoteService, str], Awaitable[None]]] = []
 
     for service_name in args.services:
         registry = service_registry.get_service_config(service_name)
@@ -149,12 +159,13 @@ async def start_local_server(
     """Handle local services setup.
 
     Args:
-        args: Parsed command line arguments
-        service_ids: List of service IDs
-        startup_function_paths: List of startup function paths
+    args: Parsed command line arguments.
+    service_ids: List of service IDs.
+    startup_function_paths: List of startup function paths.
+    port: Port to bind the local server to.
 
     Returns:
-        Server connection if connected to existing server, None if started new server
+    Server connection if connected to existing server, None if started new server.
 
     """
     server_url = args.server_url or DEFAULT_LOCAL_HOST
@@ -166,12 +177,25 @@ async def start_local_server(
             port,
             service_id,
         )
-    await run_local_services(server_url, port, startup_function_paths)
+    # Join all startup function paths with spaces
+    startup_functions_arg = [
+        f"--startup-functions={path}" for path in startup_function_paths
+    ]
+
+    command = [
+        sys.executable,
+        "-m",
+        "hypha.server",
+        f"--host={server_url}",
+        f"--port={port}",
+        *startup_functions_arg,
+    ]
+    await asyncio.create_subprocess_shell(" ".join(command))
 
 
 async def register_services_to_server(
     server: RemoteService,
-    register_functions: list[Callable],
+    register_functions: list[Callable[[RemoteService, str], Awaitable[None]]],
     service_ids: list[str],
 ) -> None:
     """Register services to an existing server.
@@ -183,7 +207,9 @@ async def register_services_to_server(
 
     """
     for register_function, service_id in zip(
-        register_functions, service_ids, strict=False
+        register_functions,
+        service_ids,
+        strict=False,
     ):
         await register_function(server, service_id)
         logger.info("Registered service %s", service_id)
@@ -191,7 +217,7 @@ async def register_services_to_server(
 
 async def serve_services(
     server: RemoteService,
-    register_functions: list[Callable],
+    register_functions: list[Callable[[RemoteService, str], Awaitable[None]]],
     service_ids: list[str],
     probes_service_id: str | None = None,
 ) -> None:
@@ -263,7 +289,7 @@ async def handle_services(args: Namespace) -> None:
 
 
 def main() -> None:
-    """Main entry point."""
+    """Run the CLI entry point."""
     # Register all available services
     register_services()
 

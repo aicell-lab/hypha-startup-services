@@ -9,9 +9,13 @@ This example shows how to:
 
 import asyncio
 import os
+from typing import TYPE_CHECKING, Any
+
 from dotenv import load_dotenv
 from hypha_rpc import connect_to_server
-from hypha_rpc.rpc import RemoteService
+
+if TYPE_CHECKING:
+    from hypha_rpc.rpc import RemoteService, ServiceProxy
 
 
 async def main():
@@ -26,11 +30,11 @@ async def main():
         {
             "server_url": "https://hypha.aicell.io",
             "token": token,
-        }
-    )  # type: ignore
+        },
+    )
 
     # Get the Weaviate service
-    weaviate_service: RemoteService = await server.get_service("weaviate")  # type: ignore
+    weaviate_service: ServiceProxy = await server.get_service("weaviate")
 
     try:
         # 1. Create a Movie Collection
@@ -38,7 +42,7 @@ async def main():
         print("\n1. Creating Movie Collection...")
 
         # Define collection schema
-        class_obj = {
+        class_obj: dict[str, Any] = {
             "class": "Movie",
             "description": "A movie collection",
             "properties": [
@@ -69,7 +73,7 @@ async def main():
                         "text2vec-ollama": {
                             "model": "llama3.2",
                             "apiEndpoint": "https://hypha-ollama.scilifelab-2-dev.sys.kth.se",
-                        }
+                        },
                     },
                     "sourceProperties": ["title"],
                     "vectorIndexType": "hnsw",
@@ -80,7 +84,7 @@ async def main():
                         "text2vec-ollama": {
                             "model": "llama3.2",
                             "apiEndpoint": "https://hypha-ollama.scilifelab-2-dev.sys.kth.se",
-                        }
+                        },
                     },
                     "sourceProperties": ["description"],
                     "vectorIndexType": "hnsw",
@@ -91,7 +95,7 @@ async def main():
                 "generative-ollama": {
                     "model": "llama3.2",
                     "apiEndpoint": "https://hypha-ollama.scilifelab-2-dev.sys.kth.se",
-                }
+                },
             },
         }
 
@@ -115,7 +119,8 @@ async def main():
         }
 
         uuid = await weaviate_service.data.insert(
-            collection_name="Movie", properties=movie
+            collection_name="Movie",
+            properties=movie,
         )
         print("Inserted movie with UUID:", uuid)
 
@@ -136,7 +141,8 @@ async def main():
         ]
 
         result = await weaviate_service.data.insert_many(
-            collection_name="Movie", objects=movies
+            collection_name="Movie",
+            objects=movies,
         )
         print("Inserted multiple movies:", result["uuids"])
 
@@ -146,7 +152,8 @@ async def main():
 
         # Fetch all movies
         query_result = await weaviate_service.query.fetch_objects(
-            collection_name="Movie", limit=10
+            collection_name="Movie",
+            limit=10,
         )
         print("\nAll movies:")
         for obj in query_result["objects"]:

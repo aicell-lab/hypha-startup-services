@@ -1,6 +1,7 @@
 """Service methods for the BioImage service."""
 
 import logging
+from collections.abc import Callable, Coroutine
 from typing import Any
 
 from hypha_rpc.utils.schema import schema_function
@@ -25,12 +26,15 @@ async def search(
     bioimage_index: BioimageIndex,
     query_text: str,
     entity_types: list[str] | None = None,
-    include_related: bool = True,
     limit: int = 10,
-    context: dict[str, Any] | None = None,
+    *,
+    include_related: bool = True,
+    context: dict[str, Any] | None = None,  # noqa: ARG001
 ) -> dict[str, Any]:
     """Unified query method that combines semantic search with related entity lookup.
-    This replaces the separate semantic_query and find_related_entities_semantic methods.
+
+    This replaces the separate semantic_query and
+    find_related_entities_semantic methods.
 
     Args:
         memory: AsyncMemory instance for semantic search
@@ -52,9 +56,10 @@ async def search(
         valid_types = {"node", "technology"}
         invalid_types = set(entity_types) - valid_types
         if invalid_types:
-            raise ValueError(
-                f"Invalid entity types: {invalid_types}. Must be 'node' or 'technology'",
+            error_msg = (
+                f"Invalid entity types: {invalid_types}. Must be 'node' or 'technology'"
             )
+            raise ValueError(error_msg)
 
     # Step 1: Perform semantic search
     semantic_results = await semantic_bioimage_search(
@@ -117,43 +122,59 @@ async def search(
     }
 
 
-def create_search(memory: AsyncMemory, bioimage_index: BioimageIndex):
+def create_search(
+    memory: AsyncMemory,
+    bioimage_index: BioimageIndex,
+) -> Callable[[], Coroutine[Any, Any, dict[str, Any]]]:
     """Create a search function with injected dependencies."""
+    query_text_field = Field(
+        description="Natural language query to search bioimage data",
+    )
+
+    entity_types_field = Field(
+        default=None,
+        description=(
+            "Filter by entity types: 'node', 'technology', or both."
+            " Defaults to both if not specified."
+        ),
+    )
+
+    limit_field = Field(
+        default=10,
+        description="Maximum number of results to return",
+    )
+
+    include_related_field = Field(
+        default=True,
+        description="Whether to include related entities for each result",
+    )
 
     @schema_function
     async def search_func(
-        query_text: str = Field(
-            description="Natural language query to search bioimage data",
-        ),
-        entity_types: list[str] | None = Field(
-            default=None,
-            description="Filter by entity types: 'node', 'technology', or both. Defaults to both if not specified.",
-        ),
-        include_related: bool = Field(
-            default=True,
-            description="Whether to include related entities for each result",
-        ),
-        limit: int = Field(
-            default=10,
-            description="Maximum number of results to return",
-        ),
+        query_text: str = query_text_field,
+        entity_types: list[str] | None = entity_types_field,
+        limit: int = limit_field,
         context: dict[str, Any] | None = None,
+        *,
+        include_related: bool = include_related_field,
     ) -> dict[str, Any]:
-        """Unified query method that combines semantic search with related entity lookup."""
+        """Unified query method: combines semantic search with related entity lookup."""
         return await search(
             memory,
             bioimage_index,
             query_text,
             entity_types,
-            include_related,
             limit,
-            context,
+            include_related=include_related,
+            context=context,
         )
 
     return search_func
 
 
-def create_get_entity_details(bioimage_index: BioimageIndex):
+def create_get_entity_details(
+    bioimage_index: BioimageIndex,
+) -> Callable[[], Coroutine[Any, Any, dict[str, Any]]]:
     """Create a get_entity_details function with injected bioimage index."""
 
     @schema_function
@@ -167,7 +188,9 @@ def create_get_entity_details(bioimage_index: BioimageIndex):
     return get_entity_details_func
 
 
-def create_get_related_entities(bioimage_index: BioimageIndex):
+def create_get_related_entities(
+    bioimage_index: BioimageIndex,
+) -> Callable[[], Coroutine[Any, Any, list[dict[str, Any]]]]:
     """Create a get_related_entities function with injected bioimage index."""
 
     @schema_function

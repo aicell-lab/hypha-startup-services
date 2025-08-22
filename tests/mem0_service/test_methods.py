@@ -1,17 +1,18 @@
 """Unit tests for mem0_service methods module."""
 
 from unittest.mock import AsyncMock, patch
+
 import pytest
 
+from hypha_startup_services.common.permissions import HyphaPermissionError
 from hypha_startup_services.mem0_service.methods import (
     init_agent,
     init_run,
     mem0_add,
     mem0_search,
 )
-from hypha_startup_services.common.permissions import HyphaPermissionError
 from tests.conftest import USER1_WS, USER2_WS
-from tests.mem0_service.utils import TEST_AGENT_ID, TEST_RUN_ID, TEST_MESSAGES
+from tests.mem0_service.utils import TEST_AGENT_ID, TEST_MESSAGES, TEST_RUN_ID
 
 
 @pytest.fixture
@@ -37,7 +38,7 @@ def patch_get_server_permissions():
     """Patch get_server for permissions module."""
     mock_server = AsyncMock()
     with patch(
-        "hypha_startup_services.common.permissions.get_server"
+        "hypha_startup_services.common.permissions.get_server",
     ) as mock_get_server:
         mock_get_server.return_value = mock_server
         yield mock_get_server, mock_server
@@ -53,7 +54,7 @@ class TestInitAgent:
         context = {"user": {"scope": {"current_workspace": USER1_WS}}}
 
         with patch(
-            "hypha_startup_services.mem0_service.methods.create_artifact"
+            "hypha_startup_services.mem0_service.methods.create_artifact",
         ) as mock_create:
             await init_agent(
                 agent_id=TEST_AGENT_ID,
@@ -79,7 +80,7 @@ class TestInitAgent:
         context = {"user": {"scope": {"current_workspace": USER1_WS}}}
 
         with patch(
-            "hypha_startup_services.mem0_service.methods.create_artifact"
+            "hypha_startup_services.mem0_service.methods.create_artifact",
         ) as mock_create:
             await init_agent(
                 agent_id=TEST_AGENT_ID,
@@ -99,7 +100,7 @@ class TestInitAgent:
         context = {"user": {"scope": {"current_workspace": USER1_WS}}}
 
         with patch(
-            "hypha_startup_services.mem0_service.methods.create_artifact"
+            "hypha_startup_services.mem0_service.methods.create_artifact",
         ) as mock_create:
             mock_create.side_effect = Exception("Creation failed")
 
@@ -120,7 +121,7 @@ class TestInitRun:
         context = {"user": {"scope": {"current_workspace": USER1_WS}}}
 
         with patch(
-            "hypha_startup_services.mem0_service.methods.create_artifact"
+            "hypha_startup_services.mem0_service.methods.create_artifact",
         ) as mock_create:
             await init_run(
                 agent_id=TEST_AGENT_ID,
@@ -154,7 +155,7 @@ class TestInitRun:
         context = {"user": {"scope": {"current_workspace": USER1_WS}}}
 
         with patch(
-            "hypha_startup_services.mem0_service.methods.create_artifact"
+            "hypha_startup_services.mem0_service.methods.create_artifact",
         ) as mock_create:
             await init_run(
                 agent_id=TEST_AGENT_ID,
@@ -176,7 +177,7 @@ class TestInitRun:
         context = {"user": {"scope": {"current_workspace": USER1_WS}}}
 
         with patch(
-            "hypha_startup_services.mem0_service.methods.create_artifact"
+            "hypha_startup_services.mem0_service.methods.create_artifact",
         ) as mock_create:
             await init_run(
                 agent_id=TEST_AGENT_ID,
@@ -202,10 +203,10 @@ class TestMem0Add:
 
         with (
             patch(
-                "hypha_startup_services.mem0_service.methods.require_permission"
+                "hypha_startup_services.mem0_service.methods.require_permission",
             ) as mock_require,
             patch(
-                "hypha_startup_services.mem0_service.methods.artifact_exists"
+                "hypha_startup_services.mem0_service.methods.artifact_exists",
             ) as mock_exists,
         ):
             mock_exists.return_value = True  # Artifact must exist for mem0_add
@@ -245,10 +246,10 @@ class TestMem0Add:
 
         with (
             patch(
-                "hypha_startup_services.mem0_service.methods.require_permission"
+                "hypha_startup_services.mem0_service.methods.require_permission",
             ) as mock_require,
             patch(
-                "hypha_startup_services.mem0_service.methods.artifact_exists"
+                "hypha_startup_services.mem0_service.methods.artifact_exists",
             ) as mock_exists,
         ):
             mock_exists.return_value = True
@@ -274,10 +275,10 @@ class TestMem0Add:
 
         with (
             patch(
-                "hypha_startup_services.mem0_service.methods.require_permission"
+                "hypha_startup_services.mem0_service.methods.require_permission",
             ) as mock_require,
             patch(
-                "hypha_startup_services.mem0_service.methods.artifact_exists"
+                "hypha_startup_services.mem0_service.methods.artifact_exists",
             ) as mock_exists,
         ):
             mock_exists.return_value = True
@@ -308,16 +309,16 @@ class TestMem0Search:
         """Test successful memory search."""
         mock_memory = AsyncMock()
         mock_memory.search.return_value = {
-            "results": [{"id": "1", "memory": "test", "score": 0.9}]
+            "results": [{"id": "1", "memory": "test", "score": 0.9}],
         }
         context = {"user": {"scope": {"current_workspace": USER1_WS}}}
 
         with (
             patch(
-                "hypha_startup_services.mem0_service.methods.require_permission"
+                "hypha_startup_services.mem0_service.methods.require_permission",
             ) as mock_require,
             patch(
-                "hypha_startup_services.mem0_service.methods.artifact_exists"
+                "hypha_startup_services.mem0_service.methods.artifact_exists",
             ) as mock_exists,
         ):
             mock_exists.return_value = True
@@ -359,10 +360,10 @@ class TestMem0Search:
 
         with (
             patch(
-                "hypha_startup_services.mem0_service.methods.require_permission"
+                "hypha_startup_services.mem0_service.methods.require_permission",
             ) as mock_require,
             patch(
-                "hypha_startup_services.mem0_service.methods.artifact_exists"
+                "hypha_startup_services.mem0_service.methods.artifact_exists",
             ) as mock_exists,
         ):
             mock_exists.return_value = True
@@ -390,7 +391,7 @@ class TestMem0Search:
         with (
             patch("hypha_startup_services.mem0_service.methods.require_permission"),
             patch(
-                "hypha_startup_services.mem0_service.methods.artifact_exists"
+                "hypha_startup_services.mem0_service.methods.artifact_exists",
             ) as mock_exists,
         ):
             mock_exists.return_value = True
@@ -414,7 +415,7 @@ class TestMem0Search:
         with (
             patch("hypha_startup_services.mem0_service.methods.require_permission"),
             patch(
-                "hypha_startup_services.mem0_service.methods.artifact_exists"
+                "hypha_startup_services.mem0_service.methods.artifact_exists",
             ) as mock_exists,
         ):
             mock_exists.return_value = True

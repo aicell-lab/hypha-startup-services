@@ -1,12 +1,16 @@
-#!/usr/bin/env python3
 """Export all objects from the shared bioimage application in Weaviate to a JSON file."""
+
 import asyncio
 import json
 import logging
 import os
+from typing import TYPE_CHECKING
 
 from hypha_rpc import connect_to_server
-from hypha_rpc.rpc import RemoteService
+
+if TYPE_CHECKING:
+    from hypha_rpc.rpc import RemoteService
+
 
 COLLECTION_NAME = "bioimage_data"
 SHARED_APPLICATION_ID = "eurobioimaging-shared"

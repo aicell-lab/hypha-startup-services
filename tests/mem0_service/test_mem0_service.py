@@ -2,14 +2,15 @@
 
 import pytest
 from hypha_rpc.rpc import RemoteException
+
+from tests.conftest import USER1_WS
 from tests.mem0_service.utils import (
-    TEST_AGENT_ID,
-    TEST_RUN_ID,
-    TEST_MESSAGES,
     SEARCH_QUERY_MOVIES,
+    TEST_AGENT_ID,
+    TEST_MESSAGES,
+    TEST_RUN_ID,
     cleanup_mem0_memories,
 )
-from tests.conftest import USER1_WS
 
 
 @pytest.mark.asyncio

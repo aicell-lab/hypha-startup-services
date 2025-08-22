@@ -1,3 +1,5 @@
+"""Weaviate service constants."""
+
 from hypha_startup_services.common.constants import (
     ADMIN_WORKSPACES,
     ARTIFACT_DELIMITER,

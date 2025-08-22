@@ -2,7 +2,7 @@
 
 import json
 import logging
-import os
+from pathlib import Path
 from typing import Any
 
 from hypha_rpc.rpc import schema_function
@@ -22,9 +22,7 @@ def html_to_markdown(html_text: str) -> str:
 
     # Clean up common formatting issues
     markdown_text = markdown_text.replace("\n\n\n", "\n\n")  # Remove triple newlines
-    markdown_text = markdown_text.replace("\\*", "*")  # Fix escaped asterisks
-
-    return markdown_text
+    return markdown_text.replace("\\*", "*")  # Fix escaped asterisks
 
 
 def process_node_data(node: dict[str, Any]) -> dict[str, Any]:
@@ -64,7 +62,8 @@ def process_technology_data(tech: dict[str, Any]) -> dict[str, Any]:
 class BioimageIndex:
     """Index for fast lookup of EBI nodes and technologies relationships."""
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Initialize the BioimageIndex."""
         self.nodes: dict[str, dict[str, Any]] = {}
         self.technologies: dict[str, dict[str, Any]] = {}
         self.node_to_technologies: dict[str, set[str]] = {}
@@ -76,7 +75,7 @@ class BioimageIndex:
         self,
         nodes_data: list[dict[str, Any]],
         technologies_data: list[dict[str, Any]],
-    ):
+    ) -> None:
         """Load and index the EBI data."""
         # Process and index technologies
         for tech in technologies_data:
@@ -177,20 +176,18 @@ class BioimageIndex:
     def search_nodes_by_name(self, name: str) -> list[dict[str, Any]]:
         """Search nodes by name (case-insensitive partial match)."""
         name_lower = name.lower()
-        results = []
-        for node in self.nodes.values():
-            if name_lower in node["name"].lower():
-                results.append(node)
-        return results
+        return [
+            node for node in self.nodes.values() if name_lower in node["name"].lower()
+        ]
 
     def search_technologies_by_name(self, name: str) -> list[dict[str, Any]]:
         """Search technologies by name (case-insensitive partial match)."""
         name_lower = name.lower()
-        results = []
-        for tech in self.technologies.values():
-            if name_lower in tech["name"].lower():
-                results.append(tech)
-        return results
+        return [
+            tech
+            for tech in self.technologies.values()
+            if name_lower in tech["name"].lower()
+        ]
 
     def get_all_nodes(self) -> list[dict[str, Any]]:
         """Get all nodes."""
@@ -224,20 +221,16 @@ def load_external_data(
     """Load data from external JSON files."""
     # Default to assets directory if no files specified
     if nodes_file is None:
-        nodes_file = os.path.join(os.path.dirname(__file__), "assets", "ebi-nodes.json")
+        nodes_file = str(Path(__file__).parent / "assets" / "ebi-nodes.json")
     if technologies_file is None:
-        technologies_file = os.path.join(
-            os.path.dirname(__file__),
-            "assets",
-            "ebi-tech.json",
-        )
+        technologies_file = str(Path(__file__).parent / "assets" / "ebi-tech.json")
 
     nodes_data = []
     technologies_data = []
 
-    if nodes_file and os.path.exists(nodes_file):
+    if nodes_file and Path(nodes_file).exists():
         try:
-            with open(nodes_file, encoding="utf-8") as f:
+            with Path(nodes_file).open(encoding="utf-8") as f:
                 nodes_data = json.load(f)
             logger.info("Loaded nodes data from %s", nodes_file)
         except (OSError, json.JSONDecodeError) as e:
@@ -247,9 +240,9 @@ def load_external_data(
                 e,
             )
 
-    if technologies_file and os.path.exists(technologies_file):
+    if technologies_file and Path(technologies_file).exists():
         try:
-            with open(technologies_file, encoding="utf-8") as f:
+            with Path(technologies_file).open(encoding="utf-8") as f:
                 technologies_data = json.load(f)
             logger.info("Loaded technologies data from %s", technologies_file)
         except (OSError, json.JSONDecodeError) as e:
@@ -270,14 +263,16 @@ async def get_entity_details(
     entity_id: str = Field(
         description="The ID of the entity (node or technology) to retrieve",
     ),
-    context: dict[str, Any] | None = None,
+    context: dict[str, Any] | None = None,  # noqa: ARG001
 ) -> dict[str, Any]:
     """Get details for a specific entity (node or technology).
+
     Entity type is inferred if not provided.
 
     Args:
         bioimage_index: The bioimage index containing entity data
         entity_id: The ID of the entity to retrieve.
+        context: The context for the request.
 
     Returns:
         A dictionary containing the entity details.
@@ -294,7 +289,8 @@ async def get_entity_details(
         entity_type = "technology"
 
         if not entity:
-            raise ValueError(f"Entity not found: {entity_id}")
+            error_msg = f"Entity not found: {entity_id}"
+            raise ValueError(error_msg)
 
     return {
         "entity_id": entity_id,
@@ -309,14 +305,16 @@ def get_related_entities(
     entity_id: str = Field(
         description="The ID of the entity to find relationships for",
     ),
-    context: dict[str, Any] | None = None,
+    context: dict[str, Any] | None = None,  # noqa: ARG001
 ) -> list[dict[str, Any]]:
     """Get entities related to a specific entity.
+
     Entity type is inferred if not provided.
 
     Args:
         bioimage_index: The bioimage index containing relationship data
         entity_id: The ID of the entity to find relationships for.
+        context: The context for the request.
 
     Returns:
         A list of related entities.
@@ -331,7 +329,8 @@ def get_related_entities(
     if bioimage_index.get_technology_by_id(entity_id):
         return bioimage_index.get_nodes_by_technology_id(entity_id)
 
-    raise ValueError(f"Entity not found: {entity_id}")
+    error_msg = f"Entity not found: {entity_id}"
+    raise ValueError(error_msg)
 
 
 def _get_object_property_dict(
@@ -349,14 +348,16 @@ def _get_object_property_dict(
     }
 
 
-def _extract_object_properties(result_obj: Any) -> dict[str, Any]:
-    """Extract properties from a result object, handling both dict and Weaviate Object structures.
+def _extract_object_properties(result_obj: dict[str, Any]) -> dict[str, Any]:
+    """Extract properties from a result object, handling both dict and Weaviate Objects.
 
     Args:
-        result_obj: The result object from a query (could be dict or Weaviate Object)
+        result_obj: The result object from a query (could be dict or Weaviate
+        Object)
 
     Returns:
-        A dictionary with extracted properties (entity_id, entity_type, text, country, description, name)
+        A dictionary with extracted properties (entity_id, entity_type, text, country,
+        description, name)
 
     """
     if hasattr(result_obj, "properties") and hasattr(result_obj, "uuid"):
@@ -393,7 +394,8 @@ def add_related_entities(
 
     Args:
         bioimage_index (BioimageIndex): The bioimage index to use for lookups.
-        objects (list[dict[str, Any]]): The list of bioimage objects to find related entities for.
+        objects (list[dict[str, Any]]): The list of bioimage objects to find related
+        entities for.
 
     Returns:
         list[dict[str, Any]]: A list of enhanced bioimage objects with related entities.

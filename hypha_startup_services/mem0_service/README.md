@@ -9,6 +9,7 @@ An AI-powered memory management service built on [Mem0](https://mem0.ai/) that p
 Initialize an agent by creating an artifact for the agent in the workspace.
 
 **Parameters:**
+
 - `agent_id` (str): ID of the agent
 - `description` (str, optional): Optional description for the artifact
 - `metadata` (dict, optional): Optional metadata for the artifact
@@ -16,6 +17,7 @@ Initialize an agent by creating an artifact for the agent in the workspace.
 **Returns:** None
 
 **Example:**
+
 ```python
 import asyncio
 from hypha_rpc import connect_to_server
@@ -41,6 +43,7 @@ Initialize a run by creating artifacts for the agent and the specific run.
 This creates two artifacts: a base artifact for the agent in the workspace and a specific artifact for this run.
 
 **Parameters:**
+
 - `agent_id` (str): ID of the agent
 - `workspace` (str, optional): Workspace for the run
 - `run_id` (str, optional): ID of the run
@@ -50,6 +53,7 @@ This creates two artifacts: a base artifact for the agent in the workspace and a
 **Returns:** None
 
 **Example:**
+
 ```python
 await mem0.init(
     agent_id="research-assistant",
@@ -64,6 +68,7 @@ await mem0.init(
 Add memories from messages.
 
 **Parameters:**
+
 - `messages` (list): List of message dictionaries with 'role' and 'content'
 - `agent_id` (str, optional): ID of the agent
 - `run_id` (str, optional): ID of the run
@@ -73,6 +78,7 @@ Add memories from messages.
 **Returns:** Dictionary with added memories
 
 **Example:**
+
 ```python
 messages = [
     {"role": "user", "content": "I'm working on machine learning"},
@@ -93,6 +99,7 @@ result = await mem0.add(
 Search for memories using a query.
 
 **Parameters:**
+
 - `query` (str): Search query text
 - `agent_id` (str, optional): ID of the agent
 - `run_id` (str, optional): ID of the run
@@ -102,6 +109,7 @@ Search for memories using a query.
 **Returns:** Dictionary with search results
 
 **Example:**
+
 ```python
 result = await mem0.search(
     query="machine learning projects",
@@ -117,6 +125,7 @@ result = await mem0.search(
 Get all memories with optional filtering.
 
 **Parameters:**
+
 - `agent_id` (str, optional): ID of the agent
 - `run_id` (str, optional): ID of the run
 - `user_id` (str, optional): ID of the user
@@ -126,6 +135,7 @@ Get all memories with optional filtering.
 **Returns:** Dictionary with all matching memories
 
 **Example:**
+
 ```python
 result = await mem0.get_all(
     agent_id="research-assistant",
@@ -140,6 +150,7 @@ result = await mem0.get_all(
 Delete all memories for specified agent/run/user.
 
 **Parameters:**
+
 - `agent_id` (str, optional): ID of the agent
 - `run_id` (str, optional): ID of the run
 - `user_id` (str, optional): ID of the user
@@ -147,6 +158,7 @@ Delete all memories for specified agent/run/user.
 **Returns:** Confirmation of deletion
 
 **Example:**
+
 ```python
 result = await mem0.delete_all(
     agent_id="research-assistant",
@@ -161,6 +173,7 @@ result = await mem0.delete_all(
 Set permissions for an agent in the memory service.
 
 **Parameters:**
+
 - `agent_id` (str): ID of the agent to set permissions for
 - `permissions` (dict[str, str]): Dictionary of permissions to set
 - `workspace` (str, optional): Workspace of the user setting the permissions
@@ -170,6 +183,7 @@ Set permissions for an agent in the memory service.
 **Returns:** None
 
 **Example:**
+
 ```python
 await mem0.set_permissions(
     agent_id="research-assistant",

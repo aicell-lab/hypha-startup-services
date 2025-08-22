@@ -1,0 +1,3 @@
+from typing import Any, Type
+
+def create_model_from_schema(schema: dict[str, Any]) -> Type[Any]: ...

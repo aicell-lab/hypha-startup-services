@@ -44,7 +44,15 @@ class HyphaPermissionError(Exception):
         self,
         message: str,
         permission_params: "BasePermissionParams | None" = None,
-    ):
+    ) -> None:
+        """Initialize HyphaPermissionError.
+
+        Args:
+            message (str): Error message.
+            permission_params (BasePermissionParams | None, optional):
+                Permission parameters associated with the error. Defaults to None.
+
+        """
         self.permission_params = permission_params
         super().__init__(message)
 
@@ -83,10 +91,12 @@ class ArtifactPermissionParams(BasePermissionParams):
 
     @property
     def artifact_id(self) -> str:
+        """Get the artifact ID."""
         return self.artifact_name
 
     @property
     def resource_description(self) -> str:
+        """Get a human-readable description of the resource."""
         return f"artifact '{self.artifact_name}'"
 
 
@@ -109,6 +119,12 @@ class AgentPermissionParams(BasePermissionParams):
 
     @property
     def resource_description(self) -> str:
+        """Get a human-readable description of the resource.
+
+        Returns:
+            str: A description of the resource.
+
+        """
         desc = f"agent '{self.agent_id}' in workspace '{self.accessed_workspace}'"
         if self.run_id:
             desc += f" with run '{self.run_id}'"
@@ -134,7 +150,11 @@ class ApplicationPermissionParams(BasePermissionParams):
 
     @property
     def resource_description(self) -> str:
-        return f"application '{self.application_id}' in collection '{self.collection_name}'"
+        """Get a human-readable description of the resource."""
+        return (
+            f"application '{self.application_id}'"
+            f" in collection '{self.collection_name}'"
+        )
 
 
 class CollectionPermissionParams(BasePermissionParams):
@@ -152,6 +172,12 @@ class CollectionPermissionParams(BasePermissionParams):
 
     @property
     def resource_description(self) -> str:
+        """Get a human-readable description of the resource.
+
+        Returns:
+            str: A description of the resource.
+
+        """
         if len(self.collection_names) == 1:
             return f"collection '{self.collection_names[0]}'"
         return f"collections {self.collection_names}"
@@ -185,11 +211,8 @@ async def get_user_permissions(
     try:
         artifact = await get_artifact(permission_params.artifact_id)
     except RemoteException as e:
-        logger.error(
-            "Failed to retrieve artifact %s: %s",
-            permission_params.artifact_id,
-            e,
-        )
+        error_msg = f"Failed to retrieve artifact {permission_params.artifact_id}: {e}"
+        logger.exception(error_msg)
         return {}
 
     permissions = artifact.get("config", {}).get("permissions", {})
@@ -213,9 +236,8 @@ async def user_has_operation_permission(
     if user_permissions == "*":
         return True
 
-    if isinstance(user_permissions, str):
-        if user_permissions in ("*", "rw+"):
-            return True
+    if isinstance(user_permissions, str) and user_permissions in ("*", "rw+"):
+        return True
 
     return permission_params.operation in user_permissions
 
@@ -225,7 +247,8 @@ async def has_permission(
 ) -> bool:
     """Check if a user has permission to perform an operation.
 
-    First checks if the user is in admin workspaces, then checks artifact-specific permissions.
+    First checks if the user is in admin workspaces,
+    then checks artifact-specific permissions.
 
     Args:
         permission_params: The permission parameters
@@ -289,11 +312,11 @@ async def require_permission(
 
     """
     if not await has_permission(permission_params):
-        raise HyphaPermissionError(
+        error_msg = (
             f"Permission denied for {permission_params.operation} operation "
-            f"on {permission_params.resource_description}",
-            permission_params,
+            f"on {permission_params.resource_description}"
         )
+        raise HyphaPermissionError(error_msg, permission_params)
 
 
 def make_artifact_permissions(owners: str | list[str]) -> dict[str, str]:
@@ -332,9 +355,8 @@ def make_artifact_permissions(owners: str | list[str]) -> dict[str, str]:
 def assert_is_admin_ws(user_ws: str) -> None:
     """Assert that user has admin permissions."""
     if not is_admin_workspace(user_ws):
-        raise HyphaPermissionError(
-            f"User workspace '{user_ws}' is not an admin workspace",
-        )
+        error_msg = f"User workspace '{user_ws}' is not an admin workspace"
+        raise HyphaPermissionError(error_msg)
 
 
 async def assert_has_artifact_permission(

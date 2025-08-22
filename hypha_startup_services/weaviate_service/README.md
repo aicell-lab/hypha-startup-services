@@ -11,12 +11,14 @@ Create a new collection.
 Verifies that the caller has admin permissions. Adds workspace prefix to collection name before creating it. Creates a collection artifact to track the collection.
 
 **Parameters:**
+
 - `settings` (dict): Collection configuration settings. For a full example configuration, see
 [weaviate_bioimage_service](../weaviate_bioimage_service/populate_shared_bioimage_data.py)
 
 **Returns:** The collection configuration with the short collection name
 
 **Example:**
+
 ```python
 import asyncio
 from hypha_rpc import connect_to_server
@@ -47,11 +49,13 @@ Delete a collection by name.
 Verifies that the caller has admin permissions. Removes the collection and its associated artifact.
 
 **Parameters:**
+
 - `name` (str | list): Short collection name to delete
 
 **Returns:** Confirmation of deletion
 
 **Example:**
+
 ```python
 result = await weaviate.collections.delete("Movie")
 # Returns confirmation of deletion
@@ -66,6 +70,7 @@ Returns collections based on caller's permissions. Admin users see all collectio
 **Returns:** Dictionary mapping collection names to their configurations
 
 **Example:**
+
 ```python
 collections = await weaviate.collections.list_all()
 ```
@@ -75,11 +80,13 @@ collections = await weaviate.collections.list_all()
 Get a collection's configuration by name.
 
 **Parameters:**
+
 - `name` (str): Short collection name to retrieve
 
 **Returns:** Collection configuration
 
 **Example:**
+
 ```python
 collection = await weaviate.collections.get("Movie")
 ```
@@ -91,11 +98,13 @@ Get the artifact for a collection.
 Retrieves the collection artifact using the caller's workspace and collection name.
 
 **Parameters:**
+
 - `collection_name` (str): Name of the collection to retrieve the artifact for
 
 **Returns:** Dictionary with collection artifact information
 
 **Example:**
+
 ```python
 artifact = await weaviate.collections.get_artifact("Movie")
 ```
@@ -105,11 +114,13 @@ artifact = await weaviate.collections.get_artifact("Movie")
 Check if a collection exists.
 
 **Parameters:**
+
 - `name` (str): Short collection name to check
 
 **Returns:** True if collection exists, False otherwise
 
 **Example:**
+
 ```python
 exists = await weaviate.collections.exists("Movie")
 ```
@@ -119,6 +130,7 @@ exists = await weaviate.collections.exists("Movie")
 Create a new application within a collection.
 
 **Parameters:**
+
 - `collection_name` (str): Name of the collection
 - `application_id` (str): Unique identifier for the application
 - `description` (str): Description of the application
@@ -126,6 +138,7 @@ Create a new application within a collection.
 **Returns:** Application creation confirmation
 
 **Example:**
+
 ```python
 result = await weaviate.applications.create(
     collection_name="Movie",
@@ -139,12 +152,14 @@ result = await weaviate.applications.create(
 Check if an application exists within a collection.
 
 **Parameters:**
+
 - `collection_name` (str): Name of the collection
 - `application_id` (str): Application identifier to check
 
 **Returns:** True if application exists, False otherwise
 
 **Example:**
+
 ```python
 exists = await weaviate.applications.exists("Movie", "movie-recommender")
 ```
@@ -156,12 +171,14 @@ Get the artifact for an application.
 Retrieves the application artifact using the caller's workspace, collection name, and application ID.
 
 **Parameters:**
+
 - `collection_name` (str): Name of the collection
 - `application_id` (str): Application identifier
 
 **Returns:** Dictionary with application artifact information
 
 **Example:**
+
 ```python
 artifact = await weaviate.applications.get_artifact("Movie", "movie-recommender")
 ```
@@ -173,6 +190,7 @@ Set permissions for an application.
 Updates the application artifact with the provided permissions. Verifies that the caller has permission to access the application.
 
 **Parameters:**
+
 - `collection_name` (str): Name of the collection
 - `application_id` (str): Application identifier
 - `permissions` (dict): Dictionary of permissions to set
@@ -182,6 +200,7 @@ Updates the application artifact with the provided permissions. Verifies that th
 **Returns:** None
 
 **Example:**
+
 ```python
 await weaviate.applications.set_permissions(
     collection_name="Movie",
@@ -196,12 +215,14 @@ await weaviate.applications.set_permissions(
 Delete an application and all its associated data from a collection.
 
 **Parameters:**
+
 - `collection_name` (str): Name of the collection
 - `application_id` (str): Application identifier
 
 **Returns:** Deletion result
 
 **Example:**
+
 ```python
 result = await weaviate.applications.delete(
     collection_name="Movie",
@@ -214,12 +235,14 @@ result = await weaviate.applications.delete(
 Get metadata and artifact information for an application.
 
 **Parameters:**
+
 - `collection_name` (str): Name of the collection
 - `application_id` (str): Application identifier
 
 **Returns:** Application metadata and artifact information
 
 **Example:**
+
 ```python
 result = await weaviate.applications.get(
     collection_name="Movie",
@@ -232,6 +255,7 @@ result = await weaviate.applications.get(
 Insert multiple objects into a collection.
 
 **Parameters:**
+
 - `collection_name` (str): Name of the collection
 - `application_id` (str): Application identifier
 - `objects` (list): List of objects to insert
@@ -239,6 +263,7 @@ Insert multiple objects into a collection.
 **Returns:** Insertion results
 
 **Example:**
+
 ```python
 objects = [
     {"title": "The Matrix", "genre": "Sci-Fi"},
@@ -252,6 +277,7 @@ result = await weaviate.data.insert_many("Movie", "movie-recommender", objects)
 Insert a single object into a collection.
 
 **Parameters:**
+
 - `collection_name` (str): Name of the collection
 - `application_id` (str): Application identifier
 - `object_data` (dict): Object to insert
@@ -259,6 +285,7 @@ Insert a single object into a collection.
 **Returns:** Insertion result
 
 **Example:**
+
 ```python
 object_data = {"title": "The Matrix", "genre": "Sci-Fi"}
 result = await weaviate.data.insert("Movie", "movie-recommender", object_data)
@@ -269,6 +296,7 @@ result = await weaviate.data.insert("Movie", "movie-recommender", object_data)
 Update an object in a collection for a given application.
 
 **Parameters:**
+
 - `collection_name` (str): Name of the collection
 - `application_id` (str): Application identifier
 - `uuid` (str): UUID of the object to update
@@ -277,6 +305,7 @@ Update an object in a collection for a given application.
 **Returns:** None
 
 **Example:**
+
 ```python
 await weaviate.data.update(
     collection_name="Movie",
@@ -291,6 +320,7 @@ await weaviate.data.update(
 Delete an object by UUID from a collection for a given application.
 
 **Parameters:**
+
 - `collection_name` (str): Name of the collection
 - `application_id` (str): Application identifier
 - `uuid` (str): UUID of the object to delete
@@ -298,6 +328,7 @@ Delete an object by UUID from a collection for a given application.
 **Returns:** None
 
 **Example:**
+
 ```python
 await weaviate.data.delete_by_id(
     collection_name="Movie",
@@ -311,6 +342,7 @@ await weaviate.data.delete_by_id(
 Delete multiple objects from a collection for a given application, optionally filtered.
 
 **Parameters:**
+
 - `collection_name` (str): Name of the collection
 - `application_id` (str): Application identifier
 - `filters` (Filter, optional): Weaviate filter conditions
@@ -318,6 +350,7 @@ Delete multiple objects from a collection for a given application, optionally fi
 **Returns:** Deletion result summary
 
 **Example:**
+
 ```python
 from weaviate.classes.query import Filter
 
@@ -333,6 +366,7 @@ result = await weaviate.data.delete_many(
 Check if an object exists in a collection for a given application by UUID.
 
 **Parameters:**
+
 - `collection_name` (str): Name of the collection
 - `application_id` (str): Application identifier
 - `uuid` (str): UUID of the object to check
@@ -340,6 +374,7 @@ Check if an object exists in a collection for a given application by UUID.
 **Returns:** True if the object exists, False otherwise
 
 **Example:**
+
 ```python
 exists = await weaviate.data.exists(
     collection_name="Movie",
@@ -355,6 +390,7 @@ exists = await weaviate.data.exists(
 Fetch objects from a collection with optional filters.
 
 **Parameters:**
+
 - `collection_name` (str): Name of the collection
 - `application_id` (str): Application identifier
 - `filters` (Filter, optional): Weaviate filter conditions
@@ -363,6 +399,7 @@ Fetch objects from a collection with optional filters.
 **Returns:** List of matching objects
 
 **Example:**
+
 ```python
 from weaviate.classes.query import Filter
 
@@ -379,6 +416,7 @@ result = await weaviate.query.fetch_objects(
 Perform hybrid search combining vector and keyword search.
 
 **Parameters:**
+
 - `collection_name` (str): Name of the collection
 - `application_id` (str): Application identifier
 - `query` (str): Search query
@@ -388,6 +426,7 @@ Perform hybrid search combining vector and keyword search.
 **Returns:** Hybrid search results
 
 **Example:**
+
 ```python
 result = await weaviate.query.hybrid(
     collection_name="Movie",
@@ -402,6 +441,7 @@ result = await weaviate.query.hybrid(
 Perform a vector similarity search in a collection for a given application.
 
 **Parameters:**
+
 - `collection_name` (str): Name of the collection
 - `application_id` (str): Application identifier
 - `vector` (list[float]): The vector to search near
@@ -411,6 +451,7 @@ Perform a vector similarity search in a collection for a given application.
 **Returns:** List of matching objects
 
 **Example:**
+
 ```python
 result = await weaviate.query.near_vector(
     collection_name="Movie",
@@ -427,6 +468,7 @@ Generate text responses using RAG (Retrieval-Augmented Generation).
 ⚠️ **Performance Warning**: This method can be slow and may time out for large datasets or complex generation tasks. Consider using other query methods as input to an LLM for generation.
 
 **Parameters:**
+
 - `collection_name` (str): Name of the collection
 - `application_id` (str): Application identifier
 - `query` (str): Search query
@@ -438,6 +480,7 @@ Generate text responses using RAG (Retrieval-Augmented Generation).
 **Returns:** Generated text response with source objects
 
 **Example:**
+
 ```python
 result = await weaviate.generate.near_text(
     collection_name="Movie",

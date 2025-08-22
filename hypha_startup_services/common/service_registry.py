@@ -1,6 +1,6 @@
 """Service registry for startup services."""
 
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from hypha_rpc.rpc import RemoteService
@@ -25,13 +25,14 @@ from .constants import (
 class ServiceRegistry:
     """Registry for different startup services."""
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Initialize the service registry."""
         self._services: dict[str, dict[str, Any]] = {}
 
     def register_service_type(
         self,
         service_name: str,
-        register_function: Callable[[RemoteService, str], Any],
+        register_function: Callable[[RemoteService, str], Awaitable[None]],
         startup_function_path: str,
         default_service_id: str,
     ) -> None:
@@ -53,9 +54,11 @@ class ServiceRegistry:
     def get_service_config(self, service_name: str) -> dict[str, Any]:
         """Get configuration for a service."""
         if service_name not in self._services:
-            raise ValueError(
-                f"Unknown service: {service_name}. Available: {list(self._services.keys())}",
+            error_msg = (
+                f"Unknown service: {service_name}."
+                f" Available: {list(self._services.keys())}"
             )
+            raise ValueError(error_msg)
         return self._services[service_name]
 
     def list_services(self) -> list[str]:
@@ -67,7 +70,7 @@ class ServiceRegistry:
 service_registry = ServiceRegistry()
 
 
-def register_services():
+def register_services() -> None:
     """Register all available services."""
     # Import here to avoid circular imports
 

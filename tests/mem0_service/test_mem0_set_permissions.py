@@ -2,21 +2,24 @@
 
 import pytest
 from hypha_rpc.rpc import RemoteException
+
 from hypha_startup_services.common.artifacts import (
-    get_artifact,
-    delete_artifact,
     artifact_exists,
+    delete_artifact,
+    get_artifact,
 )
+from tests.conftest import USER1_WS
 from tests.mem0_service.utils import (
     TEST_AGENT_ID,
     TEST_RUN_ID,
     cleanup_mem0_memories,
 )
-from tests.conftest import USER1_WS
 
 
 async def cleanup_agent_artifacts(
-    agent_id: str, workspace: str, run_id: str | None = None
+    agent_id: str,
+    workspace: str,
+    run_id: str | None = None,
 ):
     """Clean up agent artifacts to ensure test isolation."""
     try:

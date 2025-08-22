@@ -1,3 +1,5 @@
+"""Mem0 service methods."""
+
 import logging
 from typing import Any
 
@@ -6,7 +8,6 @@ from hypha_startup_services.mem0_service.weaviate_patches import apply_all_patch
 
 apply_all_patches()
 
-from hypha_rpc.utils import ObjectProxy
 from mem0 import AsyncMemory
 
 from hypha_startup_services.common.artifacts import (
@@ -82,6 +83,7 @@ async def init_run(
 
     Args:
         agent_id: ID of the agent
+        workspace: Workspace of the agent
         run_id: ID of the run
         description: Optional description for the artifacts
         metadata: Optional metadata for the artifacts
@@ -107,9 +109,11 @@ async def init_run(
     workspace_artifact_params = agent_artifact_params.for_workspace(workspace)
 
     parent_id = agent_artifact_params.artifact_id
-    assert parent_id is not None and await artifact_exists(
+    if parent_id is None or not await artifact_exists(
         artifact_id=parent_id,
-    ), "Please call init_agent() before initializing workspace agent."
+    ):
+        error_msg = "Please call init_agent() before initializing workspace agent."
+        raise ValueError(error_msg)
 
     await create_artifact(
         artifact_params=workspace_artifact_params,
@@ -124,14 +128,14 @@ async def init_run(
 
 
 async def mem0_add(
-    messages: Any,
+    messages: str | dict[str, Any] | list[dict[str, Any]],
     agent_id: str,
     workspace: str | None = None,
     *,
     memory: AsyncMemory,
-    context: dict[str, Any] | ObjectProxy,
+    context: dict[str, Any],
     run_id: str | None = None,
-    **kwargs,
+    **kwargs: Any,
 ) -> dict[str, Any] | list[Any]:
     """Add a new item to the memory service.
 
@@ -145,7 +149,8 @@ async def mem0_add(
         **kwargs: Additional keyword arguments for the memory service.
 
     Raises:
-        HyphaPermissionError: If the user does not have permission to add items to the memory.
+        HyphaPermissionError: If the user does not have permission to add items to
+            the memory.
         ValueError: If the permission parameters are invalid.
 
     """
@@ -167,21 +172,22 @@ async def mem0_add(
         operation="rw",
     )
 
-    assert await artifact_exists(
+    if not await artifact_exists(
         artifact_id=permission_params.artifact_id,
-    ), "Please call init_agent() and init() before adding memories."
+    ):
+        error_msg = "Please call init_agent() and init() before adding memories."
+        raise ValueError(error_msg)
 
     await require_permission(permission_params)
 
-    converted_messages = proxy_to_dict(messages)
     converted_kwargs = proxy_to_dict(kwargs)
 
     add_result = await memory.add(
-        converted_messages,
+        messages,
         user_id=workspace,
         agent_id=agent_id,
         run_id=run_id,
-        **converted_kwargs,  # type: ignore
+        **converted_kwargs,
     )
     logger.info("Added messages to memory: %s", add_result)
     return add_result
@@ -195,7 +201,7 @@ async def mem0_search(
     memory: AsyncMemory,
     context: dict[str, Any],
     run_id: str | None = None,
-    **kwargs,
+    **kwargs: Any,
 ) -> dict[str, Any]:
     """Search for memories based on a query.
 
@@ -209,13 +215,15 @@ async def mem0_search(
         **kwargs: Additional keyword arguments for the memory service.
 
     Raises:
-        HyphaPermissionError: If the user does not have permission to search in the memory.
+        HyphaPermissionError: If the user does not have permission to search in
+            the memory.
         ValueError: If the permission parameters are invalid.
 
     Returns:
         A dictionary containing the search results, typically under a "results" key,
         and potentially "relations" if graph store is enabled.
-        Example for v1.1+: `{"results": [{"id": "...", "memory": "...", "score": 0.8, ...}]}`
+        Example for v1.1+:
+            `{"results": [{"id": "...", "memory": "...", "score": 0.8, ...}]}`
 
     """
     accessor_ws = ws_from_context(context)
@@ -236,9 +244,11 @@ async def mem0_search(
         operation="r",
     )
 
-    assert await artifact_exists(
+    if not await artifact_exists(
         artifact_id=permission_params.artifact_id,
-    ), "Please call init() before adding memories."
+    ):
+        error_msg = "Please call init() before adding memories."
+        raise ValueError(error_msg)
 
     await require_permission(permission_params)
 
@@ -260,7 +270,7 @@ async def mem0_delete_all(
     memory: AsyncMemory,
     context: dict[str, Any],
     run_id: str | None = None,
-    **kwargs,
+    **kwargs: Any,
 ) -> dict[str, Any]:
     """Delete all memories for a specific agent and workspace.
 
@@ -293,9 +303,11 @@ async def mem0_delete_all(
         operation="rw",
     )
 
-    assert await artifact_exists(
+    if not await artifact_exists(
         artifact_id=permission_params.artifact_id,
-    ), "Please call init() before deleting memories."
+    ):
+        error_msg = "Please call init() before deleting memories."
+        raise ValueError(error_msg)
 
     await require_permission(permission_params)
 
@@ -321,7 +333,7 @@ async def mem0_get_all(
     memory: AsyncMemory,
     context: dict[str, Any],
     run_id: str | None = None,
-    **kwargs,
+    **kwargs: Any,
 ) -> dict[str, Any]:
     """Get all memories for a specific agent and workspace.
 
@@ -350,9 +362,11 @@ async def mem0_get_all(
         operation="r",
     )
 
-    assert await artifact_exists(
+    if not await artifact_exists(
         artifact_id=permission_params.artifact_id,
-    ), "Please call init() before getting memories."
+    ):
+        error_msg = "Please call init() before getting memories."
+        raise ValueError(error_msg)
 
     await require_permission(permission_params)
     # Use the memory.get_all method if available
@@ -377,6 +391,8 @@ async def mem0_set_permissions(
         permissions: Dictionary of permissions to set.
         workspace: Workspace of the user setting the permissions.
         memory: The AsyncMemory instance to set permissions on.
+        run_id: ID of the run to set permissions for.
+        merge: Whether to merge with existing permissions.
         context: Context from Hypha-rpc for permissions.
 
     Raises:
@@ -399,9 +415,11 @@ async def mem0_set_permissions(
         operation="rw",
     )
 
-    assert await artifact_exists(
+    if not await artifact_exists(
         artifact_id=permission_params.artifact_id,
-    ), "Please call init_agent() before setting permissions."
+    ):
+        error_msg = "Please call init_agent() before setting permissions."
+        raise ValueError(error_msg)
 
     await require_permission(permission_params)
 
