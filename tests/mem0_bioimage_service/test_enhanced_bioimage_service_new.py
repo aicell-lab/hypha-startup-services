@@ -2,13 +2,14 @@
 
 import pytest
 import pytest_asyncio
+
+from hypha_startup_services.common.data_index import (
+    get_entity_details,
+    load_external_data,
+)
 from hypha_startup_services.mem0_bioimage_service.methods import (
     get_related_entities,
     search,
-)
-from hypha_startup_services.common.data_index import (
-    load_external_data,
-    get_entity_details,
 )
 from hypha_startup_services.mem0_service.mem0_client import get_mem0
 
@@ -28,7 +29,6 @@ async def mem0_memory():
 @pytest.mark.asyncio
 async def test_enhanced_bioimage_find_related_entities_by_technology_id(bioimage_index):
     """Test finding related entities by technology ID (auto-infer type)."""
-
     # Find entities related to 4Pi technology (should automatically infer it's a technology)
     tech_id = "660fd1fc-a138-5740-b298-14b0c3b24fb9"
 
@@ -69,7 +69,6 @@ async def test_enhanced_bioimage_find_related_entities_by_node_id(bioimage_index
 @pytest.mark.asyncio
 async def test_enhanced_bioimage_semantic_query(bioimage_index, mem0_memory):
     """Test semantic query functionality."""
-
     result = await search(
         memory=mem0_memory,
         bioimage_index=bioimage_index,
@@ -95,10 +94,10 @@ async def test_enhanced_bioimage_semantic_query(bioimage_index, mem0_memory):
 
 @pytest.mark.asyncio
 async def test_enhanced_bioimage_semantic_query_with_context(
-    bioimage_index, mem0_memory
+    bioimage_index,
+    mem0_memory,
 ):
     """Test semantic query with related entity context."""
-
     result = await search(
         memory=mem0_memory,
         bioimage_index=bioimage_index,
@@ -133,7 +132,8 @@ async def test_enhanced_bioimage_semantic_query_with_context(
 
 @pytest.mark.asyncio
 async def test_enhanced_bioimage_traditional_methods_still_work(
-    bioimage_index, mem0_memory
+    bioimage_index,
+    mem0_memory,
 ):
     """Test that traditional exact matching methods still work."""
     # Test getting nodes by technology ID
@@ -154,7 +154,8 @@ async def test_enhanced_bioimage_traditional_methods_still_work(
 
 @pytest.mark.asyncio
 async def test_enhanced_bioimage_error_handling_invalid_entity(
-    bioimage_index, mem0_memory
+    bioimage_index,
+    mem0_memory,
 ):
     """Test error handling for invalid entity ID."""
     # The function should raise an exception for invalid entity IDs
@@ -165,7 +166,6 @@ async def test_enhanced_bioimage_error_handling_invalid_entity(
 @pytest.mark.asyncio
 async def test_enhanced_bioimage_entity_agnostic_functions(bioimage_index, mem0_memory):
     """Test the new entity-type-agnostic functions."""
-
     # Test get_entity_details for a node
     node_id = "7e35b2a1-22ef-58ec-a32b-805e388932ee"
     result = await get_entity_details(bioimage_index, entity_id=node_id)

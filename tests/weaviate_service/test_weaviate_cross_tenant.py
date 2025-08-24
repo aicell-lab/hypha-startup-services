@@ -1,21 +1,25 @@
 """Tests for Weaviate cross-tenant functionality."""
 
 import uuid as uuid_module
+
 import pytest
 from hypha_rpc.rpc import RemoteException
+
+from tests.conftest import USER1_WS
 from tests.weaviate_service.utils import (
-    create_test_collection,
+    SHARED_APP_ID,
     USER1_APP_ID,
     USER2_APP_ID,
     USER3_APP_ID,
-    SHARED_APP_ID,
+    create_test_collection,
 )
-from tests.conftest import USER1_WS
 
 
 @pytest.mark.asyncio
 async def test_cross_application_data_sharing(
-    weaviate_service, weaviate_service2, weaviate_service3
+    weaviate_service,
+    weaviate_service2,
+    weaviate_service3,
 ):
     """Test sharing data between applications owned by different users."""
     # Create collection
@@ -67,7 +71,7 @@ async def test_cross_application_data_sharing(
         print("Note: User 2 can access User 1's data with explicit user_ws")
     except (RemoteException, PermissionError, ValueError) as e:
         # This may fail depending on the permission model
-        print(f"Note: Cross-user access failed: {str(e)}")
+        print(f"Note: Cross-user access failed: {e!s}")
 
     # User 3 tries to modify User 1's data with explicit user_ws (may fail based on permissions)
     try:
@@ -92,12 +96,13 @@ async def test_cross_application_data_sharing(
             print("Note: User 3's modification didn't affect the data")
     except (RemoteException, PermissionError, ValueError) as e:
         # Expected failure due to permission settings
-        print(f"Note: Cross-user modification failed: {str(e)}")
+        print(f"Note: Cross-user modification failed: {e!s}")
 
 
 @pytest.mark.asyncio
 async def test_multi_tenant_access_with_correct_workspaces(
-    weaviate_service, weaviate_service2
+    weaviate_service,
+    weaviate_service2,
 ):
     """Test multi-tenant access using the correct workspace IDs."""
     # Create collection
@@ -125,7 +130,9 @@ async def test_multi_tenant_access_with_correct_workspaces(
     # User 2 tries to access User 1's data WITHOUT specifying the user_ws - should fail
     try:
         await weaviate_service2.query.fetch_objects(
-            collection_name="Movie", application_id=SHARED_APP_ID, limit=10
+            collection_name="Movie",
+            application_id=SHARED_APP_ID,
+            limit=10,
         )
         assert (
             False
@@ -149,7 +156,7 @@ async def test_multi_tenant_access_with_correct_workspaces(
         print("Note: Non-admin User 2 can access User 1's data with correct user_ws")
     except (RemoteException, PermissionError, ValueError) as e:
         # This may fail depending on the permission model
-        print(f"Note: Access with correct user_ws failed: {str(e)}")
+        print(f"Note: Access with correct user_ws failed: {e!s}")
 
     # User 2 attempts to modify User 1's data with the correct user_ws
     try:
@@ -173,7 +180,7 @@ async def test_multi_tenant_access_with_correct_workspaces(
         print("Note: User 2 was able to modify User 1's data with correct user_ws")
     except (RemoteException, PermissionError, ValueError) as e:
         # Expected failure due to permission settings
-        print(f"Note: Modification with correct user_ws failed: {str(e)}")
+        print(f"Note: Modification with correct user_ws failed: {e!s}")
 
 
 @pytest.mark.asyncio

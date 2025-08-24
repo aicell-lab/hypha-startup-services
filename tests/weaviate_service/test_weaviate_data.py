@@ -1,9 +1,11 @@
 """Tests for Weaviate data operations functionality."""
 
 import uuid as uuid_module
+
 import pytest
 from weaviate.classes.query import Filter
-from tests.weaviate_service.utils import create_test_application, APP_ID
+
+from tests.weaviate_service.utils import APP_ID, create_test_application
 
 
 @pytest.mark.asyncio
@@ -22,7 +24,9 @@ async def test_collection_data_insert(weaviate_service):
 
     # Insert the object
     uuid = await weaviate_service.data.insert(
-        collection_name="Movie", application_id=APP_ID, properties=test_object
+        collection_name="Movie",
+        application_id=APP_ID,
+        properties=test_object,
     )
 
     # Verify the UUID is valid
@@ -31,7 +35,9 @@ async def test_collection_data_insert(weaviate_service):
 
     # Check that the object was inserted correctly
     query_result = await weaviate_service.query.fetch_objects(
-        collection_name="Movie", application_id=APP_ID, limit=10
+        collection_name="Movie",
+        application_id=APP_ID,
+        limit=10,
     )
 
     assert len(query_result["objects"]) == 1
@@ -69,7 +75,9 @@ async def test_collection_data_insert_many(weaviate_service):
 
     # Insert the objects
     result = await weaviate_service.data.insert_many(
-        collection_name="Movie", application_id=APP_ID, objects=test_objects
+        collection_name="Movie",
+        application_id=APP_ID,
+        objects=test_objects,
     )
 
     # Verify the result contains successful operations and UUIDs
@@ -82,7 +90,9 @@ async def test_collection_data_insert_many(weaviate_service):
 
     # Verify the objects were inserted correctly
     query_result = await weaviate_service.query.fetch_objects(
-        collection_name="Movie", application_id=APP_ID, limit=10
+        collection_name="Movie",
+        application_id=APP_ID,
+        limit=10,
     )
 
     assert len(query_result["objects"]) == len(test_objects)
@@ -106,7 +116,9 @@ async def test_collection_data_update(weaviate_service):
     }
 
     uuid = await weaviate_service.data.insert(
-        collection_name="Movie", application_id=APP_ID, properties=test_object
+        collection_name="Movie",
+        application_id=APP_ID,
+        properties=test_object,
     )
 
     # Update the object
@@ -124,11 +136,14 @@ async def test_collection_data_update(weaviate_service):
 
     # Verify the update
     query_result = await weaviate_service.query.fetch_objects(
-        collection_name="Movie", application_id=APP_ID, limit=10
+        collection_name="Movie",
+        application_id=APP_ID,
+        limit=10,
     )
 
     updated_obj = next(
-        (obj for obj in query_result["objects"] if obj["uuid"] == uuid), None
+        (obj for obj in query_result["objects"] if obj["uuid"] == uuid),
+        None,
     )
     assert updated_obj is not None
     assert updated_obj["properties"]["description"] == updated_properties["description"]
@@ -152,12 +167,16 @@ async def test_collection_data_exists(weaviate_service):
     }
 
     uuid = await weaviate_service.data.insert(
-        collection_name="Movie", application_id=APP_ID, properties=test_object
+        collection_name="Movie",
+        application_id=APP_ID,
+        properties=test_object,
     )
 
     # Check if the object exists
     exists = await weaviate_service.data.exists(
-        collection_name="Movie", application_id=APP_ID, uuid=uuid
+        collection_name="Movie",
+        application_id=APP_ID,
+        uuid=uuid,
     )
 
     assert exists is True
@@ -165,7 +184,9 @@ async def test_collection_data_exists(weaviate_service):
     # Check if a non-existent object returns False
     fake_uuid = str(uuid_module.uuid4())
     exists = await weaviate_service.data.exists(
-        collection_name="Movie", application_id=APP_ID, uuid=fake_uuid
+        collection_name="Movie",
+        application_id=APP_ID,
+        uuid=fake_uuid,
     )
 
     assert exists is False
@@ -185,23 +206,31 @@ async def test_collection_data_delete_by_id(weaviate_service):
     }
 
     uuid = await weaviate_service.data.insert(
-        collection_name="Movie", application_id=APP_ID, properties=test_object
+        collection_name="Movie",
+        application_id=APP_ID,
+        properties=test_object,
     )
 
     # Verify the object exists
     exists = await weaviate_service.data.exists(
-        collection_name="Movie", application_id=APP_ID, uuid=uuid
+        collection_name="Movie",
+        application_id=APP_ID,
+        uuid=uuid,
     )
     assert exists is True
 
     # Delete the object
     await weaviate_service.data.delete_by_id(
-        collection_name="Movie", application_id=APP_ID, uuid=uuid
+        collection_name="Movie",
+        application_id=APP_ID,
+        uuid=uuid,
     )
 
     # Verify the object no longer exists
     exists = await weaviate_service.data.exists(
-        collection_name="Movie", application_id=APP_ID, uuid=uuid
+        collection_name="Movie",
+        application_id=APP_ID,
+        uuid=uuid,
     )
     assert exists is False
 
@@ -236,12 +265,16 @@ async def test_collection_data_delete_many(weaviate_service):
 
     # Insert data
     await weaviate_service.data.insert_many(
-        collection_name="Movie", application_id=APP_ID, objects=test_objects
+        collection_name="Movie",
+        application_id=APP_ID,
+        objects=test_objects,
     )
 
     # Verify objects were inserted
     query_result = await weaviate_service.query.fetch_objects(
-        collection_name="Movie", application_id=APP_ID, limit=10
+        collection_name="Movie",
+        application_id=APP_ID,
+        limit=10,
     )
     assert len(query_result["objects"]) == 3
 
@@ -258,7 +291,9 @@ async def test_collection_data_delete_many(weaviate_service):
 
     # Verify the remaining objects
     query_result = await weaviate_service.query.fetch_objects(
-        collection_name="Movie", application_id=APP_ID, limit=10
+        collection_name="Movie",
+        application_id=APP_ID,
+        limit=10,
     )
 
     assert len(query_result["objects"]) == 1

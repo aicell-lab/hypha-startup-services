@@ -1,16 +1,15 @@
 """Tests for the Weaviate BioImage service methods."""
 
 from unittest.mock import Mock, patch
+
 import pytest
 from weaviate.collections.classes.filters import _FilterValue, _Operator
 
 from hypha_startup_services.weaviate_bioimage_service.methods import (
-    query,
-    get_entity,
     BIOIMAGE_COLLECTION,
-)
-from hypha_startup_services.weaviate_bioimage_service.methods import (
     SHARED_APPLICATION_ID,
+    get_entity,
+    query,
 )
 
 
@@ -28,10 +27,10 @@ class TestQueryMethods:
 
     @pytest.mark.asyncio
     @patch(
-        "hypha_startup_services.weaviate_bioimage_service.methods.generate_near_text"
+        "hypha_startup_services.weaviate_bioimage_service.methods.generate_near_text",
     )
     @patch(
-        "hypha_startup_services.weaviate_bioimage_service.methods.applications_exists"
+        "hypha_startup_services.weaviate_bioimage_service.methods.applications_exists",
     )
     async def test_query_parameters(self, mock_app_exists, mock_generate):
         """Test that query passes parameters correctly."""
@@ -64,10 +63,10 @@ class TestQueryMethods:
 
     @pytest.mark.asyncio
     @patch(
-        "hypha_startup_services.weaviate_bioimage_service.methods.query_fetch_objects"
+        "hypha_startup_services.weaviate_bioimage_service.methods.query_fetch_objects",
     )
     @patch(
-        "hypha_startup_services.weaviate_bioimage_service.methods.applications_exists"
+        "hypha_startup_services.weaviate_bioimage_service.methods.applications_exists",
     )
     async def test_get_entity_parameters(self, mock_app_exists, mock_fetch):
         """Test that get_entity passes parameters correctly."""

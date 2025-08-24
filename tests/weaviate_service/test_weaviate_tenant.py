@@ -1,16 +1,17 @@
 """Tests for cross-user and tenant functionality in Weaviate service."""
 
 import pytest
-from weaviate.classes.query import Filter
 from hypha_rpc.rpc import RemoteException
+from weaviate.classes.query import Filter
+
+from tests.conftest import USER1_WS, USER2_WS, USER3_WS
 from tests.weaviate_service.utils import (
-    create_test_collection,
+    SHARED_APP_ID,
     USER1_APP_ID,
     USER2_APP_ID,
     USER3_APP_ID,
-    SHARED_APP_ID,
+    create_test_collection,
 )
-from tests.conftest import USER1_WS, USER2_WS, USER3_WS
 
 
 @pytest.mark.asyncio
@@ -39,7 +40,9 @@ async def test_shared_application_access(weaviate_service, weaviate_service2):
     }
 
     await weaviate_service.data.insert(
-        collection_name="Movie", application_id=SHARED_APP_ID, properties=shared_movie1
+        collection_name="Movie",
+        application_id=SHARED_APP_ID,
+        properties=shared_movie1,
     )
 
     # User 2 tries to add data to User 1's application using the user_ws parameter to specify User 1
@@ -62,7 +65,9 @@ async def test_shared_application_access(weaviate_service, weaviate_service2):
 
         # If it didn't fail, we can check if both users can see the data
         user1_results = await weaviate_service.query.fetch_objects(
-            collection_name="Movie", application_id=SHARED_APP_ID, limit=10
+            collection_name="Movie",
+            application_id=SHARED_APP_ID,
+            limit=10,
         )
 
         assert len(user1_results["objects"]) >= 1
@@ -73,13 +78,15 @@ async def test_shared_application_access(weaviate_service, weaviate_service2):
 
     # Clean up
     await weaviate_service.applications.delete(
-        collection_name="Movie", application_id=SHARED_APP_ID
+        collection_name="Movie",
+        application_id=SHARED_APP_ID,
     )
 
 
 @pytest.mark.asyncio
 async def test_data_operations_permission_boundaries(
-    weaviate_service, weaviate_service2
+    weaviate_service,
+    weaviate_service2,
 ):
     """Test permission boundaries for various data operations."""
     # Create collection
@@ -110,7 +117,9 @@ async def test_data_operations_permission_boundaries(
         (
             "exists",
             lambda: weaviate_service2.data.exists(
-                collection_name="Movie", application_id=USER1_APP_ID, uuid=movie_uuid
+                collection_name="Movie",
+                application_id=USER1_APP_ID,
+                uuid=movie_uuid,
             ),
         ),
         # Test update
@@ -127,14 +136,18 @@ async def test_data_operations_permission_boundaries(
         (
             "delete",
             lambda: weaviate_service2.data.delete_by_id(
-                collection_name="Movie", application_id=USER1_APP_ID, uuid=movie_uuid
+                collection_name="Movie",
+                application_id=USER1_APP_ID,
+                uuid=movie_uuid,
             ),
         ),
         # Test query
         (
             "query",
             lambda: weaviate_service2.query.fetch_objects(
-                collection_name="Movie", application_id=USER1_APP_ID, limit=10
+                collection_name="Movie",
+                application_id=USER1_APP_ID,
+                limit=10,
             ),
         ),
     ]
@@ -151,13 +164,16 @@ async def test_data_operations_permission_boundaries(
 
     # Clean up
     await weaviate_service.applications.delete(
-        collection_name="Movie", application_id=USER1_APP_ID
+        collection_name="Movie",
+        application_id=USER1_APP_ID,
     )
 
 
 @pytest.mark.asyncio
 async def test_cross_user_application_access(
-    weaviate_service, weaviate_service2, weaviate_service3
+    weaviate_service,
+    weaviate_service2,
+    weaviate_service3,
 ):
     """Test that users can access applications across workspaces using the user_ws parameter."""
     # Create collection
@@ -232,23 +248,28 @@ async def test_cross_user_application_access(
         assert user2_from_user1["objects"][0]["properties"]["title"] == "User 2's Movie"
     except (RemoteException, PermissionError, ValueError) as e:
         # If it fails, it should be due to permission settings, not because the approach is wrong
-        print(f"Note: Admin accessing data with user_ws parameter failed: {str(e)}")
+        print(f"Note: Admin accessing data with user_ws parameter failed: {e!s}")
 
     # Clean up
     await weaviate_service.applications.delete(
-        collection_name="Movie", application_id=USER1_APP_ID
+        collection_name="Movie",
+        application_id=USER1_APP_ID,
     )
     await weaviate_service2.applications.delete(
-        collection_name="Movie", application_id=USER2_APP_ID
+        collection_name="Movie",
+        application_id=USER2_APP_ID,
     )
     await weaviate_service3.applications.delete(
-        collection_name="Movie", application_id=USER3_APP_ID
+        collection_name="Movie",
+        application_id=USER3_APP_ID,
     )
 
 
 @pytest.mark.asyncio
 async def test_cross_application_data_isolation(
-    weaviate_service, weaviate_service2, weaviate_service3
+    weaviate_service,
+    weaviate_service2,
+    weaviate_service3,
 ):
     """Test data isolation between applications across different users/tenants."""
     # Create collection (only admin can do this)
@@ -374,11 +395,14 @@ async def test_cross_application_data_isolation(
 
     # Clean up
     await weaviate_service.applications.delete(
-        collection_name="Movie", application_id=USER1_APP_ID
+        collection_name="Movie",
+        application_id=USER1_APP_ID,
     )
     await weaviate_service2.applications.delete(
-        collection_name="Movie", application_id=USER2_APP_ID
+        collection_name="Movie",
+        application_id=USER2_APP_ID,
     )
     await weaviate_service3.applications.delete(
-        collection_name="Movie", application_id=USER3_APP_ID
+        collection_name="Movie",
+        application_id=USER3_APP_ID,
     )

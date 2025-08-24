@@ -2,11 +2,12 @@
 
 import pytest
 from hypha_rpc.rpc import RemoteException
+
 from tests.weaviate_service.utils import (
-    create_test_collection,
-    create_test_application,
     APP_ID,
     USER1_APP_ID,
+    create_test_application,
+    create_test_collection,
 )
 
 
@@ -55,12 +56,15 @@ async def test_application_delete(weaviate_service):
     }
 
     await weaviate_service.data.insert(
-        collection_name="Movie", application_id=APP_ID, properties=test_object
+        collection_name="Movie",
+        application_id=APP_ID,
+        properties=test_object,
     )
 
     # Delete the application
     result = await weaviate_service.applications.delete(
-        collection_name="Movie", application_id=APP_ID
+        collection_name="Movie",
+        application_id=APP_ID,
     )
 
     assert result is not None
@@ -68,7 +72,8 @@ async def test_application_delete(weaviate_service):
 
     # Verify the application no longer exists
     exists = await weaviate_service.applications.exists(
-        collection_name="Movie", application_id=APP_ID
+        collection_name="Movie",
+        application_id=APP_ID,
     )
 
     assert exists is False
@@ -76,7 +81,9 @@ async def test_application_delete(weaviate_service):
     # Verify that the data was also deleted
     with pytest.raises(RemoteException):
         await weaviate_service.query.fetch_objects(
-            collection_name="Movie", application_id=APP_ID, limit=10
+            collection_name="Movie",
+            application_id=APP_ID,
+            limit=10,
         )
 
 
@@ -88,7 +95,8 @@ async def test_application_get(weaviate_service):
 
     # Get the application details
     application = await weaviate_service.applications.get(
-        collection_name="Movie", application_id=APP_ID
+        collection_name="Movie",
+        application_id=APP_ID,
     )
 
     assert application is not None
@@ -127,7 +135,8 @@ async def test_application_exists_across_users(weaviate_service, weaviate_servic
 
     # Clean up
     await weaviate_service.applications.delete(
-        collection_name="Movie", application_id=USER1_APP_ID
+        collection_name="Movie",
+        application_id=USER1_APP_ID,
     )
 
 

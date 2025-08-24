@@ -1,8 +1,9 @@
 """Tests for the Weaviate collection functionality."""
 
 import pytest
-from tests.weaviate_service.utils import create_test_collection
 from hypha_rpc.rpc import RemoteException
+
+from tests.weaviate_service.utils import create_test_collection
 
 
 @pytest.mark.asyncio
@@ -99,6 +100,7 @@ async def test_collection_get_artifact(weaviate_service):
 async def test_collection_get_artifact_nonexistent(weaviate_service):
     """Test retrieving artifact name for a non-existent collection."""
     with pytest.raises(
-        RemoteException, match="Collection 'NonExistentCollection' does not exist."
+        RemoteException,
+        match="Collection 'NonExistentCollection' does not exist.",
     ):
         await weaviate_service.collections.get_artifact("NonExistentCollection")

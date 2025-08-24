@@ -1,7 +1,8 @@
 """Tests for Weaviate query functionality."""
 
 import pytest
-from tests.weaviate_service.utils import create_test_application, APP_ID
+
+from tests.weaviate_service.utils import APP_ID, create_test_application
 
 
 @pytest.mark.asyncio
@@ -27,7 +28,9 @@ async def test_collection_query_fetch_objects(weaviate_service):
     ]
 
     await weaviate_service.data.insert_many(
-        collection_name="Movie", application_id=APP_ID, objects=test_objects
+        collection_name="Movie",
+        application_id=APP_ID,
+        objects=test_objects,
     )
 
     # Fetch objects using kwargs with various parameters
@@ -85,7 +88,9 @@ async def test_collection_query_hybrid(weaviate_service):
     ]
 
     await weaviate_service.data.insert_many(
-        collection_name="Movie", application_id=APP_ID, objects=test_objects
+        collection_name="Movie",
+        application_id=APP_ID,
+        objects=test_objects,
     )
 
     # Perform a hybrid search
@@ -136,7 +141,9 @@ async def test_collection_query_near_text(weaviate_service):
     ]
 
     await weaviate_service.data.insert_many(
-        collection_name="Movie", application_id=APP_ID, objects=test_objects
+        collection_name="Movie",
+        application_id=APP_ID,
+        objects=test_objects,
     )
 
     # Perform a near_text search
@@ -181,7 +188,9 @@ async def test_collection_query_near_vector(weaviate_service):
 
     # Insert data
     await weaviate_service.data.insert_many(
-        collection_name="Movie", application_id=APP_ID, objects=test_objects
+        collection_name="Movie",
+        application_id=APP_ID,
+        objects=test_objects,
     )
 
     # Get a vector to use for near_vector search

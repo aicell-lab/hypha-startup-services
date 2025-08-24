@@ -2,12 +2,13 @@
 
 import pytest
 import pytest_asyncio
+
+from hypha_startup_services.common.data_index import (
+    get_related_entities,
+    load_external_data,
+)
 from hypha_startup_services.mem0_bioimage_service.methods import (
     search,
-)
-from hypha_startup_services.common.data_index import (
-    load_external_data,
-    get_related_entities,
 )
 from hypha_startup_services.mem0_service.mem0_client import get_mem0
 
@@ -27,7 +28,6 @@ async def mem0_memory():
 @pytest.mark.asyncio
 async def test_query_returns_only_info_issue(bioimage_index, mem0_memory):
     """Test to confirm that query currently only returns 'info' field."""
-
     result = await search(
         memory=mem0_memory,
         bioimage_index=bioimage_index,
@@ -65,14 +65,13 @@ async def test_query_returns_only_info_issue(bioimage_index, mem0_memory):
         # If no related fields, this confirms the issue
         if not has_related_fields:
             print(
-                "CONFIRMED: Query only returns 'info' field, missing related entities"
+                "CONFIRMED: Query only returns 'info' field, missing related entities",
             )
 
 
 @pytest.mark.asyncio
 async def test_query_should_include_related_entities(bioimage_index, mem0_memory):
     """Test that query includes related entities when include_related=True."""
-
     result = await search(
         memory=mem0_memory,
         bioimage_index=bioimage_index,
@@ -102,7 +101,8 @@ async def test_query_should_include_related_entities(bioimage_index, mem0_memory
                     "exists_in_nodes" in result_item
                 ), f"Technology result should include 'exists_in_nodes' field: {result_item}"
                 assert isinstance(
-                    result_item["exists_in_nodes"], list
+                    result_item["exists_in_nodes"],
+                    list,
                 ), "exists_in_nodes should be a list"
             elif entity_type == "node":
                 # Nodes should have related technologies
@@ -110,14 +110,14 @@ async def test_query_should_include_related_entities(bioimage_index, mem0_memory
                     "has_technologies" in result_item
                 ), f"Node result should include 'has_technologies' field: {result_item}"
                 assert isinstance(
-                    result_item["has_technologies"], list
+                    result_item["has_technologies"],
+                    list,
                 ), "has_technologies should be a list"
 
 
 @pytest.mark.asyncio
 async def test_query_without_related_entities(bioimage_index, mem0_memory):
     """Test that query doesn't include related entities when include_related=False."""
-
     result = await search(
         memory=mem0_memory,
         bioimage_index=bioimage_index,
@@ -141,7 +141,6 @@ async def test_query_without_related_entities(bioimage_index, mem0_memory):
 @pytest.mark.asyncio
 async def test_get_related_entities_works_correctly(bioimage_index):
     """Test that get_related_entities function works correctly."""
-
     # Test with a known technology ID that should have related nodes
     tech_id = "660fd1fc-a138-5740-b298-14b0c3b24fb9"  # 4Pi microscopy
 
