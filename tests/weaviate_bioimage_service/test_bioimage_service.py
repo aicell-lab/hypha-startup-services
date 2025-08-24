@@ -9,7 +9,7 @@ from tests.conftest import get_user_server
 @pytest_asyncio.fixture
 async def weaviate_bioimage_test_service():
     server = await get_user_server("PERSONAL_TOKEN")
-    service = await server.get_service("aria-agents/weaviate-bioimage-test")
+    service = await server.get_service("hypha-agents/weaviate-bioimage-test")
     yield service
     await server.disconnect()
 
@@ -17,7 +17,7 @@ async def weaviate_bioimage_test_service():
 @pytest_asyncio.fixture
 async def weaviate_bioimage_live_service():
     server = await get_user_server("PERSONAL_TOKEN")
-    service = await server.get_service("public/weaviate-bioimage")
+    service = await server.get_service("hypha-agents/weaviate-bioimage")
     yield service
     await server.disconnect()
 
@@ -408,7 +408,7 @@ async def test_populate_bioimage_test_service(weaviate_bioimage_test_service):
 
         # Try to get the weaviate service for data population
         try:
-            weaviate_service = await server.get_service("public/weaviate")
+            weaviate_service = await server.get_service("hypha-agents/weaviate")
             print("Found weaviate service for population")
 
             # Check if the bioimage_data collection exists
@@ -528,7 +528,7 @@ async def test_check_and_populate_eurobioimaging_shared_app(
 
     try:
         server = await get_user_server("PERSONAL_TOKEN")
-        weaviate_service = await server.get_service("public/weaviate")
+        weaviate_service = await server.get_service("hypha-agents/weaviate")
 
         # Check if the eurobioimaging-shared application exists
         collection_name = "bioimage_data"
@@ -657,7 +657,7 @@ async def test_investigate_eurobioimaging_shared_app_contents(
 
     try:
         server = await get_user_server("PERSONAL_TOKEN")
-        weaviate_service = await server.get_service("public/weaviate")
+        weaviate_service = await server.get_service("hypha-agents/weaviate")
 
         collection_name = "bioimage_data"
         application_id = "eurobioimaging-shared"

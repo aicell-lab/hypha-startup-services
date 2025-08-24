@@ -34,7 +34,7 @@ async def main():
     )
 
     # Get the Weaviate service
-    weaviate_service: RemoteService = await server.get_service("public/weaviate")
+    weaviate_service: RemoteService = await server.get_service("hypha-agents/weaviate")
 
     try:
         # 1. Create a Movie Collection

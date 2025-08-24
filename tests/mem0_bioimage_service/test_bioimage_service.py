@@ -80,7 +80,7 @@ EBI_TECHNOLOGIES_DATA = [
 async def mem0_live_service():
     """Mem0 BioImage service fixture for live (admin) environment."""
     server = await get_user_server("HYPHA_TOKEN")
-    service = await server.get_service("public/mem0")
+    service = await server.get_service("hypha-agents/mem0")
     yield service
     await server.disconnect()
 
@@ -399,7 +399,7 @@ async def test_mem0_bioimage_integration(mem0_bioimage_live_service, mem0_live_s
 async def mem0_bioimage_test_service():
     """Mem0 BioImage service fixture forpublicnce."""
     server = await get_user_server("PERSONAL_TOKEN")
-    service = await server.get_service("aria-agents/mem0-bioimage-test")
+    service = await server.get_service("hypha-agents/mem0-bioimage-test")
     yield service
     await server.disconnect()
 
@@ -408,7 +408,7 @@ async def mem0_bioimage_test_service():
 async def mem0_bioimage_live_service():
     """Mem0 BioImage service fixture for live/prod instance."""
     server = await get_user_server("PERSONAL_TOKEN")
-    service = await server.get_service("public/mem0-bioimage")
+    service = await server.get_service("hypha-agents/mem0-bioimage")
     yield service
     await server.disconnect()
 

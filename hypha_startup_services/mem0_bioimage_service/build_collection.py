@@ -205,7 +205,7 @@ class RemoteMemoryServiceWrapper:
 
 
 async def get_memory_service(
-    service_id: str = "public/mem0",
+    service_id: str = "hypha-agents/mem0",
     *,
     use_remote: bool = False,
 ) -> AsyncMemory | RemoteMemoryServiceWrapper:
@@ -449,7 +449,7 @@ async def initialize_bioimage_database_deduplicated(
 async def build_bioimage_index_deduplicated(
     nodes_file: str | None = None,
     technologies_file: str | None = None,
-    service_id: str = "public/mem0",
+    service_id: str = "hypha-agents/mem0",
     *,
     force_rebuild: bool = False,
     use_remote: bool = False,
@@ -593,8 +593,8 @@ def main() -> None:
     parser.add_argument(
         "--service-id",
         type=str,
-        default="public/mem0",
-        help="Remote Hypha service ID to connect to (default: public/mem0)",
+        default="hypha-agents/mem0",
+        help="Remote Hypha service ID to connect to (default: hypha-agents/mem0)",
     )
 
     parser.add_argument(

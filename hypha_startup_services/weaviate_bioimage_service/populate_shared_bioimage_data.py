@@ -33,7 +33,7 @@ logger.setLevel(logging.INFO)
 COLLECTION_NAME = "bioimage_data"
 SHARED_APPLICATION_ID = "eurobioimaging-shared"
 DEFAULT_SERVER_URL = "https://hypha.aicell.io"
-WEAVIATE_SERVICE_ID = "public/weaviate"
+WEAVIATE_SERVICE_ID = "hypha-agents/weaviate"
 
 
 async def load_data_files() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:

@@ -8,7 +8,7 @@ from tests.conftest import get_user_server
 async def mem0_bioimage_test_service():
     """Mem0 BioImage service fixture for user 1."""
     server = await get_user_server("PERSONAL_TOKEN")
-    service = await server.get_service("aria-agents/mem0-bioimage-test")
+    service = await server.get_service("hypha-agents/mem0-bioimage-test")
     yield service
     await server.disconnect()
 
@@ -72,7 +72,7 @@ async def test_local_integration_mem0_bioimage(mem0_bioimage_test_service):
 async def mem0_bioimage_live_service():
     """Mem0 BioImage live service fixture."""
     server = await get_user_server("PERSONAL_TOKEN")
-    service = await server.get_service("public/mem0-bioimage")
+    service = await server.get_service("hypha-agents/mem0-bioimage")
     yield service
     await server.disconnect()
 

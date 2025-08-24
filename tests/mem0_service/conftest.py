@@ -13,7 +13,7 @@ from tests.mem0_service.utils import (
 async def mem0_live_service():
     """Mem0 BioImage service fixture for live (admin) environment."""
     server = await get_user_server("HYPHA_TOKEN")
-    service = await server.get_service("public/mem0")
+    service = await server.get_service("hypha-agents/mem0")
     yield service
     await server.disconnect()
 
@@ -22,7 +22,7 @@ async def mem0_live_service():
 async def mem0_service():
     """Mem0 service fixture for user 1."""
     server = await get_user_server("PERSONAL_TOKEN")
-    service = await server.get_service("aria-agents/mem0-test")
+    service = await server.get_service("hypha-agents/mem0-test")
     yield service
     await server.disconnect()
 
@@ -31,7 +31,7 @@ async def mem0_service():
 async def mem0_service2():
     """Mem0 service fixture for user 2."""
     server = await get_user_server("PERSONAL_TOKEN2")
-    service = await server.get_service("aria-agents/mem0-test")
+    service = await server.get_service("hypha-agents/mem0-test")
     yield service
     await server.disconnect()
 
@@ -40,7 +40,7 @@ async def mem0_service2():
 async def mem0_service3():
     """Mem0 service fixture for user 3."""
     server = await get_user_server("PERSONAL_TOKEN3")
-    service = await server.get_service("aria-agents/mem0-test")
+    service = await server.get_service("hypha-agents/mem0-test")
     yield service
     await server.disconnect()
 

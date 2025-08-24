@@ -38,7 +38,7 @@ async def weaviate_service():
     """Weaviate service fixture for user 1."""
     server = await get_user_server("PERSONAL_TOKEN")
     register_weaviate_codecs(server)
-    service = await server.get_service("aria-agents/weaviate-test")
+    service = await server.get_service("hypha-agents/weaviate-test")
     yield service
     await server.disconnect()
 
@@ -48,7 +48,7 @@ async def weaviate_service2():
     """Weaviate service fixture for user 2."""
     server = await get_user_server("PERSONAL_TOKEN2")
     register_weaviate_codecs(server)
-    service = await server.get_service("aria-agents/weaviate-test")
+    service = await server.get_service("hypha-agents/weaviate-test")
     yield service
     await server.disconnect()
 
@@ -58,6 +58,6 @@ async def weaviate_service3():
     """Weaviate service fixture for user 3."""
     server = await get_user_server("PERSONAL_TOKEN3")
     register_weaviate_codecs(server)
-    service = await server.get_service("aria-agents/weaviate-test")
+    service = await server.get_service("hypha-agents/weaviate-test")
     yield service
     await server.disconnect()

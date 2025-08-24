@@ -24,7 +24,7 @@ from hypha_rpc import connect_to_server
 
 async def setup_agent():
     server = await connect_to_server({"server_url": "https://hypha.aicell.io"})
-    mem0 = await server.get_service("public/mem0")
+    mem0 = await server.get_service("hypha-agents/mem0")
     
     await mem0.init_agent(
         agent_id="research-assistant",
