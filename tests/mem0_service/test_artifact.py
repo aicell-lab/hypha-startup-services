@@ -58,7 +58,7 @@ class TestGetArtifact:
         result = await get_artifact("test-artifact-123")
 
         mock_get_server.assert_called_once_with("https://hypha.aicell.io")
-        mock_server.get_service.assert_called_once_with("hypha-agents/artifact-manager")
+        mock_server.get_service.assert_called_once_with("public/artifact-manager")
         mock_artifact_manager.read.assert_called_once_with(
             artifact_id="test-artifact-123",
         )
