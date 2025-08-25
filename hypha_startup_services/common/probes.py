@@ -1,6 +1,7 @@
 """Health probes for hypha startup services."""
 
 import logging
+from functools import partial
 from typing import Any, Never
 
 from hypha_rpc.rpc import RemoteException, RemoteService
@@ -158,9 +159,17 @@ async def add_probes(
             "id": probes_service_id,
             "config": {"visibility": "public"},
             "type": "probes",
-            "readiness": readiness_probe,
-            "liveness": liveness_probe,
-            "status": get_service_status,  # Additional endpoint for detailed status
+            "readiness": partial(
+                readiness_probe,
+                server=server,
+                service_ids=service_ids,
+            ),
+            "liveness": partial(liveness_probe, server=server, service_ids=service_ids),
+            "status": partial(
+                check_all_services,
+                server=server,
+                service_ids=service_ids,
+            ),
         },
     )
 
