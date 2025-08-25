@@ -14,7 +14,7 @@ async def is_service_available(server: RemoteService, service_id: str) -> bool:
     client_id = server.config.client_id
     full_service_id = f"{client_id}:{service_id}"
     try:
-        svc = await server.get_service(full_service_id)
+        await server.get_service(full_service_id)
     except RemoteException as e:
         logger.warning("Service %s is not available: %s", service_id, e)
         return False
@@ -23,7 +23,12 @@ async def is_service_available(server: RemoteService, service_id: str) -> bool:
         logger.exception(error_msg)
         return False
     else:
-        return svc is not None
+        return True
+
+
+def num_available(available_dict: dict[str, Any]) -> int:
+    """Get the number of available services."""
+    return sum(1 for v in available_dict.values() if v["available"])
 
 
 async def check_all_services(
@@ -31,7 +36,7 @@ async def check_all_services(
     service_ids: list[str],
 ) -> dict[str, Any]:
     """Check the availability of all monitored services."""
-    results = {}
+    results: dict[str, dict[str, Any]] = {}
     all_available = True
 
     for service_id in service_ids:
@@ -48,7 +53,7 @@ async def check_all_services(
         "services": results,
         "monitored_services": service_ids,
         "total_services": len(service_ids),
-        "available_count": sum(1 for r in results.values() if r["available"]),
+        "available_count": num_available(results),
     }
 
 
@@ -191,11 +196,11 @@ async def add_individual_service_probe(server: RemoteService, service_id: str) -
     async def is_available() -> bool:
         """Check if this specific service is available."""
         try:
-            svc = await server.get_service(service_id)
+            await server.get_service(service_id)
         except RemoteException:
             return False
         else:
-            return svc is not None
+            return True
 
     async def health_check() -> dict[str, str]:
         """Health check for this specific service."""
