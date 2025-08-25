@@ -5,6 +5,7 @@ This guide explains how to deploy both the Weaviate database server and the hyph
 ## Overview
 
 The deployment consists of:
+
 1. **Weaviate Server**: The actual vector database (using the original Weaviate Helm chart)
 2. **Weaviate Service**: Hypha service that exposes Weaviate functionality via the Hypha RPC framework
 3. **Mem0 Service**: Hypha service that provides memory management capabilities
@@ -27,6 +28,7 @@ helm install weaviate-with-services weaviate/weaviate \
 ```
 
 This approach:
+
 - Uses the official Weaviate Helm chart
 - Adds startup services as additional deployments
 - Maintains compatibility with Weaviate updates
@@ -62,12 +64,13 @@ Both services use the same Docker image but with different startup commands:
 ### Environment Variables
 
 Required environment variables:
-- `HYPHA_TOKEN`: Token for connecting to the Hypha server (from secret `aria-agents-secrets`)
-- `MEM0_API_KEY`: Optional API key for Mem0 service (from secret `aria-agents-secrets`)
+
+- `MEM0_API_KEY`: Optional API key for Mem0 service (from secret `hss-secrets`)
 
 ### Security Context
 
 All services run with:
+
 - Non-root user (UID 1000)
 - Dropped capabilities
 - Read-only root filesystem (for Weaviate server)
@@ -76,18 +79,21 @@ All services run with:
 ### Resources
 
 Default resource allocation per service:
+
 - **Limits**: 500m CPU, 512Mi memory
 - **Requests**: 100m CPU, 128Mi memory
 
 ## Service URLs
 
 After deployment, the services will be available at:
-- **Weaviate Service**: `https://hypha.aicell.io/aria-agents/services/weaviate-production`
-- **Mem0 Service**: `https://hypha.aicell.io/aria-agents/services/mem0-production`
+
+- **Weaviate Service**: `https://hypha.aicell.io/hypha-agents/services/weaviate-production`
+- **Mem0 Service**: `https://hypha.aicell.io/hypha-agents/services/mem0-production`
 
 ## Monitoring
 
 The deployments include:
+
 - **Liveness Probes**: Check that the processes are running
 - **Readiness Probes**: Check that the services are ready to accept connections
 - **Service Accounts**: For proper RBAC if needed
@@ -106,12 +112,14 @@ kubectl scale deployment mem0-startup-service --replicas=2 -n hypha-services
 
 ## Troubleshooting
 
-### Check pod status:
+### Check pod status
+
 ```bash
 kubectl get pods -n hypha-services -l component=hypha-startup-services
 ```
 
-### Check logs:
+### Check logs
+
 ```bash
 # Weaviate service logs
 kubectl logs -l app=weaviate-startup-service -n hypha-services
@@ -120,11 +128,12 @@ kubectl logs -l app=weaviate-startup-service -n hypha-services
 kubectl logs -l app=mem0-startup-service -n hypha-services
 ```
 
-### Test connectivity:
+### Test connectivity
+
 ```bash
 # Test if services are registered with Hypha
-curl https://hypha.aicell.io/aria-agents/services/weaviate-production
-curl https://hypha.aicell.io/aria-agents/services/mem0-production
+curl https://hypha.aicell.io/hypha-agents/services/weaviate-production
+curl https://hypha.aicell.io/hypha-agents/services/mem0-production
 ```
 
 ## Updates
