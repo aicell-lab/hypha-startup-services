@@ -1,6 +1,6 @@
 # Weaviate Service
 
-A wrapper service of [Weaviate](https://weaviate.io/) as a Hypha service. With the help of Hypha, it provides virtual collections called "applications" and fine-grained permissions. Just like Weaviate, this service provides high-performance vector storage, semantic search, and hybrid query capabilities.
+A wrapper of [Weaviate](https://weaviate.io/) exposed as a Hypha service. Via Hypha it offers virtual collections ("applications"), multi-tenancy style isolation, and fine‑grained permissions while retaining Weaviate's vector, hybrid, and semantic search capabilities.
 
 ## API
 
@@ -44,30 +44,27 @@ asyncio.run(create_collection())
 
 ### `collections.delete(name: str | list)`
 
-Delete a collection by name.
-
-Verifies that the caller has admin permissions. Removes the collection and its associated artifact.
+Delete one or multiple collections (admin only). Also removes associated artifacts.
 
 **Parameters:**
 
-- `name` (str | list): Short collection name to delete
+- `name` (str | list): Short collection name or list of names to delete
 
-**Returns:** Confirmation of deletion
+**Returns:** None
 
 **Example:**
 
 ```python
-result = await weaviate.collections.delete("Movie")
-# Returns confirmation of deletion
+await weaviate.collections.delete("Movie")
 ```
 
 ### `collections.list_all()`
 
-List all collections accessible to the caller.
+List all collections (admin only).
 
-Returns collections based on caller's permissions. Admin users see all collections, others see collections they have access to.
+**Parameters:** None
 
-**Returns:** Dictionary mapping collection names to their configurations
+**Returns:** Dict mapping short collection names to their configurations.
 
 **Example:**
 
@@ -77,77 +74,77 @@ collections = await weaviate.collections.list_all()
 
 ### `collections.get(name: str)`
 
-Get a collection's configuration by name.
+Get a collection configuration (short name).
 
 **Parameters:**
 
-- `name` (str): Short collection name to retrieve
+- `name` (str): Short collection name
 
-**Returns:** Collection configuration
+**Returns:** Collection configuration dict
 
 **Example:**
 
 ```python
-collection = await weaviate.collections.get("Movie")
+movie_cfg = await weaviate.collections.get("Movie")
 ```
 
 ### `collections.get_artifact(collection_name: str)`
 
-Get the artifact for a collection.
-
-Retrieves the collection artifact using the caller's workspace and collection name.
+Return the artifact id (the full workspace-prefixed collection name).
 
 **Parameters:**
 
-- `collection_name` (str): Name of the collection to retrieve the artifact for
+- `collection_name` (str): Short collection name
 
-**Returns:** Dictionary with collection artifact information
+**Returns:** String artifact id
 
 **Example:**
 
 ```python
-artifact = await weaviate.collections.get_artifact("Movie")
+artifact_id = await weaviate.collections.get_artifact("Movie")
 ```
 
 ### `collections.exists(name: str)`
 
-Check if a collection exists.
+Check whether a collection exists (both in Weaviate and as an artifact).
 
 **Parameters:**
 
-- `name` (str): Short collection name to check
+- `name` (str): Short collection name
 
-**Returns:** True if collection exists, False otherwise
+**Returns:** bool
 
 **Example:**
 
 ```python
-exists = await weaviate.collections.exists("Movie")
+if await weaviate.collections.exists("Movie"):
+    print("Movie collection ready")
 ```
 
-### `applications.create(collection_name: str, application_id: str, description: str)`
+### `applications.create(collection_name: str, application_id: str, description: str, user_ws: str | None = None)`
 
-Create a new application within a collection.
+Create a new application within a collection (and tenant if needed).
 
 **Parameters:**
 
-- `collection_name` (str): Name of the collection
-- `application_id` (str): Unique identifier for the application
-- `description` (str): Description of the application
+- `collection_name` (str): Collection name
+- `application_id` (str): New application id
+- `description` (str): Description
+- `user_ws` (str, optional): Workspace to own the application (defaults to caller)
 
-**Returns:** Application creation confirmation
+**Returns:** Dict with application metadata (ids, artifact_name, owner)
 
 **Example:**
 
 ```python
-result = await weaviate.applications.create(
+app = await weaviate.applications.create(
     collection_name="Movie",
-    application_id="movie-recommender", 
+    application_id="movie-recommender",
     description="Movie recommendation system"
 )
 ```
 
-### `applications.exists(collection_name: str, application_id: str)`
+### `applications.exists(collection_name: str, application_id: str, user_ws: str | None = None)`
 
 Check if an application exists within a collection.
 
@@ -166,16 +163,14 @@ exists = await weaviate.applications.exists("Movie", "movie-recommender")
 
 ### `applications.get_artifact(collection_name: str, application_id: str)`
 
-Get the artifact for an application.
-
-Retrieves the application artifact using the caller's workspace, collection name, and application ID.
+Get the artifact id for an application (string).
 
 **Parameters:**
 
 - `collection_name` (str): Name of the collection
 - `application_id` (str): Application identifier
 
-**Returns:** Dictionary with application artifact information
+**Returns:** String artifact id
 
 **Example:**
 
@@ -250,57 +245,72 @@ result = await weaviate.applications.get(
 )
 ```
 
-### `data.insert_many(collection_name: str, application_id: str, objects: list)`
+### `data.insert_many(collection_name: str, application_id: str, objects: list, *, enable_chunking: bool = False, chunk_size: int = 512, chunk_overlap: int = 50, text_field: str = "text")`
 
-Insert multiple objects into a collection.
+Insert multiple objects (optional text chunking).
 
 **Parameters:**
 
-- `collection_name` (str): Name of the collection
-- `application_id` (str): Application identifier
-- `objects` (list): List of objects to insert
+- `collection_name` (str)
+- `application_id` (str)
+- `objects` (list[dict])
+- `enable_chunking` (bool)
+- `chunk_size` (int)
+- `chunk_overlap` (int)
+- `text_field` (str)
 
-**Returns:** Insertion results
+**Returns:** Dict with insertion summary
 
 **Example:**
 
 ```python
 objects = [
     {"title": "The Matrix", "genre": "Sci-Fi"},
-    {"title": "Inception", "genre": "Sci-Fi"}
+    {"title": "Inception", "genre": "Sci-Fi"},
 ]
-result = await weaviate.data.insert_many("Movie", "movie-recommender", objects)
+res = await weaviate.data.insert_many(
+    "Movie",
+    "movie-recommender",
+    objects,
+)
+print(res["uuids"])
 ```
 
-### `data.insert(collection_name: str, application_id: str, object_data: dict)`
+### `data.insert(collection_name: str, application_id: str, properties: dict, *, enable_chunking: bool = False, chunk_size: int = 512, chunk_overlap: int = 50, text_field: str = "text", **kwargs)`
 
-Insert a single object into a collection.
+Insert a single object (optional chunking). Returns UUID of inserted object (or first chunk).
 
 **Parameters:**
 
-- `collection_name` (str): Name of the collection
-- `application_id` (str): Application identifier
-- `object_data` (dict): Object to insert
+- `collection_name` (str)
+- `application_id` (str)
+- `properties` (dict)
+- `enable_chunking` / `chunk_size` / `chunk_overlap` / `text_field`
+- `**kwargs`: Passed to underlying insert (e.g. `uuid`)
 
-**Returns:** Insertion result
+**Returns:** UUID
 
 **Example:**
 
 ```python
-object_data = {"title": "The Matrix", "genre": "Sci-Fi"}
-result = await weaviate.data.insert("Movie", "movie-recommender", object_data)
+uuid_ = await weaviate.data.insert(
+    "Movie",
+    "movie-recommender",
+    {"title": "Interstellar", "genre": "Sci-Fi"},
+)
 ```
 
-### `data.update(collection_name: str, application_id: str, uuid: str, properties: dict)`
+### `data.update(collection_name: str, application_id: str, **kwargs)`
 
-Update an object in a collection for a given application.
+Update an object (pass `uuid` and `properties` in kwargs).
 
 **Parameters:**
 
-- `collection_name` (str): Name of the collection
-- `application_id` (str): Application identifier
-- `uuid` (str): UUID of the object to update
-- `properties` (dict): Properties to update
+- `collection_name` (str)
+- `application_id` (str)
+- `uuid` (str) via kwargs
+- `properties` (dict) via kwargs
+- Other weaviate update kwargs as needed
 
 **Returns:** None
 
@@ -308,10 +318,10 @@ Update an object in a collection for a given application.
 
 ```python
 await weaviate.data.update(
-    collection_name="Movie",
-    application_id="movie-recommender",
+    "Movie",
+    "movie-recommender",
     uuid="<object-uuid>",
-    properties={"genre": "Action"}
+    properties={"genre": "Action"},
 )
 ```
 
@@ -337,27 +347,28 @@ await weaviate.data.delete_by_id(
 )
 ```
 
-### `data.delete_many(collection_name: str, application_id: str, filters: Filter = None)`
+### `data.delete_many(collection_name: str, application_id: str, where: Filter | None = None, **kwargs)`
 
-Delete multiple objects from a collection for a given application, optionally filtered.
+Delete multiple objects matching a filter. `where` is ANDed with internal application filter.
 
 **Parameters:**
 
-- `collection_name` (str): Name of the collection
-- `application_id` (str): Application identifier
-- `filters` (Filter, optional): Weaviate filter conditions
+- `collection_name` (str)
+- `application_id` (str)
+- `where` (Filter | None)
+- `**kwargs` (e.g. `dry_run`, `output`)
 
-**Returns:** Deletion result summary
+**Returns:** Dict with `failed`, `matches`, `objects`, `successful`
 
 **Example:**
 
 ```python
 from weaviate.classes.query import Filter
 
-result = await weaviate.data.delete_many(
-    collection_name="Movie",
-    application_id="movie-recommender",
-    filters=Filter.by_property("genre").equal("Sci-Fi")
+summary = await weaviate.data.delete_many(
+    "Movie",
+    "movie-recommender",
+    where=Filter.by_property("genre").equal("Sci-Fi"),
 )
 ```
 
@@ -385,18 +396,19 @@ exists = await weaviate.data.exists(
 
 ## Query Methods
 
-### `query.fetch_objects(collection_name: str, application_id: str, filters: Filter = None, limit: int = 100)`
+### `query.fetch_objects(collection_name: str, application_id: str, filters: Filter = None, limit: int = 100, **kwargs)`
 
-Fetch objects from a collection with optional filters.
+Fetch objects with optional filters (internally constrained by application).
 
 **Parameters:**
 
-- `collection_name` (str): Name of the collection
-- `application_id` (str): Application identifier
-- `filters` (Filter, optional): Weaviate filter conditions
-- `limit` (int): Maximum number of objects to return (default: 100)
+- `collection_name` (str)
+- `application_id` (str)
+- `filters` (Filter | None)
+- `limit` (int)
+- `**kwargs`: Extra fetch options
 
-**Returns:** List of matching objects
+**Returns:** Dict with `objects`
 
 **Example:**
 
@@ -407,13 +419,14 @@ result = await weaviate.query.fetch_objects(
     collection_name="Movie",
     application_id="movie-recommender",
     filters=Filter.by_property("genre").equal("Sci-Fi"),
-    limit=10
+    limit=10,
 )
+print(len(result["objects"]))
 ```
 
-### `query.hybrid(collection_name: str, application_id: str, query: str, filters: Filter = None, limit: int = 10)`
+### `query.hybrid(collection_name: str, application_id: str, query: str, filters: Filter = None, limit: int = 10, **kwargs)`
 
-Perform hybrid search combining vector and keyword search.
+Hybrid (vector + keyword) search. Returns dict with `objects`.
 
 **Parameters:**
 
@@ -436,19 +449,22 @@ result = await weaviate.query.hybrid(
 )
 ```
 
-### `query.near_vector(collection_name: str, application_id: str, vector: list[float], filters: Filter = None, limit: int = 10)`
+### `query.near_vector(collection_name: str, application_id: str, near_vector: list[float], target_vector: str | None = None, include_vector: bool = False, filters: Filter = None, limit: int = 10, **kwargs)`
 
-Perform a vector similarity search in a collection for a given application.
+Vector similarity search. Returns dict with `objects`.
 
 **Parameters:**
 
 - `collection_name` (str): Name of the collection
 - `application_id` (str): Application identifier
-- `vector` (list[float]): The vector to search near
-- `filters` (Filter, optional): Weaviate filter conditions
-- `limit` (int): Maximum number of results (default: 10)
+- `near_vector` (list[float]): Query vector
+- `target_vector` (str, optional): Named vector field to search
+- `include_vector` (bool): Include vectors in response
+- `filters` (Filter, optional): Filter conditions
+- `limit` (int): Max results (default 10)
+- `**kwargs`: Additional weaviate near_vector kwargs
 
-**Returns:** List of matching objects
+**Returns:** Dict with `objects`
 
 **Example:**
 
@@ -456,14 +472,16 @@ Perform a vector similarity search in a collection for a given application.
 result = await weaviate.query.near_vector(
     collection_name="Movie",
     application_id="movie-recommender",
-    vector=[0.1, 0.2, 0.3],
-    limit=5
+    near_vector=[0.1, 0.2, 0.3],
+    target_vector="title_vector",
+    include_vector=False,
+    limit=5,
 )
 ```
 
-### `generate.near_text(collection_name: str, application_id: str, query: str, single_prompt: str = None, grouped_task: str = None, filters: Filter = None, limit: int = 10)`
+### `generate.near_text(collection_name: str, application_id: str, query: str, single_prompt: str = None, grouped_task: str = None, filters: Filter = None, limit: int = 10, **kwargs)`
 
-Generate text responses using RAG (Retrieval-Augmented Generation).
+Generate content (retrieval augmented). Returns dict with `objects` and `generated` text.
 
 ⚠️ **Performance Warning**: This method can be slow and may time out for large datasets or complex generation tasks. Consider using other query methods as input to an LLM for generation.
 
@@ -486,6 +504,8 @@ result = await weaviate.generate.near_text(
     collection_name="Movie",
     application_id="movie-recommender",
     query="What are good sci-fi movies?",
-    grouped_task="Recommend science fiction movies based on the data"
+    grouped_task="Recommend science fiction movies based on the data",
+    limit=5,
 )
+print(result["generated"])  # RAG answer
 ```
