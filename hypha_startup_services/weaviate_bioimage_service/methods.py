@@ -1,6 +1,7 @@
 """Service methods for the Weaviate BioImage service."""
 
 import logging
+from collections.abc import Callable, Coroutine
 from typing import Any
 
 from hypha_rpc.utils.schema import schema_function
@@ -33,6 +34,7 @@ async def ensure_shared_application_exists(
     client: WeaviateAsyncClient,
     context: dict[str, Any] | None = None,
 ) -> None:
+    """Ensure the shared application for bioimage data exists."""
     exists = await applications_exists(
         client=client,
         collection_name=BIOIMAGE_COLLECTION,
@@ -82,9 +84,10 @@ async def query(
         valid_types = {"node", "technology"}
         invalid_types = set(entity_types) - valid_types
         if invalid_types:
-            raise ValueError(
-                f"Invalid entity types: {invalid_types}. Must be 'node' or 'technology'",
+            error_msg = (
+                f"Invalid entity types: {invalid_types}. Must be 'node' or 'technology'"
             )
+            raise ValueError(error_msg)
 
     where_filter = None
     if entity_types:
@@ -102,10 +105,15 @@ async def query(
         limit=limit,
         target_vector="text_vector",  # Use available vector field
         single_prompt=(
-            f"Based on the bioimage data below, provide a comprehensive answer about the user's query: '{query_text}'. "
-            "Focus on nodes (facilities) and technologies that are relevant to this query."
+            "Based on the bioimage data below, provide a comprehensive answer about"
+            " the user's query: '{query_text}'."
+            " Focus on nodes (facilities) and technologies that are relevant to"
+            " this query."
         ),
-        grouped_task=f"Summarize the bioimage information to answer the user's question about: '{query_text}'",
+        grouped_task=(
+            "Summarize the bioimage information to answer the user's"
+            f" question about: '{query_text}'"
+        ),
         grouped_properties=["text", "entity_type", "name"],
         context=context,
     )
@@ -116,9 +124,10 @@ async def search(
     bioimage_index: BioimageIndex,
     query_text: str,
     entity_types: list[str] | None = None,
-    include_related: bool = True,
     limit: int = 10,
     context: dict[str, Any] | None = None,
+    *,
+    include_related: bool = True,
 ) -> dict[str, Any]:
     """Search bioimage data using natural language.
 
@@ -129,6 +138,7 @@ async def search(
         entity_types: Filter by entity types ('node', 'technology', or both)
         limit: Maximum number of results
         context: Context containing caller information
+        include_related: Whether to include related entities in results
 
     Returns:
         Dictionary with search results and generated response
@@ -216,18 +226,24 @@ async def get_entity(
     )
 
 
-def create_query(client: WeaviateAsyncClient):
+def create_query(
+    client: WeaviateAsyncClient,
+) -> Callable[..., Coroutine[Any, Any, dict[str, Any]]]:
     """Create a query function with injected Weaviate client."""
+    entity_types_field = Field(
+        default=None,
+        description=(
+            "Filter by entity types: 'node', 'technology', or both. Defaults to"
+            " both if not specified."
+        ),
+    )
 
     @schema_function
     async def query_func(
         query_text: str = Field(
             description="Natural language query to search bioimage data",
         ),
-        entity_types: list[str] | None = Field(
-            default=None,
-            description="Filter by entity types: 'node', 'technology', or both. Defaults to both if not specified.",
-        ),
+        entity_types: list[str] | None = entity_types_field,
         limit: int = Field(
             default=10,
             description="Maximum number of results to return",
@@ -240,7 +256,9 @@ def create_query(client: WeaviateAsyncClient):
     return query_func
 
 
-def create_get_entity(client: WeaviateAsyncClient):
+def create_get_entity(
+    client: WeaviateAsyncClient,
+) -> Callable[..., Coroutine[Any, Any, dict[str, Any]]]:
     """Create a get_entity function with injected Weaviate client."""
 
     @schema_function
@@ -254,23 +272,31 @@ def create_get_entity(client: WeaviateAsyncClient):
     return get_entity_func
 
 
-def create_search(client: WeaviateAsyncClient, bioimage_index: BioimageIndex):
+def create_search(
+    client: WeaviateAsyncClient,
+    bioimage_index: BioimageIndex,
+) -> Callable[..., Coroutine[Any, Any, dict[str, Any]]]:
     """Create a search function with injected dependencies."""
+    entity_types_field = Field(
+        default=None,
+        description=(
+            "Filter by entity types: 'node', 'technology', or both. Defaults to"
+            " both if not specified."
+        ),
+    )
 
     @schema_function
     async def search_func(
         query_text: str = Field(description="Search query for bioimage data"),
-        entity_types: list[str] | None = Field(
-            default=None,
-            description="Filter by entity types: 'node', 'technology', or both. Defaults to both if not specified.",
-        ),
-        include_related: bool = Field(
-            default=True,
-            description="Include related entities in results",
-        ),
+        entity_types: list[str] | None = entity_types_field,
         limit: int = Field(
             default=10,
             description="Maximum number of results to return",
+        ),
+        *,
+        include_related: bool = Field(
+            default=True,
+            description="Include related entities in results",
         ),
         context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
@@ -280,15 +306,17 @@ def create_search(client: WeaviateAsyncClient, bioimage_index: BioimageIndex):
             bioimage_index,
             query_text,
             entity_types,
-            include_related,
             limit,
             context,
+            include_related=include_related,
         )
 
     return search_func
 
 
-def create_get_related(bioimage_index: BioimageIndex):
+def create_get_related(
+    bioimage_index: BioimageIndex,
+) -> Callable[..., Coroutine[Any, Any, list[dict[str, Any]]]]:
     """Create a get_related function with injected bioimage index."""
 
     @schema_function
