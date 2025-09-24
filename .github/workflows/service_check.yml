@@ -1,0 +1,92 @@
+name: Service Health Check
+
+on:
+  schedule:
+    - cron: '*/9 * * * *'  # Every 9 minutes
+  workflow_dispatch:  # Allows manual triggering of the workflow
+
+jobs:
+  check_services:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: service-health-check
+      cancel-in-progress: false
+
+    env:
+      # Explicit service id; adjust if different in production
+      WEAVIATE_SERVICE_ID: weaviate-probes
+      BASE_URL: https://hypha.aicell.io/hypha-agents/services
+      # Space separated list of required services expected to be available in JSON
+      REQUIRED_SERVICES: "weaviate"
+      # Retry configuration
+      MAX_ATTEMPTS: 3
+      RETRY_DELAY_SECONDS: 15
+
+    steps:
+    - name: Initialize error log
+      run: |
+        : > error.log
+
+    - name: Check Services (simple, with retries)
+      run: |
+        set -euo pipefail
+        url="${BASE_URL}/${WEAVIATE_SERVICE_ID}/liveness?_mode=random"
+        attempt=1
+        : > last_payload.log
+        while [ $attempt -le ${MAX_ATTEMPTS} ]; do
+          echo "Attempt $attempt/$MAX_ATTEMPTS ..."
+          response=$(curl -s --location --max-time 20 --write-out "\n%{http_code}" "$url" || true)
+          body="${response%$'\n'*}"
+          http_code="${response##*$'\n'}"
+          echo "$body" > last_payload.log
+          errors=()
+          if [ "$http_code" != "200" ]; then
+            errors+=("HTTP $http_code")
+          else
+            grep -q '"status":"alive"' last_payload.log || errors+=("missing status=alive")
+            grep -q '"all_services_available":true' last_payload.log || errors+=("missing all_services_available=true")
+            for svc in $REQUIRED_SERVICES; do
+              grep -q "\"$svc\"" last_payload.log || errors+=("missing service $svc")
+            done
+          fi
+          if [ ${#errors[@]} -eq 0 ]; then
+            echo "Healthy (attempt $attempt)"
+            break
+          fi
+          printf 'Attempt %d errors: %s\n' "$attempt" "${errors[*]}" >> error.log
+          if [ $attempt -lt ${MAX_ATTEMPTS} ]; then
+            echo "Retrying in ${RETRY_DELAY_SECONDS}s..."
+            sleep ${RETRY_DELAY_SECONDS}
+          fi
+          attempt=$((attempt+1))
+        done
+        if [ ${#errors[@]} -ne 0 ]; then
+          echo "Final payload:" >> error.log
+          cat last_payload.log >> error.log
+        fi
+        rm -f last_payload.log
+        
+    - name: Exit with error if any services are down
+      run: |
+        if [ -s error.log ]; then
+          echo "Service health check failures:" >&2
+          cat error.log >&2
+          exit 1
+        fi
+        echo "All services are functioning normally"
+
+    - name: Slack Notify on Failure
+      if: failure()
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      run: |
+        if [ -z "${SLACK_WEBHOOK_URL}" ]; then
+          echo "SLACK_WEBHOOK_URL not set; skipping Slack notification"
+          exit 0
+        fi
+        raw_log=$(sed 's/`/"/g' error.log | head -c 3400)
+        msg_header=":rotating_light: Service health check failed on *hypha-startup-services* (${GITHUB_REF} commit ${GITHUB_SHA})"
+        full_msg="$msg_header\n\n\`\`\`\n$raw_log\n\`\`\`"
+        # Escape backslashes, double quotes, and newlines for JSON
+        json_text=$(printf '%s' "$full_msg" | python3 -c 'import json,sys; print(json.dumps({"text": sys.stdin.read()}))')
+        curl -X POST -H 'Content-type: application/json' --data "$json_text" "$SLACK_WEBHOOK_URL" || echo "Slack notification failed"
