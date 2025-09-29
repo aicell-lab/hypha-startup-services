@@ -60,10 +60,6 @@ jobs:
           fi
           attempt=$((attempt+1))
         done
-        if [ ${#errors[@]} -ne 0 ]; then
-          echo "Final payload:" >> error.log
-          cat last_payload.log >> error.log
-        fi
         rm -f last_payload.log
         
     - name: Exit with error if any services are down
