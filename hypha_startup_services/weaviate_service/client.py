@@ -5,7 +5,7 @@ from weaviate import WeaviateAsyncClient
 from weaviate.classes.init import AdditionalConfig
 from weaviate.connect import ConnectionParams
 
-load_dotenv()
+load_dotenv(override=True)
 
 
 async def instantiate_and_connect() -> WeaviateAsyncClient:

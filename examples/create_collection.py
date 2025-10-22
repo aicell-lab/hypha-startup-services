@@ -13,7 +13,7 @@ from hypha_rpc.rpc import RemoteService
 
 from hypha_startup_services.weaviate_service.register_service import register_weaviate
 
-load_dotenv()
+load_dotenv(override=True)
 SERVICE_NAME = "weaviate-test"
 
 logger = logging.getLogger(__name__)

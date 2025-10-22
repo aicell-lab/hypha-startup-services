@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 async def main():
     # Load environment variables
-    load_dotenv()
+    load_dotenv(override=True)
 
     # Connect to Hypha server
     token = os.environ.get("HYPHA_TOKEN")

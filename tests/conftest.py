@@ -20,7 +20,7 @@ TOKEN_ENVS = ["PERSONAL_TOKEN", "PERSONAL_TOKEN2", "PERSONAL_TOKEN3"]
 
 async def get_user_server(token_env="PERSONAL_TOKEN"):
     """Get a user server connection with the specified token."""
-    load_dotenv()
+    load_dotenv(override=True)
     token = os.environ.get(token_env)
     assert token is not None, f"{token_env} environment variable is not set"
     server = await connect_to_server(
