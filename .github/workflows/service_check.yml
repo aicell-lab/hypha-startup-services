@@ -60,10 +60,6 @@ jobs:
           fi
           attempt=$((attempt+1))
         done
-        if [ ${#errors[@]} -ne 0 ]; then
-          echo "Final payload:" >> error.log
-          cat last_payload.log >> error.log
-        fi
         rm -f last_payload.log
         
     - name: Exit with error if any services are down
@@ -85,7 +81,7 @@ jobs:
           exit 0
         fi
         raw_log=$(sed 's/`/"/g' error.log | head -c 3400)
-        msg_header=":rotating_light: Service health check failed on *hypha-startup-services* (${GITHUB_REF} commit ${GITHUB_SHA})"
+        msg_header=":rotating_light: Weaviate down!"
         full_msg="$msg_header\n\n\`\`\`\n$raw_log\n\`\`\`"
         # Escape backslashes, double quotes, and newlines for JSON
         json_text=$(printf '%s' "$full_msg" | python3 -c 'import json,sys; print(json.dumps({"text": sys.stdin.read()}))')
