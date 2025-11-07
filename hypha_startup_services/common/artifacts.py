@@ -2,7 +2,6 @@
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Any
 
 from hypha_rpc.rpc import RemoteException
 
@@ -26,7 +25,7 @@ class BaseArtifactParams(ABC):
 
     @property
     @abstractmethod
-    def creation_dict(self) -> dict[str, Any]:
+    def creation_dict(self) -> dict[str, object]:
         """Return a dictionary suitable for artifact creation."""
         raise NotImplementedError
 
@@ -38,14 +37,14 @@ class BaseArtifactParams(ABC):
 
     @property
     @abstractmethod
-    def manifest(self) -> dict[str, Any]:
+    def manifest(self) -> dict[str, object]:
         """Return the artifact manifest as a dictionary."""
         raise NotImplementedError
 
 
 async def get_artifact(
     artifact_id: str,
-) -> dict[str, Any]:
+) -> dict[str, object]:
     """Get an artifact from the artifact manager.
 
     Args:
@@ -66,7 +65,7 @@ async def get_artifact(
 
 async def create_artifact(
     artifact_params: BaseArtifactParams,
-) -> dict[str, Any]:
+) -> dict[str, object]:
     """Create a new artifact using the model-based approach."""
     if await artifact_exists(
         artifact_id=artifact_params.artifact_id,
@@ -122,12 +121,12 @@ async def artifact_exists(
 
 async def artifact_edit(
     artifact_id: str,
-    manifest: dict[str, Any] | None = None,
-    config: dict[str, Any] | None = None,
-    **kwargs: Any,
+    manifest: dict[str, object] | None = None,
+    config: dict[str, object] | None = None,
+    **kwargs: object,
 ) -> None:
     """Edit an existing artifact's manifest, config, or other properties."""
-    edit_params: dict[str, Any] = {"artifact_id": artifact_id}
+    edit_params: dict[str, object] = {"artifact_id": artifact_id}
     if manifest is not None:
         edit_params["manifest"] = manifest
     if config is not None:

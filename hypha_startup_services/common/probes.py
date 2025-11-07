@@ -2,11 +2,21 @@
 
 import logging
 from functools import partial
-from typing import Any, Never
+from typing import Never, TypedDict
 
 from hypha_rpc.rpc import RemoteException, RemoteService
 
 logger = logging.getLogger(__name__)
+
+
+class ServicesCheck(TypedDict):
+    """Service availability check result."""
+
+    all_services_available: bool
+    services: dict[str, dict[str, object]]
+    monitored_services: list[str]
+    total_services: int
+    available_count: int
 
 
 async def is_service_available(server: RemoteService, service_id: str) -> bool:
@@ -26,7 +36,7 @@ async def is_service_available(server: RemoteService, service_id: str) -> bool:
         return True
 
 
-def num_available(available_dict: dict[str, Any]) -> int:
+def num_available(available_dict: dict[str, dict[str, object]]) -> int:
     """Get the number of available services."""
     return sum(1 for v in available_dict.values() if v["available"])
 
@@ -34,9 +44,9 @@ def num_available(available_dict: dict[str, Any]) -> int:
 async def check_all_services(
     server: RemoteService,
     service_ids: list[str],
-) -> dict[str, Any]:
+) -> ServicesCheck:
     """Check the availability of all monitored services."""
-    results: dict[str, dict[str, Any]] = {}
+    results: dict[str, dict[str, object]] = {}
     all_available = True
 
     for service_id in service_ids:
@@ -57,7 +67,7 @@ async def check_all_services(
     }
 
 
-def raise_unavailable(status: dict[str, Any]) -> Never:
+def raise_unavailable(status: ServicesCheck) -> Never:
     """Raise an error because some services are unavailable."""
     unavailable = [
         sid for sid, info in status["services"].items() if not info["available"]
@@ -73,7 +83,7 @@ def raise_unavailable(status: dict[str, Any]) -> Never:
 async def readiness_probe(
     server: RemoteService,
     service_ids: list[str],
-) -> dict[str, Any]:
+) -> dict[str, object]:
     """Readiness probe - checks if all services are ready to serve traffic."""
     try:
         status = await check_all_services(server, service_ids)
@@ -104,7 +114,7 @@ def raise_unhealthy(available_share: float, availability_threshold: float) -> Ne
 async def liveness_probe(
     server: RemoteService,
     service_ids: list[str],
-) -> dict[str, Any]:
+) -> dict[str, object]:
     """Liveness probe - checks if the probe service itself is alive."""
     try:
         status = await check_all_services(server, service_ids)
@@ -125,14 +135,6 @@ async def liveness_probe(
         error_msg = f"Liveness probe failed: {e}"
         logger.exception(error_msg)
         raise
-
-
-async def get_service_status(
-    server: RemoteService,
-    service_ids: list[str],
-) -> dict[str, Any]:
-    """Get detailed status of all services (for debugging/monitoring)."""
-    return await check_all_services(server, service_ids)
 
 
 async def add_probes(

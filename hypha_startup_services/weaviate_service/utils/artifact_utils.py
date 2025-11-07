@@ -1,19 +1,18 @@
 """Artifact util functions."""
 
 import logging
-from typing import Any
 
 from hypha_startup_services.common.artifacts import (
     create_artifact,
     delete_artifact,
 )
+from hypha_startup_services.common.constants import (
+    ADMIN_WORKSPACES,
+)
 from hypha_startup_services.common.utils import (
     get_application_artifact_name,
 )
 
-from .constants import (
-    ADMIN_WORKSPACES,
-)
 from .format_utils import (
     get_full_collection_name,
 )
@@ -74,7 +73,7 @@ async def delete_collection_artifacts(short_names: list[str]) -> None:
 
 
 async def create_collection_artifact(
-    settings: dict[str, Any],
+    settings: dict[str, object],
 ) -> None:
     """Create a collection artifact using the model-based approach."""
     permissions = make_artifact_permissions(owners=ADMIN_WORKSPACES)
@@ -103,7 +102,7 @@ async def create_application_artifact(
     description: str,
     user_ws: str,
     caller_ws: str,
-) -> dict[str, Any]:
+) -> dict[str, object]:
     """Create an application artifact.
 
     Args:

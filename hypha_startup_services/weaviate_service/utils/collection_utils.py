@@ -1,18 +1,35 @@
 """Utility functions for managing Weaviate collections."""
 
+import uuid as uuid_class
 from collections.abc import Sequence
+from typing import TypedDict, TypeVar
 
 from weaviate import WeaviateAsyncClient
 from weaviate.classes.query import Filter
 from weaviate.classes.tenants import Tenant
 from weaviate.collections import CollectionAsync
-from weaviate.collections.classes.filters import _Filters
+from weaviate.collections.classes.batch import ErrorObject
+from weaviate.collections.classes.filters import (
+    _Filters,  # type: ignore[reportPrivateUsage]
+)
 from weaviate.collections.classes.internal import GenerativeObject, Object
 
 from .format_utils import (
     get_full_collection_name,
     get_short_name,
 )
+
+P = TypeVar("P")
+R = TypeVar("R")
+
+
+class InsertManyReturn(TypedDict):
+    """Return type for data_insert_many method."""
+
+    elapsed_seconds: float
+    errors: dict[str, ErrorObject]
+    uuids: dict[str, uuid_class.UUID]
+    has_errors: bool
 
 
 def acquire_collection(
@@ -25,8 +42,8 @@ def acquire_collection(
 
 
 def objects_part_coll_name(
-    objects: Sequence[Object | GenerativeObject],
-) -> Sequence[Object | GenerativeObject]:
+    objects: Sequence[Object[P, R] | GenerativeObject[P, R]],
+) -> Sequence[Object[P, R] | GenerativeObject[P, R]]:
     """Shorten collection names in object IDs."""
     for obj in objects:
         obj.collection = get_short_name(obj.collection)
@@ -83,7 +100,7 @@ async def add_tenant_if_not_exists(
     collection = acquire_collection(client, collection_name)
     formatted_tenant_name = format_tenant_name(tenant_name)
     existing_tenant = await collection.tenants.get_by_name(formatted_tenant_name)
-    if existing_tenant is None or not existing_tenant.name == formatted_tenant_name:
+    if existing_tenant is None or existing_tenant.name != formatted_tenant_name:
         await collection.tenants.create(
             tenants=[Tenant(name=formatted_tenant_name)],
         )

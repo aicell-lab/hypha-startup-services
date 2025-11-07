@@ -1,3 +1,5 @@
+"""Models for Weaviate artifact parameters."""
+
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -8,6 +10,9 @@ from hypha_startup_services.common.constants import ARTIFACT_DELIMITER
 from .format_utils import (
     get_full_collection_name,
 )
+
+# TODO: refactor this file significantly
+# Idea: composition, not inheritance: every class has an artifact params instance
 
 # Type alias for permission operations
 PermissionOperation = Literal[
@@ -27,7 +32,7 @@ PermissionOperation = Literal[
 
 
 class WeaviateArtifactParams(BaseModel, BaseArtifactParams):
-    """Model for Weaviate artifact parameters with validation and computed properties."""
+    """Weaviate artifact parameters with validation and computed properties."""
 
     artifact_name: str = Field(
         description="The name/ID of the artifact",
@@ -38,7 +43,7 @@ class WeaviateArtifactParams(BaseModel, BaseArtifactParams):
     )
     permissions: dict[str, str] | None = Field(
         default=None,
-        description="Permissions for the artifact, mapping user IDs to permission levels",
+        description="Artifact permissions, mapping user IDs to permission levels",
     )
     metadata: dict[str, Any] | None = Field(
         default=None,
@@ -77,7 +82,7 @@ class WeaviateArtifactParams(BaseModel, BaseArtifactParams):
 
     @property
     def creation_dict(self) -> dict[str, Any]:
-        """Convert the ArtifactParams instance to a dictionary suitable for artifact creation."""
+        """Convert instance to a dictionary suitable for artifact creation."""
         return {
             "parent_id": self.parent_id,
             "alias": self.artifact_name,
@@ -96,7 +101,8 @@ class CollectionArtifactParams(WeaviateArtifactParams):
         description="The short name of the collection",
     )
 
-    def __init__(self, **data):
+    def __init__(self, **data: Any) -> None:
+        """Initialize CollectionArtifactParams."""
         # Auto-generate artifact_name from collection_name if not provided
         if "artifact_name" not in data and "collection_name" in data:
             data["artifact_name"] = get_full_collection_name(data["collection_name"])
@@ -126,7 +132,7 @@ class ApplicationArtifactParams(WeaviateArtifactParams):
         description="The user workspace for the application",
     )
 
-    def __init__(self, **data):
+    def __init__(self, **data: Any) -> None:
         # Auto-generate artifact_name and parent_id if not provided
         if "artifact_name" not in data:
             full_collection_name = get_full_collection_name(data["collection_name"])

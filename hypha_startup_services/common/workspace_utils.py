@@ -10,6 +10,6 @@ def ws_from_context(context: dict[str, Any]) -> str:
 
 def validate_workspace(workspace: str) -> None:
     """Raise ValueError if workspace is not a valid non-empty string."""
-    if not isinstance(workspace, str) or not workspace.strip():
+    if not workspace.strip():
         error_msg = f"Invalid workspace: {workspace}"
         raise ValueError(error_msg)
