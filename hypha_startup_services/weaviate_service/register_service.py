@@ -6,6 +6,10 @@ from functools import partial
 from hypha_rpc.rpc import RemoteService
 from weaviate import WeaviateAsyncClient
 
+from hypha_startup_services.common.constants import (
+    DEFAULT_WEAVIATE_SERVICE_ID as DEFAULT_SERVICE_ID,
+)
+
 from .client import (
     instantiate_and_connect,
 )
@@ -36,7 +40,6 @@ from .methods import (
 from .service_codecs import (
     register_weaviate_codecs,
 )
-from .utils.constants import DEFAULT_SERVICE_ID
 
 logger = logging.getLogger(__name__)
 

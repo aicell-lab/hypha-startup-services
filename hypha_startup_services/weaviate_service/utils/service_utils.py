@@ -4,8 +4,6 @@ This module contains helper functions for Weaviate service operations
 that need to be shared across different parts of the service.
 """
 
-from typing import Any
-
 from weaviate import WeaviateAsyncClient
 from weaviate.collections import CollectionAsync
 
@@ -33,8 +31,7 @@ async def prepare_application_creation(
     collection_name: str,
     user_ws: str,
 ) -> None:
-    """Prepare for application creation by checking collection existence and
-            adding tenant.
+    """Prepare application creation by checking collection existence and adding tenant.
 
     Args:
         client: WeaviateAsyncClient instance
@@ -136,7 +133,7 @@ async def prepare_tenant_collection(
     collection_name: str,
     application_id: str,
     user_ws: str | None = None,
-    context: dict[str, Any] | None = None,
+    context: dict[str, object] | None = None,
 ) -> CollectionAsync:
     """Validate that the Weaviate client is properly configured.
 

@@ -1,10 +1,19 @@
-from typing import Any
+"""Utilities for formatting Weaviate collection names and configurations."""
+
+from typing import Protocol
 
 from weaviate.collections import CollectionAsync
-from weaviate.collections.classes.config import CollectionConfig
 
 from hypha_startup_services.common.constants import COLLECTION_DELIMITER
 from hypha_startup_services.common.utils import get_full_collection_name
+
+
+class SupportsToDict(Protocol):
+    """Structural type for objects exposing a to_dict method."""
+
+    def to_dict(self) -> dict[str, object]:
+        """Return a JSON-serializable dictionary representation."""
+        ...
 
 
 def get_short_name(collection_name: str) -> str:
@@ -19,15 +28,20 @@ def get_short_name(collection_name: str) -> str:
 
 
 def config_with_short_name(
-    collection_config: CollectionConfig,
-) -> dict[str, Any]:
+    collection_config: SupportsToDict,
+) -> dict[str, object]:
     """Remove workspace from collection config."""
     config_dict = collection_config.to_dict()
-    config_dict["class"] = get_short_name(config_dict["class"])
+    class_name = config_dict.get("class")
+    if not isinstance(class_name, str):
+        error_msg = "The 'class' field in collection config must be a string."
+        raise TypeError(error_msg)
+
+    config_dict["class"] = get_short_name(class_name)
     return config_dict
 
 
-async def collection_to_config_dict(collection: CollectionAsync) -> dict[str, Any]:
+async def collection_to_config_dict(collection: CollectionAsync) -> dict[str, object]:
     """Convert collection to a dictionary with shortened collection name.
 
     Gets the collection's configuration and converts the full collection name
@@ -41,8 +55,7 @@ async def collection_to_config_dict(collection: CollectionAsync) -> dict[str, An
 
     """
     config = await collection.config.get()
-    config_dict = config_with_short_name(config)
-    return config_dict
+    return config_with_short_name(config)
 
 
 def get_full_collection_names(short_names: list[str]) -> list[str]:
@@ -50,18 +63,23 @@ def get_full_collection_names(short_names: list[str]) -> list[str]:
     return [get_full_collection_name(short_name) for short_name in short_names]
 
 
-def get_settings_full_name(settings: dict[str, Any]) -> dict[str, Any]:
+def get_settings_full_name(settings: dict[str, object]) -> dict[str, object]:
     """Add workspace prefix to the collection name in settings."""
     settings_full_name = settings.copy()
     original_class_name = settings_full_name["class"]
+
+    if not isinstance(original_class_name, str):
+        error_msg = "The 'class' field in settings must be a string."
+        raise TypeError(error_msg)
+
     settings_full_name["class"] = get_full_collection_name(original_class_name)
     return settings_full_name
 
 
 def add_app_id(
-    objects: list[dict[str, Any]],
+    objects: list[dict[str, object]],
     application_id: str,
-) -> list[dict[str, Any]]:
+) -> list[dict[str, object]]:
     """Append the application ID to each object in the list or to a single object.
 
     If objects is a single dictionary, it gets converted to a list with one item.

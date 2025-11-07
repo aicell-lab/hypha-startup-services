@@ -11,8 +11,27 @@ from typing import Any
 from hypha_rpc.rpc import RemoteService
 from hypha_rpc.utils.pydantic import create_model_from_schema
 from pydantic import BaseModel
-from weaviate.collections.classes.filters import _FilterValue, _Operator
+from weaviate.collections.classes.filters import (
+    _FilterValue,  # type: ignore[reportPrivateUsage]
+    _Operator,  # type: ignore[reportPrivateUsage]
+)
 from weaviate.collections.classes.internal import Object
+
+
+def encode_uuid(obj: uuid.UUID) -> str:
+    """Encode UUID to string."""
+    return obj.hex
+
+
+def encode_object(obj: Object[object, object]) -> dict[str, object]:
+    """Encode Weaviate Object to dictionary."""
+    return {
+        "uuid": obj.uuid.hex,
+        "vector": obj.vector,
+        "properties": obj.properties,
+        "metadata": obj.metadata and asdict(obj.metadata),
+        "collection": obj.collection,
+    }
 
 
 def register_weaviate_codecs(server: RemoteService) -> None:
@@ -21,13 +40,13 @@ def register_weaviate_codecs(server: RemoteService) -> None:
         {
             "name": "uuid-uuid",
             "type": uuid.UUID,
-            "encoder": lambda obj: obj.hex,
+            "encoder": encode_uuid,
             "decoder": uuid.UUID,
         },
     )
 
     # Override the built-in Pydantic codec to handle _FilterValue specially
-    def custom_pydantic_encoder(obj: BaseModel) -> dict[str, Any]:
+    def custom_pydantic_encoder(obj: BaseModel) -> dict[str, object]:
         """Encode pydantic model with special case _FilterValue."""
         if isinstance(obj, _FilterValue):
             # Use model_dump("json") as suggested by maintainer
@@ -69,12 +88,6 @@ def register_weaviate_codecs(server: RemoteService) -> None:
         {
             "name": "weaviate_object",
             "type": Object,
-            "encoder": lambda obj: {
-                "uuid": obj.uuid.hex,
-                "vector": obj.vector,
-                "properties": obj.properties,
-                "metadata": obj.metadata and asdict(obj.metadata),
-                "collection": obj.collection,
-            },
+            "encoder": encode_object,
         },
     )

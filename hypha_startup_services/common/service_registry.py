@@ -1,7 +1,6 @@
 """Service registry for startup services."""
 
 from collections.abc import Awaitable, Callable
-from typing import Any
 
 from hypha_rpc.rpc import RemoteService
 
@@ -27,7 +26,7 @@ class ServiceRegistry:
 
     def __init__(self) -> None:
         """Initialize the service registry."""
-        self._services: dict[str, dict[str, Any]] = {}
+        self._services: dict[str, dict[str, object]] = {}
 
     def register_service_type(
         self,
@@ -51,7 +50,7 @@ class ServiceRegistry:
             "default_service_id": default_service_id,
         }
 
-    def get_service_config(self, service_name: str) -> dict[str, Any]:
+    def get_service_config(self, service_name: str) -> dict[str, object]:
         """Get configuration for a service."""
         if service_name not in self._services:
             error_msg = (

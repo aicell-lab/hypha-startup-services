@@ -6,7 +6,7 @@ based on the mem0 service design with enhancements for flexibility.
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Literal
+from typing import Literal, TypedDict, cast
 
 from hypha_rpc.rpc import RemoteException
 from pydantic import BaseModel, Field
@@ -196,9 +196,30 @@ def is_admin_workspace(workspace: str) -> bool:
     return workspace in ADMIN_WORKSPACES
 
 
+class ArtifactConfig(TypedDict, total=False):
+    """Artifact configuration shape.
+
+    "permissions" is expected to be present and a mapping of
+    workspace -> permission string when the artifact is created by
+    our services, but the overall config can include additional
+    provider-specific keys that we don't model.
+    """
+
+    permissions: dict[str, str]
+
+
+class ArtifactData(TypedDict, total=False):
+    """Artifact data as returned by artifact manager.
+
+    Only the "config" portion is modeled here since that's all we access.
+    """
+
+    config: ArtifactConfig
+
+
 async def get_user_permissions(
     permission_params: BasePermissionParams,
-) -> dict[str, Any] | str:
+) -> str:
     """Get user permissions for a specific artifact.
 
     Args:
@@ -209,14 +230,16 @@ async def get_user_permissions(
 
     """
     try:
-        artifact = await get_artifact(permission_params.artifact_id)
+        artifact_raw = await get_artifact(permission_params.artifact_id)
     except RemoteException as e:
         error_msg = f"Failed to retrieve artifact {permission_params.artifact_id}: {e}"
         logger.exception(error_msg)
-        return {}
+        return ""
+    artifact = cast("ArtifactData", artifact_raw)
+    config: ArtifactConfig = artifact.get("config", {})
+    permissions: dict[str, str] = config.get("permissions", {})
 
-    permissions = artifact.get("config", {}).get("permissions", {})
-    return permissions.get(permission_params.accessor_workspace, {})
+    return permissions.get(permission_params.accessor_workspace, "")
 
 
 async def user_has_operation_permission(
@@ -236,7 +259,7 @@ async def user_has_operation_permission(
     if user_permissions == "*":
         return True
 
-    if isinstance(user_permissions, str) and user_permissions in ("*", "rw+"):
+    if user_permissions in ("*", "rw+"):
         return True
 
     return permission_params.operation in user_permissions

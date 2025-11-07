@@ -4,7 +4,6 @@ import logging
 import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Any
 
 from hypha_rpc import connect_to_server
 from hypha_rpc.rpc import RemoteService
@@ -17,7 +16,7 @@ async def get_server(
     provided_url: str,
     port: int | None = None,
     client_id: str | None = None,
-) -> AsyncGenerator[RemoteService, Any]:
+) -> AsyncGenerator[RemoteService, object]:
     """Get a connection to a remote Hypha server.
 
     Args:
@@ -38,10 +37,6 @@ async def get_server(
     if client_id:
         server_config["client_id"] = client_id
     server = await connect_to_server(server_config)
-
-    if not isinstance(server, RemoteService):
-        error_msg = "Server is not a RemoteService instance."
-        raise TypeError(error_msg)
 
     try:
         yield server
