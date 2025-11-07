@@ -2,9 +2,10 @@
 
 import uuid as uuid_class
 from collections.abc import Sequence
-from typing import TypedDict, TypeVar
+from typing import TYPE_CHECKING, TypedDict, TypeVar, cast
 
 from weaviate import WeaviateAsyncClient
+from weaviate.classes.data import DataObject
 from weaviate.classes.query import Filter
 from weaviate.classes.tenants import Tenant
 from weaviate.collections import CollectionAsync
@@ -12,12 +13,20 @@ from weaviate.collections.classes.batch import ErrorObject
 from weaviate.collections.classes.filters import (
     _Filters,  # type: ignore[reportPrivateUsage]
 )
-from weaviate.collections.classes.internal import GenerativeObject, Object
+from weaviate.collections.classes.internal import (
+    GenerativeObject,
+    Object,
+    ReferenceInputs,
+)
+from weaviate.collections.classes.types import WeaviateProperties
 
 from .format_utils import (
     get_full_collection_name,
     get_short_name,
 )
+
+if TYPE_CHECKING:
+    from weaviate.types import UUID, VECTORS
 
 P = TypeVar("P")
 R = TypeVar("R")
@@ -30,6 +39,27 @@ class InsertManyReturn(TypedDict):
     errors: dict[str, ErrorObject]
     uuids: dict[str, uuid_class.UUID]
     has_errors: bool
+
+
+def to_data_object(
+    obj: dict[str, object],
+) -> DataObject[WeaviateProperties, ReferenceInputs]:
+    """Convert a dictionary to a DataObject."""
+    props = dict(obj)
+
+    raw_vector = props.pop("vector", None)
+    raw_uuid = props.pop("uuid", props.pop("id", None))
+    raw_references = props.pop("references", None)
+
+    uuid_value = raw_uuid if raw_uuid is not None else None
+    vector_value = raw_vector if raw_vector is not None else None
+
+    return DataObject(
+        properties=cast("WeaviateProperties", props),
+        uuid=cast("UUID", uuid_value),
+        vector=cast("VECTORS", vector_value),
+        references=cast("ReferenceInputs", raw_references),
+    )
 
 
 def acquire_collection(

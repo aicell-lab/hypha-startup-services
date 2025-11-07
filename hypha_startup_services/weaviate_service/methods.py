@@ -42,6 +42,7 @@ from .utils.collection_utils import (
     InsertManyReturn,
     add_tenant_if_not_exists,
     is_multitenancy_enabled,
+    to_data_object,
 )
 from .utils.format_utils import (
     add_app_id,
@@ -66,7 +67,10 @@ if TYPE_CHECKING:
         BatchObjectReturn,
         DeleteManyReturn,
     )
-    from weaviate.collections.classes.internal import GenerativeReturn, QueryReturn
+    from weaviate.collections.classes.internal import (
+        GenerativeReturn,
+        QueryReturn,
+    )
     from weaviate.collections.classes.types import WeaviateField
 
 logger = logging.getLogger(__name__)
@@ -625,10 +629,10 @@ async def data_insert_many(
         processed_objects = objects
 
     app_objects = add_app_id(processed_objects, application_id)
-    app_objects = cast("list[dict[str, WeaviateField]]", app_objects)
+    data_objects = [to_data_object(obj) for obj in app_objects]
 
     response: BatchObjectReturn = await tenant_collection.data.insert_many(
-        objects=app_objects,
+        objects=data_objects,
     )
 
     return InsertManyReturn(
