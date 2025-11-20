@@ -9,6 +9,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any, cast
 
+from weaviate.classes.query import MetadataQuery
+
 from hypha_startup_services.common.artifacts import (
     artifact_edit,
     artifact_exists,
@@ -722,6 +724,8 @@ async def query_near_vector(
     application_id: str,
     user_ws: str | None = None,
     context: dict[str, object] | None = None,
+    *,
+    return_metadata: bool = True,
     **kwargs: Any,
 ) -> dict[str, object]:
     """Query the collection using vector similarity search.
@@ -751,6 +755,9 @@ async def query_near_vector(
     )
 
     kwargs["filters"] = and_app_filter(application_id, kwargs.get("filters"))
+
+    if return_metadata:
+        kwargs["return_metadata"] = MetadataQuery.full()
 
     response = cast(
         "QueryReturn[object, object]",

@@ -6,6 +6,7 @@ allowing them to be serialized and transferred through Hypha RPC.
 
 import uuid
 from dataclasses import asdict
+from datetime import datetime
 from typing import Any
 
 from hypha_rpc.rpc import RemoteService
@@ -32,6 +33,11 @@ def encode_object(obj: Object[object, object]) -> dict[str, object]:
         "metadata": obj.metadata and asdict(obj.metadata),
         "collection": obj.collection,
     }
+
+
+def _datetime_encoder(dt: datetime) -> str:
+    """Encode datetime to ISO format string."""
+    return dt.isoformat()
 
 
 def register_weaviate_codecs(server: RemoteService) -> None:
@@ -89,5 +95,14 @@ def register_weaviate_codecs(server: RemoteService) -> None:
             "name": "weaviate_object",
             "type": Object,
             "encoder": encode_object,
+        },
+    )
+
+    server.register_codec(
+        {
+            "name": "datetime-datetime",
+            "type": datetime,
+            "encoder": _datetime_encoder,
+            "decoder": datetime.fromisoformat,
         },
     )
