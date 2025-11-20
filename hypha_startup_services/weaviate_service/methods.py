@@ -740,6 +740,7 @@ async def query_near_vector(
         application_id: ID of the application to filter results by
         user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
+        return_metadata: Whether to return metadata in the results
         **kwargs: Additional arguments to pass to near_vector()
 
     Returns:
@@ -775,6 +776,8 @@ async def query_fetch_objects(
     application_id: str,
     user_ws: str | None = None,
     context: dict[str, object] | None = None,
+    *,
+    return_metadata: bool = True,
     **kwargs: Any,
 ) -> dict[str, object]:
     """Query the collection to fetch objects based on filters.
@@ -789,6 +792,7 @@ async def query_fetch_objects(
         application_id: ID of the application to filter results by (optional)
         user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
+        return_metadata: Whether to return metadata in the results
         **kwargs: Additional arguments to pass to fetch_objects()
 
     Returns:
@@ -804,6 +808,9 @@ async def query_fetch_objects(
     )
 
     kwargs["filters"] = and_app_filter(application_id, kwargs.get("filters"))
+
+    if return_metadata:
+        kwargs["return_metadata"] = MetadataQuery.full()
 
     response = cast(
         "QueryReturn[object, object]",
@@ -821,6 +828,8 @@ async def query_hybrid(
     application_id: str,
     user_ws: str | None = None,
     context: dict[str, object] | None = None,
+    *,
+    return_metadata: bool = True,
     **kwargs: Any,
 ) -> dict[str, object]:
     """Query collection using hybrid search (combination of vector and keyword search).
@@ -836,6 +845,7 @@ async def query_hybrid(
         application_id: ID of the application to filter results by (optional)
         user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
+        return_metadata: Whether to return metadata in the results
         **kwargs: Additional arguments to pass to hybrid()
 
     Returns:
@@ -851,6 +861,9 @@ async def query_hybrid(
     )
 
     kwargs["filters"] = and_app_filter(application_id, kwargs.get("filters"))
+
+    if return_metadata:
+        kwargs["return_metadata"] = MetadataQuery.full()
 
     response = cast(
         "QueryReturn[object, object]",
