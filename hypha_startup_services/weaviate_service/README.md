@@ -2,6 +2,12 @@
 
 A wrapper of [Weaviate](https://weaviate.io/) exposed as a Hypha service. Via Hypha it offers virtual collections ("applications"), multi-tenancy style isolation, and fine‑grained permissions while retaining Weaviate's vector, hybrid, and semantic search capabilities.
 
+## ⚠️ Client Setup: Codecs Required
+
+This service take complex objects (like `UUID`s and Weaviate `Object`s). You **must** register custom codecs in your client to handle these responses.
+
+👉 **[See the Codecs Guide](../../codecs.md)** for setup instructions.
+
 ## API
 
 ### `collections.create(settings: dict)`
@@ -435,8 +441,12 @@ Hybrid (vector + keyword) search. Returns dict with `objects`.
 - `query` (str): Search query
 - `filters` (Filter, optional): Weaviate filter conditions
 - `limit` (int): Maximum number of results (default: 10)
+- `**kwargs`: Additional arguments, including `return_metadata`
 
 **Returns:** Hybrid search results
+
+**Metadata Note:**
+By default, this method returns full metadata (distance, score, creation time, etc.) for each object. You can control this by passing a `return_metadata` argument (see `query.near_vector` for details).
 
 **Example:**
 
@@ -462,9 +472,13 @@ Vector similarity search. Returns dict with `objects`.
 - `include_vector` (bool): Include vectors in response
 - `filters` (Filter, optional): Filter conditions
 - `limit` (int): Max results (default 10)
+- `return_metadata` (bool, optional): Whether to return full metadata (default: True)
 - `**kwargs`: Additional weaviate near_vector kwargs
 
 **Returns:** Dict with `objects`
+
+**Metadata Behavior:**
+This method automatically requests full metadata (`MetadataQuery.full()`) if you do not provide a `return_metadata` argument. This ensures fields like `distance`, `certainty`, `creation_time`, etc., are populated in the response instead of being `None`.
 
 **Example:**
 
@@ -494,8 +508,13 @@ Generate content (retrieval augmented). Returns dict with `objects` and `generat
 - `grouped_task` (str, optional): Task description for grouped response
 - `filters` (Filter, optional): Weaviate filter conditions
 - `limit` (int): Maximum number of results (default: 10)
+- `return_metadata` (bool, optional): Whether to return full metadata (default: True)
+- `**kwargs`: Additional arguments
 
 **Returns:** Generated text response with source objects
+
+**Metadata Note:**
+Like other query methods, this supports `return_metadata`. If not specified, it defaults to returning full metadata for the source objects used in generation.
 
 **Example:**
 

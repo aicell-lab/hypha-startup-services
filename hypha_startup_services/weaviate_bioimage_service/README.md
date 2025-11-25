@@ -2,6 +2,12 @@
 
 A specialized vector database service built on the core [Weaviate Service](../weaviate_service/README.md) for bioimage data management. This service provides semantic search and retrieval capabilities specifically designed for EuroBioImaging nodes and technologies, with enhanced support for scientific data relationships.
 
+## ⚠️ Client Setup: Codecs Required
+
+This service may accept complex objects. If you want to use those, you must register custom codecs in your client to handle these calls correctly.
+
+👉 **[See the Codecs Guide](../../codecs.md)** for setup instructions.
+
 ## Service Endpoints
 
 ⚠️ **Performance Warning**: The query method can be slow and may timeout for large datasets or complex scientific data operations. Consider using `search` instead and giving that as input to an LLM for generation.

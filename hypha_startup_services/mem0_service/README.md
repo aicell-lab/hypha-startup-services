@@ -2,6 +2,12 @@
 
 An AI-powered memory management service built on [Mem0](https://mem0.ai/) that provides persistent, contextual memory for AI agents and applications. This service enables agents to remember conversations, learn from interactions, and maintain context across sessions.
 
+## ⚠️ Client Setup: Codecs Required
+
+This service may accept complex objects. If you want to use those, you must register custom codecs in your client to handle these calls correctly.
+
+👉 **[See the Codecs Guide](../../codecs.md)** for setup instructions.
+
 ## Service Endpoints
 
 ### `init_agent(agent_id: str, description: str = None, metadata: dict = None)`
