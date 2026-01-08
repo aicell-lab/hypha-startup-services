@@ -54,6 +54,7 @@ from .utils.format_utils import (
     get_settings_full_name,
 )
 from .utils.service_utils import (
+    MissingContextError,
     collection_exists,
     get_permitted_collection,
     prepare_application_creation,
@@ -127,8 +128,7 @@ async def collections_create(
 
     """
     if context is None:
-        error_msg = "Context must be provided to determine the tenant workspace"
-        raise ValueError(error_msg)
+        raise MissingContextError
 
     caller_ws = ws_from_context(context)
     assert_is_admin_ws(caller_ws)
@@ -162,8 +162,7 @@ async def collections_list_all(
 
     """
     if context is None:
-        error_msg = "Context must be provided to determine the tenant workspace"
-        raise ValueError(error_msg)
+        raise MissingContextError
 
     caller_ws = ws_from_context(context)
     assert_is_admin_ws(caller_ws)
@@ -190,8 +189,7 @@ async def collections_get(
 
     """
     if context is None:
-        error_msg = "Context must be provided to determine the tenant workspace"
-        raise ValueError(error_msg)
+        raise MissingContextError
 
     caller_ws = ws_from_context(context)
     await assert_has_collection_permission(caller_ws, name)
@@ -221,8 +219,7 @@ async def collections_delete(
 
     """
     if context is None:
-        error_msg = "Context must be provided to determine the tenant workspace"
-        raise ValueError(error_msg)
+        raise MissingContextError
 
     caller_ws = ws_from_context(context)
 
@@ -290,8 +287,7 @@ async def applications_create(
 
     """
     if context is None:
-        error_msg = "Context must be provided to determine the tenant workspace"
-        raise ValueError(error_msg)
+        raise MissingContextError
 
     caller_ws = ws_from_context(context)
     if user_ws is None:
@@ -349,8 +345,7 @@ async def applications_delete(
 
     if user_ws is None:
         if context is None:
-            error_msg = "Context must be provided to determine the tenant workspace"
-            raise ValueError(error_msg)
+            raise MissingContextError
         user_ws = ws_from_context(context)
 
     if await is_multitenancy_enabled(client, collection_name):
@@ -369,8 +364,7 @@ async def applications_delete(
     )
 
     if context is None:
-        error_msg = "Context must be provided to determine the tenant workspace"
-        raise ValueError(error_msg)
+        raise MissingContextError
 
     full_collection_name = get_full_collection_name(collection_name)
     caller_ws = ws_from_context(context)
@@ -433,8 +427,7 @@ async def applications_exists(
 
     """
     if context is None:
-        error_msg = "Context must be provided to determine the tenant workspace"
-        raise ValueError(error_msg)
+        raise MissingContextError
 
     caller_ws = ws_from_context(context)
 
@@ -479,8 +472,7 @@ async def applications_get_artifact(
     """
     if user_ws is None:
         if context is None:
-            error_msg = "Context must be provided to determine the tenant workspace"
-            raise ValueError(error_msg)
+            raise MissingContextError
         user_ws = ws_from_context(context)
 
     await prepare_tenant_collection(

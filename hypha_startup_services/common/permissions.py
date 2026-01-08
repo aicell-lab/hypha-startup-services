@@ -256,9 +256,6 @@ async def user_has_operation_permission(
     """
     user_permissions = await get_user_permissions(permission_params)
 
-    if user_permissions == "*":
-        return True
-
     if user_permissions in ("*", "rw+"):
         return True
 

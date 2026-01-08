@@ -26,6 +26,14 @@ from .collection_utils import (
 )
 
 
+class MissingContextError(ValueError):
+    """Exception raised when context is missing where required."""
+
+    def __init__(self) -> None:
+        """Initialize the MissingContextError exception."""
+        super().__init__("Context must be provided to determine the tenant workspace")
+
+
 async def prepare_application_creation(
     client: WeaviateAsyncClient,
     collection_name: str,
@@ -152,8 +160,7 @@ async def prepare_tenant_collection(
 
     """
     if context is None:
-        error_msg = "Context must be provided to determine the tenant workspace"
-        raise ValueError(error_msg)
+        raise MissingContextError
 
     caller_ws = ws_from_context(context)
 
