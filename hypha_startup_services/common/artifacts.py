@@ -7,6 +7,8 @@ from hypha_rpc.rpc import RemoteException
 
 from hypha_startup_services.common.server_utils import get_server
 
+from .constants import ARTIFACT_MANAGER_SERVICE_ID, DEFAULT_REMOTE_URL
+
 logger = logging.getLogger(__name__)
 
 
@@ -58,8 +60,8 @@ async def get_artifact(
         RemoteException: If there's a server communication error
 
     """
-    async with get_server("https://hypha.aicell.io") as server:
-        artifact_manager = await server.get_service("public/artifact-manager")
+    async with get_server(DEFAULT_REMOTE_URL) as server:
+        artifact_manager = await server.get_service(ARTIFACT_MANAGER_SERVICE_ID)
         return await artifact_manager.read(artifact_id=artifact_id)
 
 
@@ -79,8 +81,8 @@ async def create_artifact(
             "status": "already_exists",
         }
 
-    async with get_server("https://hypha.aicell.io") as server:
-        artifact_manager = await server.get_service("public/artifact-manager")
+    async with get_server(DEFAULT_REMOTE_URL) as server:
+        artifact_manager = await server.get_service(ARTIFACT_MANAGER_SERVICE_ID)
 
         await artifact_manager.create(**artifact_params.creation_dict)
         logger.info(
@@ -95,8 +97,8 @@ async def delete_artifact(
     artifact_id: str,
 ) -> None:
     """Delete an artifact."""
-    async with get_server("https://hypha.aicell.io") as server:
-        artifact_manager = await server.get_service("public/artifact-manager")
+    async with get_server(DEFAULT_REMOTE_URL) as server:
+        artifact_manager = await server.get_service(ARTIFACT_MANAGER_SERVICE_ID)
         try:
             await artifact_manager.delete(artifact_id=artifact_id, delete_files=True)
             logger.info("Artifact deleted: '%s'", artifact_id)
@@ -137,7 +139,7 @@ async def artifact_edit(
         error_msg = f"Artifact '{artifact_id}' does not exist."
         raise ValueError(error_msg)
 
-    async with get_server("https://hypha.aicell.io") as server:
+    async with get_server(DEFAULT_REMOTE_URL) as server:
         artifact_manager = await server.get_service("public/artifact-manager")
 
         await artifact_manager.edit(**edit_params)

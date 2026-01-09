@@ -753,7 +753,7 @@ async def query_near_vector(
         kwargs["return_metadata"] = MetadataQuery.full()
 
     response = cast(
-        "QueryReturn[object, object]",
+        "QueryReturn[object, object]",  # NOSONAR (S1192) Repeated literal necessary
         await tenant_collection.query.near_vector(**kwargs),
     )
 
@@ -805,7 +805,7 @@ async def query_fetch_objects(
         kwargs["return_metadata"] = MetadataQuery.full()
 
     response = cast(
-        "QueryReturn[object, object]",
+        "QueryReturn[object, object]",  # NOSONAR (S1192) Repeated literal necessary
         await tenant_collection.query.fetch_objects(**kwargs),
     )
 
