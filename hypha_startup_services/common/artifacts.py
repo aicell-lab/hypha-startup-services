@@ -93,6 +93,16 @@ async def create_artifact(
         return {"artifact_name": artifact_params.artifact_id, "status": "created"}
 
 
+async def list_artifacts(
+    parent_id: str | None = None,
+    **kwargs: object,
+) -> list[dict[str, object]]:
+    """List artifacts."""
+    async with get_server(DEFAULT_REMOTE_URL) as server:
+        artifact_manager = await server.get_service(ARTIFACT_MANAGER_SERVICE_ID)
+        return await artifact_manager.list(parent_id=parent_id, **kwargs)
+
+
 async def delete_artifact(
     artifact_id: str,
 ) -> None:

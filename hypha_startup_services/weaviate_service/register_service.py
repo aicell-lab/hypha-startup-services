@@ -1,5 +1,6 @@
 """Helper functions to register the Weaviate service with proper API endpoints."""
 
+import asyncio
 import logging
 from functools import partial
 
@@ -10,6 +11,7 @@ from hypha_startup_services.common.constants import (
     DEFAULT_WEAVIATE_SERVICE_ID as DEFAULT_SERVICE_ID,
 )
 
+from .cleanup import start_cleanup_loop
 from .client import (
     instantiate_and_connect,
 )
@@ -42,6 +44,9 @@ from .service_codecs import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Set to keep references to background tasks to prevent garbage collection
+_background_tasks: set[asyncio.Task[None]] = set()
 
 
 async def register_weaviate(
@@ -118,3 +123,8 @@ async def register_weaviate_service(
         server.config.client_id,
         service_id,
     )
+
+    # Start cleanup loop in background
+    task = asyncio.create_task(start_cleanup_loop(server, client))
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)

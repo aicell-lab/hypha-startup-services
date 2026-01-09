@@ -1,5 +1,5 @@
 select = ["ALL"]
-ignore = ["PLR0913", "ANN401"]
+ignore = ["PLR0913", "ANN401", "S101"]
 extend-exclude = [
 	"typings/**",
 ]
