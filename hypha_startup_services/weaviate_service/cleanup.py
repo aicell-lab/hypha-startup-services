@@ -79,6 +79,7 @@ async def cleanup_weaviate_resources(
                 await artifact_manager.delete(artifact_id=alias, recursive=True)
             except Exception:
                 logger.exception("Failed to delete orphaned artifact: %s", alias)
+                return
 
     # 5. Delete collections with no corresponding artifact
     for coll_name in weaviate_collection_names:
@@ -98,3 +99,4 @@ async def cleanup_weaviate_resources(
                     "Failed to delete orphaned collection: %s",
                     coll_name,
                 )
+                return

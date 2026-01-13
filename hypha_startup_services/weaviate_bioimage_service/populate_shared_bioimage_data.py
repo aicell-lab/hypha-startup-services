@@ -74,7 +74,7 @@ def prepare_node_objects(nodes_data: list[dict[str, Any]]) -> list[dict[str, Any
         if node.get("description"):
             text_parts.append(f"Description: {node['description']}")
 
-        obj = {
+        obj: dict[str, object] = {
             "entity_type": "node",
             "name": node.get("name", ""),
             "description": node.get("description", ""),
@@ -262,7 +262,7 @@ async def ensure_collection_exists(
         raise
 
 
-async def ensure_application_exists(weaviate_service) -> None:
+async def ensure_application_exists(weaviate_service: RemoteService) -> None:
     """Ensure the shared bioimage application exists."""
     try:
         # Check if application exists

@@ -1,18 +1,24 @@
 """Tests for Weaviate admin functionality."""
 
+import contextlib
+
 import pytest
-from hypha_rpc.rpc import RemoteException
+from hypha_rpc.rpc import RemoteException, RemoteService
 
 from tests.conftest import USER2_WS
 from tests.weaviate_service.utils import (
     USER1_APP_ID,
     USER2_APP_ID,
+    MovieInfo,
     create_test_collection,
 )
 
 
 @pytest.mark.asyncio
-async def test_admin_access_to_other_users_data(weaviate_service, weaviate_service2):
+async def test_admin_access_to_other_users_data(
+    weaviate_service: RemoteService,
+    weaviate_service2: RemoteService,
+) -> None:
     """Test admin access to data owned by other users."""
     # Create collection
     await create_test_collection(weaviate_service)
@@ -31,7 +37,7 @@ async def test_admin_access_to_other_users_data(weaviate_service, weaviate_servi
     )
 
     # User 2 adds private data
-    test_object = {
+    test_object: MovieInfo = {
         "title": "User 2's Private Movie",
         "description": "This movie belongs only to User 2",
         "genre": "Horror",
@@ -77,7 +83,10 @@ async def test_admin_access_to_other_users_data(weaviate_service, weaviate_servi
 
 
 @pytest.mark.asyncio
-async def test_admin_only_collection_creation(weaviate_service, weaviate_service2):
+async def test_admin_only_collection_creation(
+    weaviate_service: RemoteService,
+    weaviate_service2: RemoteService,
+) -> None:
     """Test that only admin users can create collections."""
     # Admin should be able to create collections
     collection = await create_test_collection(weaviate_service)
@@ -85,7 +94,10 @@ async def test_admin_only_collection_creation(weaviate_service, weaviate_service
 
     # Non-admin should not be able to create collections
     try:
-        class_obj = {
+        class_obj: dict[
+            str,
+            str | dict[str, bool] | list[dict[str, str | list[str]]],
+        ] = {
             "class": "TestCollection2",
             "description": "A test collection created by non-admin",
             "properties": [
@@ -98,16 +110,18 @@ async def test_admin_only_collection_creation(weaviate_service, weaviate_service
         }
 
         await weaviate_service2.collections.create(class_obj)
-        assert False, "Non-admin user should not be able to create collections"
+        pytest.fail("Non-admin user should not be able to create collections")
     except (RemoteException, PermissionError, ValueError) as e:
         # Expected error for non-admin user
-        assert (
-            "admin" in str(e).lower() or "permission" in str(e).lower()
-        ), f"Error should mention admin permissions, but got: {e!s}"
+        if not ("admin" in str(e).lower() or "permission" in str(e).lower()):
+            pytest.fail(f"Error should mention admin permissions, but got: {e!s}")
 
 
 @pytest.mark.asyncio
-async def test_admin_only_collection_deletion(weaviate_service, weaviate_service2):
+async def test_admin_only_collection_deletion(
+    weaviate_service: RemoteService,
+    weaviate_service2: RemoteService,
+) -> None:
     """Test that only admin users can delete collections."""
     # Create a collection with admin
     await create_test_collection(weaviate_service)
@@ -115,42 +129,41 @@ async def test_admin_only_collection_deletion(weaviate_service, weaviate_service
     # Non-admin should not be able to delete collections
     try:
         await weaviate_service2.collections.delete("Movie")
-        assert False, "Non-admin user should not be able to delete collections"
+        pytest.fail("Non-admin user should not be able to delete collections")
     except (RemoteException, PermissionError, ValueError) as e:
         # Expected error for non-admin user
-        assert (
-            "admin" in str(e).lower() or "permission" in str(e).lower()
-        ), f"Error should mention admin permissions, but got: {e!s}"
+        error_str = str(e).lower()
+        if not ("admin" in error_str or "permission" in error_str):
+            pytest.fail(f"Error should mention admin permissions, but got: {e!s}")
 
     collections = await weaviate_service.collections.list_all()
-    assert any(coll_name == "Movie" for coll_name in collections.keys())
+    assert any(coll_name == "Movie" for coll_name in collections)
 
     # Admin should be able to delete collections
     await weaviate_service.collections.delete("Movie")
 
     # Verify collection was deleted
     collections = await weaviate_service.collections.list_all()
-    assert not any(coll_name == "Movie" for coll_name in collections.keys())
+    assert not any(coll_name == "Movie" for coll_name in collections)
 
 
 @pytest.mark.asyncio
-async def test_admin_only_collection_list(weaviate_service, weaviate_service2):
+async def test_admin_only_collection_list(
+    weaviate_service: RemoteService,
+    weaviate_service2: RemoteService,
+) -> None:
     """Test that only admin users can list all collections."""
     # Clean up any existing collections first
-    try:
+    with contextlib.suppress(RemoteException, ValueError, RuntimeError):
         await weaviate_service.collections.delete("Movie")
-    except (RemoteException, ValueError, RuntimeError):
-        pass  # Collection might not exist
 
-    try:
+    with contextlib.suppress(RemoteException, ValueError, RuntimeError):
         await weaviate_service.collections.delete("TestCollection2")
-    except (RemoteException, ValueError, RuntimeError):
-        pass  # Collection might not exist
 
     # Create two collections with admin
     await create_test_collection(weaviate_service)
 
-    class_obj = {
+    class_obj: dict[str, str | list[dict[str, str | list[str]]]] = {
         "class": "TestCollection2",
         "description": "Another test collection",
         "properties": [
@@ -166,19 +179,19 @@ async def test_admin_only_collection_list(weaviate_service, weaviate_service2):
 
     # Admin should be able to list all collections
     collections = await weaviate_service.collections.list_all()
-    assert len(collections) >= 2
-    assert any(coll_name == "Movie" for coll_name in collections.keys())
-    assert any(coll_name == "TestCollection2" for coll_name in collections.keys())
+    num_expected_collections = 2
+    assert len(collections) >= num_expected_collections
+    assert any(coll_name == "Movie" for coll_name in collections)
+    assert any(coll_name == "TestCollection2" for coll_name in collections)
 
     # Non-admin should not be able to list all collections
     try:
         await weaviate_service2.collections.list_all()
-        assert False, "Non-admin user should not be able to list all collections"
+        pytest.fail("Non-admin user should not be able to list all collections")
     except (RemoteException, PermissionError, ValueError) as e:
-        # Expected error for non-admin user
-        assert (
-            "admin" in str(e).lower() or "permission" in str(e).lower()
-        ), f"Error should mention admin permissions, but got: {e!s}"
+        error_str = str(e).lower()
+        if not ("admin" in error_str or "permission" in error_str):
+            pytest.fail(f"Error should mention admin permissions, but got: {e!s}")
 
     # Clean up
     await weaviate_service.collections.delete("Movie")

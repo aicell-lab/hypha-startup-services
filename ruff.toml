@@ -1,5 +1,7 @@
 select = ["ALL"]
-ignore = ["PLR0913", "ANN401", "S101"]
+ignore = ["PLR0913", "ANN401"]
 extend-exclude = [
 	"typings/**",
 ]
+[lint.per-file-ignores]
+"tests/**" = ["S101", "T201"]

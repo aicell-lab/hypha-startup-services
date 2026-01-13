@@ -16,7 +16,7 @@ async def test_query_near_vector_metadata_not_all_none(weaviate_service: Any) ->
     await create_test_application(weaviate_service)
 
     # Insert a few sample objects
-    test_objects = [
+    test_objects: list[dict[str, str | int]] = [
         {
             "title": "Arrival",
             "description": "A linguist works with the military to communicate with alien lifeforms.",
@@ -61,7 +61,7 @@ async def test_query_near_vector_metadata_not_all_none(weaviate_service: Any) ->
     assert vector_results is not None
     assert "objects" in vector_results
     objs = cast("list[dict[str, Any]]", vector_results["objects"])
-    assert 1 <= len(objs) <= 3
+    assert 1 <= len(objs) <= len(test_objects)
 
     # Metadata should not be entirely None
     for obj in objs:
@@ -75,5 +75,6 @@ async def test_query_near_vector_metadata_not_all_none(weaviate_service: Any) ->
         assert metadata["score"] is not None, "metadata score is None"
         assert isinstance(metadata["score"], float), "metadata score is not a float"
         assert isinstance(
-            metadata["distance"], float
+            metadata["distance"],
+            float,
         ), "metadata distance is not a float"

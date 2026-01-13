@@ -1,25 +1,26 @@
 """Tests for Weaviate application functionality."""
 
 import pytest
-from hypha_rpc.rpc import RemoteException
+from hypha_rpc.rpc import RemoteException, RemoteService
 
 from tests.weaviate_service.utils import (
     APP_ID,
     USER1_APP_ID,
+    MovieInfo,
     create_test_application,
     create_test_collection,
 )
 
 
 @pytest.mark.asyncio
-async def test_create_application(weaviate_service):
+async def test_create_application(weaviate_service: RemoteService) -> None:
     """Test creating a Weaviate application with proper schema configuration."""
     await create_test_collection(weaviate_service)
     await create_test_application(weaviate_service)
 
 
 @pytest.mark.asyncio
-async def test_application_exists(weaviate_service):
+async def test_application_exists(weaviate_service: RemoteService) -> None:
     """Test checking if an application exists."""
     # First create a collection and application
     await create_test_application(weaviate_service)
@@ -42,15 +43,17 @@ async def test_application_exists(weaviate_service):
 
 
 @pytest.mark.asyncio
-async def test_application_delete(weaviate_service):
+async def test_application_delete(weaviate_service: RemoteService) -> None:
     """Test deleting an application."""
     # First create a collection and application
     await create_test_application(weaviate_service)
 
     # Add some data to the application
-    test_object = {
+    test_object: MovieInfo = {
         "title": "Avatar",
-        "description": "A paraplegic Marine dispatched to the moon Pandora on a unique mission",
+        "description": (
+            "A paraplegic Marine dispatched to the moon Pandora on a unique mission"
+        ),
         "genre": "Science Fiction",
         "year": 2009,
     }
@@ -88,7 +91,7 @@ async def test_application_delete(weaviate_service):
 
 
 @pytest.mark.asyncio
-async def test_application_get(weaviate_service):
+async def test_application_get(weaviate_service: RemoteService) -> None:
     """Test getting an application's details."""
     # First create a collection and application
     await create_test_application(weaviate_service)
@@ -107,7 +110,10 @@ async def test_application_get(weaviate_service):
 
 
 @pytest.mark.asyncio
-async def test_application_exists_across_users(weaviate_service, weaviate_service2):
+async def test_application_exists_across_users(
+    weaviate_service: RemoteService,
+    weaviate_service2: RemoteService,
+) -> None:
     """Test checking if applications exist across different users."""
     # Create collection
     await create_test_collection(weaviate_service)
@@ -141,13 +147,13 @@ async def test_application_exists_across_users(weaviate_service, weaviate_servic
 
 
 @pytest.mark.asyncio
-async def test_insert_data_invalid_application(weaviate_service):
+async def test_insert_data_invalid_application(weaviate_service: RemoteService) -> None:
     """Test inserting data into an invalid application should fail with an error."""
     # First create a valid collection
     await create_test_application(weaviate_service)
 
     # Try to insert data into a non-existent application
-    test_object = {
+    test_object: MovieInfo = {
         "title": "Test Movie",
         "description": "A test movie for error testing",
         "genre": "Test Genre",
@@ -155,7 +161,7 @@ async def test_insert_data_invalid_application(weaviate_service):
     }
 
     # This should fail because the application doesn't exist
-    with pytest.raises(Exception) as exc_info:
+    with pytest.raises(RemoteException) as exc_info:
         await weaviate_service.data.insert(
             collection_name="Movie",
             application_id="NonExistentApplication",
@@ -178,7 +184,7 @@ async def test_insert_data_invalid_application(weaviate_service):
 
 
 @pytest.mark.asyncio
-async def test_application_invalid_collection(weaviate_service):
+async def test_application_invalid_collection(weaviate_service: RemoteService) -> None:
     """Create a test application with an invalid collection."""
     with pytest.raises(RemoteException) as exc_info:
         await weaviate_service.applications.create(
@@ -190,7 +196,7 @@ async def test_application_invalid_collection(weaviate_service):
 
 
 @pytest.mark.asyncio
-async def test_application_get_artifact(weaviate_service):
+async def test_application_get_artifact(weaviate_service: RemoteService) -> None:
     """Test retrieving an application's artifact information."""
     # First create a collection and application
     await create_test_application(weaviate_service)
@@ -215,7 +221,9 @@ async def test_application_get_artifact(weaviate_service):
 
 
 @pytest.mark.asyncio
-async def test_application_get_artifact_nonexistent(weaviate_service):
+async def test_application_get_artifact_nonexistent(
+    weaviate_service: RemoteService,
+) -> None:
     """Test retrieving artifact for a non-existent application."""
     # First create a collection but no application
     await create_test_collection(weaviate_service)
@@ -245,7 +253,9 @@ async def test_application_get_artifact_nonexistent(weaviate_service):
 
 
 @pytest.mark.asyncio
-async def test_application_set_permissions_merge(weaviate_service):
+async def test_application_set_permissions_merge(
+    weaviate_service: RemoteService,
+) -> None:
     """Test setting permissions with merge=True (default behavior)."""
     # First create a collection and application
     await create_test_application(weaviate_service)
@@ -301,7 +311,9 @@ async def test_application_set_permissions_merge(weaviate_service):
 
 
 @pytest.mark.asyncio
-async def test_application_set_permissions_no_merge(weaviate_service):
+async def test_application_set_permissions_no_merge(
+    weaviate_service: RemoteService,
+) -> None:
     """Test setting permissions with merge=False (replace behavior)."""
     # First create a collection and application
     await create_test_application(weaviate_service)
@@ -348,7 +360,9 @@ async def test_application_set_permissions_no_merge(weaviate_service):
 
 
 @pytest.mark.asyncio
-async def test_application_set_permissions_default_merge(weaviate_service):
+async def test_application_set_permissions_default_merge(
+    weaviate_service: RemoteService,
+) -> None:
     """Test that merge=True is the default behavior for backward compatibility."""
     # First create a collection and application
     await create_test_application(weaviate_service)
@@ -392,7 +406,9 @@ async def test_application_set_permissions_default_merge(weaviate_service):
 
 
 @pytest.mark.asyncio
-async def test_application_set_permissions_empty_manifest(weaviate_service):
+async def test_application_set_permissions_empty_manifest(
+    weaviate_service: RemoteService,
+) -> None:
     """Test setting permissions when manifest has no existing permissions."""
     # First create a collection and application
     await create_test_application(weaviate_service)

@@ -21,7 +21,7 @@ from hypha_startup_services.weaviate_bioimage_service.methods import (
 class TestFactoryFunctionSchemas:
     """Test that factory functions create schema functions correctly."""
 
-    def test_weaviate_factory_functions_create_schemas(self):
+    def test_weaviate_factory_functions_create_schemas(self) -> None:
         """Test that weaviate factory functions create functions with schemas."""
         # Create mock dependencies
         mock_client = Mock()
@@ -141,7 +141,7 @@ class TestFactoryFunctionSchemas:
             "client" not in required
         ), "client should NOT be required (injected by factory)"
 
-    def test_factory_vs_original_function_schemas(self):
+    def test_factory_vs_original_function_schemas(self) -> None:
         """Test that factory functions create different schemas than raw functions would."""
         # Import the original function (without @schema_function decorator)
         from hypha_startup_services.weaviate_bioimage_service.methods import (

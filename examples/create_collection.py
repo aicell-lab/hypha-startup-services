@@ -5,7 +5,6 @@ import logging
 import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Any
 
 from dotenv import load_dotenv
 from hypha_rpc import connect_to_server
@@ -20,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def get_server(server_url: str) -> AsyncGenerator[RemoteService, Any]:
+async def get_server(server_url: str) -> AsyncGenerator[RemoteService, None]:
     """Get Hypha server."""
     token = os.environ.get("HYPHA_TOKEN")
     if token is None:
@@ -44,7 +43,7 @@ async def create_document_collection(
     weaviate_service: RemoteService,
     ollama_model: str,
     ollama_endpoint: str,
-):
+) -> None:
     """Create a document collection in Weaviate.
 
     Args:
@@ -55,7 +54,7 @@ async def create_document_collection(
     """
     await weaviate_service.collections.delete("Document")
 
-    class_obj = {
+    class_obj: dict[str, object] = {
         "class": "Document",
         "multiTenancyConfig": {
             "enabled": True,
@@ -144,10 +143,11 @@ async def create_document_collection(
 
     await weaviate_service.collections.create(class_obj)
 
-    print("Done")
+    logger.info("Created 'Document' collection in Weaviate")
 
 
-async def main():
+async def main() -> None:
+    """Create collection."""
     async with get_server("https://hypha.aicell.io") as server:
         service = await server.get_service(SERVICE_NAME)
         await create_document_collection(

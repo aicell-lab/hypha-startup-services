@@ -3,19 +3,20 @@
 import uuid as uuid_module
 
 import pytest
+from hypha_rpc.rpc import RemoteService
 from weaviate.classes.query import Filter
 
-from tests.weaviate_service.utils import APP_ID, create_test_application
+from tests.weaviate_service.utils import APP_ID, MovieInfo, create_test_application
 
 
 @pytest.mark.asyncio
-async def test_collection_data_insert(weaviate_service):
+async def test_collection_data_insert(weaviate_service: RemoteService) -> None:
     """Test inserting a single object into a collection."""
     # First create a collection and application
     await create_test_application(weaviate_service)
 
     # Create a test object
-    test_object = {
+    test_object: MovieInfo = {
         "title": "The Matrix",
         "description": "A computer hacker learns about the true nature of reality",
         "genre": "Science Fiction",
@@ -46,13 +47,13 @@ async def test_collection_data_insert(weaviate_service):
 
 
 @pytest.mark.asyncio
-async def test_collection_data_insert_many(weaviate_service):
+async def test_collection_data_insert_many(weaviate_service: RemoteService) -> None:
     """Test inserting multiple objects into a collection using kwargs."""
     # First create a collection and application
     await create_test_application(weaviate_service)
 
     # Create test objects
-    test_objects = [
+    test_objects: list[MovieInfo] = [
         {
             "title": "Inception",
             "description": "A thief who steals corporate secrets through dream-sharing technology",
@@ -100,12 +101,12 @@ async def test_collection_data_insert_many(weaviate_service):
 
 
 @pytest.mark.asyncio
-async def test_collection_data_update(weaviate_service):
+async def test_collection_data_update(weaviate_service: RemoteService) -> None:
     """Test updating an object in a collection."""
     # First insert a test object
     await create_test_application(weaviate_service)
 
-    test_object = {
+    test_object: MovieInfo = {
         "title": "Pulp Fiction",
         "description": (
             "The lives of two mob hitmen, a boxer, a gangster's wife, and"
@@ -122,7 +123,7 @@ async def test_collection_data_update(weaviate_service):
     )
 
     # Update the object
-    updated_properties = {
+    updated_properties: dict[str, str | int] = {
         "description": "Updated description for Pulp Fiction",
         "year": 1995,  # Deliberately changing for test purposes
     }
@@ -154,12 +155,12 @@ async def test_collection_data_update(weaviate_service):
 
 
 @pytest.mark.asyncio
-async def test_collection_data_exists(weaviate_service):
+async def test_collection_data_exists(weaviate_service: RemoteService) -> None:
     """Test checking if an object exists in a collection."""
     # First create a collection and application with a test object
     await create_test_application(weaviate_service)
 
-    test_object = {
+    test_object: MovieInfo = {
         "title": "The Godfather",
         "description": "The aging patriarch of an organized crime dynasty transfers control to his son",
         "genre": "Crime",
@@ -193,12 +194,12 @@ async def test_collection_data_exists(weaviate_service):
 
 
 @pytest.mark.asyncio
-async def test_collection_data_delete_by_id(weaviate_service):
+async def test_collection_data_delete_by_id(weaviate_service: RemoteService) -> None:
     """Test deleting an object by ID from a collection."""
     # First create a collection and application with a test object
     await create_test_application(weaviate_service)
 
-    test_object = {
+    test_object: MovieInfo = {
         "title": "Goodfellas",
         "description": "The story of Henry Hill and his life in the mob",
         "genre": "Crime",
@@ -236,13 +237,13 @@ async def test_collection_data_delete_by_id(weaviate_service):
 
 
 @pytest.mark.asyncio
-async def test_collection_data_delete_many(weaviate_service):
+async def test_collection_data_delete_many(weaviate_service: RemoteService) -> None:
     """Test deleting multiple objects using filters."""
     # First create a collection and application
     await create_test_application(weaviate_service)
 
     # Add some test data
-    test_objects = [
+    test_objects: list[MovieInfo] = [
         {
             "title": "Star Wars: A New Hope",
             "description": "Luke Skywalker joins forces with a Jedi Knight",
@@ -276,7 +277,8 @@ async def test_collection_data_delete_many(weaviate_service):
         application_id=APP_ID,
         limit=10,
     )
-    assert len(query_result["objects"]) == 3
+
+    assert len(query_result["objects"]) == len(test_objects)
 
     # Delete objects with science fiction genre
     result = await weaviate_service.data.delete_many(
@@ -287,7 +289,9 @@ async def test_collection_data_delete_many(weaviate_service):
 
     assert result is not None
     assert "successful" in result
-    assert result["successful"] == 2  # Should have deleted 2 Star Wars movies
+    assert (
+        result["successful"] == len(test_objects) - 1
+    )  # Should have deleted 2 Star Wars movies
 
     # Verify the remaining objects
     query_result = await weaviate_service.query.fetch_objects(

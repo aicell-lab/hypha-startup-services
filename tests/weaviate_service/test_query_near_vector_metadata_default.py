@@ -16,7 +16,7 @@ class _FakeQuery:
     def __init__(self) -> None:
         self.last_kwargs: dict[str, Any] | None = None
 
-    async def near_vector(self, **kwargs: Any) -> Any:
+    async def near_vector(self, **kwargs: Any) -> Any:  # NOSONAR S7503
         # Capture kwargs for assertion and return minimal result shape
         self.last_kwargs = kwargs
 
@@ -34,20 +34,24 @@ class _FakeTenantCollection:
 
 @pytest.mark.asyncio
 async def test_query_near_vector_includes_metadata_by_default(monkeypatch: Any) -> None:
+    """Ensure query_near_vector includes return_metadata by default."""
     fake_tenant = _FakeTenantCollection()
 
-    async def _fake_prepare_tenant_collection(
-        *_args: Any, **_kwargs: Any
+    async def _fake_prepare_tenant_collection(  # NOSONAR S7503
+        *_args: Any,
+        **_kwargs: Any,
     ) -> _FakeTenantCollection:
         return fake_tenant
 
     monkeypatch.setattr(
-        w_methods, "prepare_tenant_collection", _fake_prepare_tenant_collection
+        w_methods,
+        "prepare_tenant_collection",
+        _fake_prepare_tenant_collection,
     )
 
     # Call wrapper without providing `return_metadata`
-    await w_methods.query_near_vector(  # type: ignore[arg-type]
-        client=None,
+    await w_methods.query_near_vector(
+        client=None,  # pyright: ignore[reportArgumentType]
         collection_name="Movie",
         application_id="TestApp",
         query_vector=[0.0, 0.1, 0.2],

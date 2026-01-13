@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING, Any
 from dotenv import load_dotenv
 from hypha_rpc import connect_to_server
 
+from tests.weaviate_service.utils import MovieInfo
+
 if TYPE_CHECKING:
     from hypha_rpc.rpc import RemoteService
 
@@ -125,7 +127,7 @@ async def main():
         print("Inserted movie with UUID:", uuid)
 
         # Insert multiple movies
-        movies = [
+        movies: list[MovieInfo] = [
             {
                 "title": "Inception",
                 "description": "A thief enters dreams to steal secrets",

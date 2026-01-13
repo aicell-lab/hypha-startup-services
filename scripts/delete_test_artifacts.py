@@ -78,6 +78,8 @@ async def cleanup_test_artifacts() -> None:
                 logger.info("✅ Deleted %s", alias)
             except Exception:
                 logger.exception("❌ Failed to delete %s", alias)
+                await server.disconnect()
+                return
 
         logger.info("\n✨ Cleanup completed!")
 

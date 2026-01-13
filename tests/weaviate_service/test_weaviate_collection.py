@@ -1,20 +1,20 @@
 """Tests for the Weaviate collection functionality."""
 
 import pytest
-from hypha_rpc.rpc import RemoteException
+from hypha_rpc.rpc import RemoteException, RemoteService
 
 from tests.weaviate_service.utils import create_test_collection
 
 
 @pytest.mark.asyncio
-async def test_create_collection(weaviate_service):
+async def test_create_collection(weaviate_service: RemoteService) -> None:
     """Test creating a Weaviate collection with proper schema configuration."""
     collection = await create_test_collection(weaviate_service)
     assert isinstance(collection, dict)
 
 
 @pytest.mark.asyncio
-async def test_get_collection(weaviate_service):
+async def test_get_collection(weaviate_service: RemoteService) -> None:
     """Test retrieving a collection's configuration by name."""
     await create_test_collection(weaviate_service)
 
@@ -26,7 +26,7 @@ async def test_get_collection(weaviate_service):
 
 
 @pytest.mark.asyncio
-async def test_list_collections(weaviate_service):
+async def test_list_collections(weaviate_service: RemoteService) -> None:
     """Test listing all available collections."""
     # First create a collection
     await create_test_collection(weaviate_service)
@@ -40,25 +40,25 @@ async def test_list_collections(weaviate_service):
         isinstance(coll_name, str) and isinstance(coll_obj, dict)
         for coll_name, coll_obj in collections.items()
     )
-    assert any(coll_name == "Movie" for coll_name in collections.keys())
+    assert any(coll_name == "Movie" for coll_name in collections)
 
 
 @pytest.mark.asyncio
-async def test_delete_collection(weaviate_service):
+async def test_delete_collection(weaviate_service: RemoteService) -> None:
     """Test deleting a collection and verifying it no longer exists."""
     await create_test_collection(weaviate_service)
 
     collections = await weaviate_service.collections.list_all()
-    assert any(coll_name == "Movie" for coll_name in collections.keys())
+    assert any(coll_name == "Movie" for coll_name in collections)
 
     await weaviate_service.collections.delete("Movie")
 
     collections = await weaviate_service.collections.list_all()
-    assert not any(coll_name == "Movie" for coll_name in collections.keys())
+    assert not any(coll_name == "Movie" for coll_name in collections)
 
 
 @pytest.mark.asyncio
-async def test_collection_exists(weaviate_service):
+async def test_collection_exists(weaviate_service: RemoteService) -> None:
     """Test checking if a collection exists."""
     # First create a collection
     await create_test_collection(weaviate_service)
@@ -78,7 +78,7 @@ async def test_collection_exists(weaviate_service):
 
 
 @pytest.mark.asyncio
-async def test_collection_get_artifact(weaviate_service):
+async def test_collection_get_artifact(weaviate_service: RemoteService) -> None:
     """Test retrieving a collection's artifact name."""
     # First create a collection
     await create_test_collection(weaviate_service)
@@ -89,7 +89,6 @@ async def test_collection_get_artifact(weaviate_service):
     assert artifact_name is not None
     assert isinstance(artifact_name, str)
     # The artifact name should be the full collection name with workspace prefix
-    # Format: SHARED__DELIM__Movie
     assert artifact_name == "Shared__DELIM__Movie"
 
     # Clean up
@@ -97,7 +96,9 @@ async def test_collection_get_artifact(weaviate_service):
 
 
 @pytest.mark.asyncio
-async def test_collection_get_artifact_nonexistent(weaviate_service):
+async def test_collection_get_artifact_nonexistent(
+    weaviate_service: RemoteService,
+) -> None:
     """Test retrieving artifact name for a non-existent collection."""
     with pytest.raises(
         RemoteException,

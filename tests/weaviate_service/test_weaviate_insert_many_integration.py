@@ -10,13 +10,14 @@ vector separation logic at the service boundary.
 """
 
 import uuid as uuid_module
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
 from tests.weaviate_service import utils as weav_utils
 
-# ruff: noqa: S101
+if TYPE_CHECKING:
+    from utils import MovieInfo
 
 
 @pytest.mark.asyncio
@@ -48,7 +49,7 @@ async def test_insert_many_with_top_level_vector_and_uuid(
         "title_vector": title_vector,
         "description_vector": description_vector,
     }
-    objects: list[dict[str, object]] = [
+    objects: list[MovieInfo] = [
         {
             "title": "Vector One",
             "description": "Custom vector + uuid",

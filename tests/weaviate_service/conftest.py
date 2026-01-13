@@ -1,5 +1,7 @@
 """Common test fixtures for weaviate tests."""
 
+from collections.abc import AsyncGenerator
+
 import pytest_asyncio
 from hypha_rpc.rpc import RemoteException, RemoteService
 
@@ -9,8 +11,10 @@ from hypha_startup_services.weaviate_service.service_codecs import (
 from tests.conftest import get_user_server
 from tests.weaviate_service.utils import APP_ID
 
+WEAVIATE_TEST_ID = "hypha-agents/weaviate-test"
 
-async def cleanup_weaviate_service(service: RemoteService):
+
+async def cleanup_weaviate_service(service: RemoteService) -> None:
     """Cleanup after weaviate tests."""
     try:
         # Try to delete test applications first
@@ -28,36 +32,36 @@ async def cleanup_weaviate_service(service: RemoteService):
         pass
 
 
-def setup_weaviate_server(server: RemoteService):
-    """Setup function to register weaviate codecs."""
+def setup_weaviate_server(server: RemoteService) -> None:
+    """Set up register weaviate codecs."""
     register_weaviate_codecs(server)
 
 
 @pytest_asyncio.fixture
-async def weaviate_service():
-    """Weaviate service fixture for user 1."""
+async def weaviate_service() -> AsyncGenerator[RemoteService, None]:
+    """Create Weaviate service fixture for user 1."""
     server = await get_user_server("PERSONAL_TOKEN")
     register_weaviate_codecs(server)
-    service = await server.get_service("hypha-agents/weaviate-test")
+    service = await server.get_service(WEAVIATE_TEST_ID)
     yield service
     await server.disconnect()
 
 
 @pytest_asyncio.fixture
-async def weaviate_service2():
+async def weaviate_service2() -> AsyncGenerator[RemoteService, None]:
     """Weaviate service fixture for user 2."""
     server = await get_user_server("PERSONAL_TOKEN2")
     register_weaviate_codecs(server)
-    service = await server.get_service("hypha-agents/weaviate-test")
+    service = await server.get_service(WEAVIATE_TEST_ID)
     yield service
     await server.disconnect()
 
 
 @pytest_asyncio.fixture
-async def weaviate_service3():
+async def weaviate_service3() -> AsyncGenerator[RemoteService, None]:
     """Weaviate service fixture for user 3."""
     server = await get_user_server("PERSONAL_TOKEN3")
     register_weaviate_codecs(server)
-    service = await server.get_service("hypha-agents/weaviate-test")
+    service = await server.get_service(WEAVIATE_TEST_ID)
     yield service
     await server.disconnect()

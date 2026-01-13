@@ -1,18 +1,19 @@
 """Tests for Weaviate query functionality."""
 
 import pytest
+from hypha_rpc.rpc import RemoteService
 
 from tests.weaviate_service.utils import APP_ID, create_test_application
 
 
 @pytest.mark.asyncio
-async def test_collection_query_fetch_objects(weaviate_service):
+async def test_collection_query_fetch_objects(weaviate_service: RemoteService) -> None:
     """Test fetching objects from a collection using kwargs."""
     # First insert test data by running another test
     await create_test_application(weaviate_service)
 
     # Add test objects
-    test_objects = [
+    test_objects: list[dict[str, str | int]] = [
         {
             "title": "Inception",
             "description": "A thief who steals corporate secrets through dream-sharing technology",
@@ -56,17 +57,17 @@ async def test_collection_query_fetch_objects(weaviate_service):
         limit=10,
     )
 
-    assert len(all_results["objects"]) == 2
+    assert len(all_results["objects"]) == len(test_objects)
 
 
 @pytest.mark.asyncio
-async def test_collection_query_hybrid(weaviate_service):
+async def test_collection_query_hybrid(weaviate_service: RemoteService) -> None:
     """Test hybrid query on a collection using kwargs."""
     # First insert test data
     await create_test_application(weaviate_service)
 
     # Add test objects
-    test_objects = [
+    test_objects: list[dict[str, str | int]] = [
         {
             "title": "Inception",
             "description": "A thief who steals corporate secrets through dream-sharing technology",
@@ -104,7 +105,7 @@ async def test_collection_query_hybrid(weaviate_service):
 
     assert result is not None
     assert "objects" in result
-    assert len(result["objects"]) <= 2  # Should respect the limit
+    assert len(result["objects"]) <= len(test_objects)  # Should respect the limit
 
     # Results should be relevant to the query
     assert any(
@@ -113,13 +114,13 @@ async def test_collection_query_hybrid(weaviate_service):
 
 
 @pytest.mark.asyncio
-async def test_collection_query_near_text(weaviate_service):
+async def test_collection_query_near_text(weaviate_service: RemoteService) -> None:
     """Test near_text query on a collection using kwargs."""
     # First insert test data
     await create_test_application(weaviate_service)
 
     # Add test objects
-    test_objects = [
+    test_objects: list[dict[str, str | int]] = [
         {
             "title": "Inception",
             "description": "A thief who steals corporate secrets through dream-sharing technology",
@@ -157,7 +158,7 @@ async def test_collection_query_near_text(weaviate_service):
 
     assert result is not None
     assert "objects" in result
-    assert len(result["objects"]) <= 2  # Should respect the limit
+    assert len(result["objects"]) <= len(test_objects)  # Should respect the limit
 
     # Results should be relevant to the query - Interstellar should be included
     titles = [obj["properties"]["title"] for obj in result["objects"]]
@@ -165,13 +166,13 @@ async def test_collection_query_near_text(weaviate_service):
 
 
 @pytest.mark.asyncio
-async def test_collection_query_near_vector(weaviate_service):
+async def test_collection_query_near_vector(weaviate_service: RemoteService) -> None:
     """Test querying a collection using near_vector with kwargs."""
     # First create a collection and application
     await create_test_application(weaviate_service)
 
     # Create test objects
-    test_objects = [
+    test_objects: list[dict[str, str | int]] = [
         {
             "title": "The Matrix",
             "description": "A computer hacker learns about the true nature of reality",
@@ -209,7 +210,7 @@ async def test_collection_query_near_vector(weaviate_service):
 
     assert result is not None
     assert "objects" in result
-    assert len(result["objects"]) <= 2  # Should respect the limit
+    assert len(result["objects"]) <= len(test_objects)  # Should respect the limit
 
     # Check that vector was included in results
     assert all(
