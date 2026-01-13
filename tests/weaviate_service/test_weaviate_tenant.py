@@ -177,7 +177,7 @@ async def test_cross_user_application_access(
     weaviate_service2: RemoteService,
     weaviate_service3: RemoteService,
 ) -> None:
-    """Test that users can access applications across workspaces using the user_ws parameter."""
+    """Test user application access across workspaces using user_ws parameter."""
     # Create collection
     await create_test_collection(weaviate_service)
 
@@ -249,7 +249,8 @@ async def test_cross_user_application_access(
         # If successful, verify the data
         assert user2_from_user1["objects"][0]["properties"]["title"] == "User 2's Movie"
     except (RemoteException, PermissionError, ValueError) as e:
-        # If it fails, it should be due to permission settings, not because the approach is wrong
+        # If it fails, it should be due to permission settings, not because the
+        # approach is wrong
         print(f"Note: Admin accessing data with user_ws parameter failed: {e!s}")
 
     # Clean up
@@ -296,7 +297,8 @@ async def test_cross_application_data_isolation(
         description="User 3's movie application",
     )
 
-    # Each user adds data to their own application with identical properties but different titles
+    # Each user adds data to their own application with identical properties but
+    # different titles
     movie_props: dict[str, str | int] = {
         "description": "A test movie with identical properties across tenants",
         "genre": "Science Fiction",

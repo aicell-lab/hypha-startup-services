@@ -107,7 +107,7 @@ async def test_separate_user_applications(
     weaviate_service2: RemoteService,
     weaviate_service3: RemoteService,
 ) -> None:
-    """Test that non-admin users can create and access their own applications independently."""
+    """Test nonadmin users can create and access owned applications independently."""
     # Create collection (must use admin user for this)
     await create_test_collection(weaviate_service)
 

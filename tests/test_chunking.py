@@ -42,8 +42,7 @@ class TestChunkText:
 
         if len(chunks) > 1:
             # There should be some content overlap between consecutive chunks
-            # This is a basic test - the actual overlap depends on tiktoken's behavior
-            assert len(chunks) > 1  # TODO @hugokallander: fix
+            assert sum(len(c) for c in chunks) > len(text)
 
     def test_custom_chunk_size(self) -> None:
         """Test different chunk sizes."""
@@ -90,31 +89,16 @@ class TestChunkDocuments:
         ]
         result = chunk_documents(documents, chunk_size=100, chunk_overlap=10)
 
-        if len(result) != len(documents):
-            pytest.fail("Expected two chunks for two short documents")
+        assert len(result) == len(
+            documents,
+        ), "Expected two chunks for two short documents"
 
-        # Check first document
-        if result[0]["text"] != "First document text.":
-            pytest.fail("First document text mismatch")
-        if result[0]["id"] != "doc1":
-            pytest.fail("First document ID mismatch")
-        if result[0]["meta"] != "data1":
-            pytest.fail("First document meta mismatch")
-        if result[0]["chunk_index"] != 0:
-            pytest.fail("First document chunk index mismatch")
-        if result[0]["total_chunks"] != 1:
-            pytest.fail("First document total chunks mismatch")
-        # Check second document
-        if result[1]["text"] != "Second document text.":
-            pytest.fail("Second document text mismatch")
-        if result[1]["id"] != "doc2":
-            pytest.fail("Second document ID mismatch")
-        if result[1]["meta"] != "data2":
-            pytest.fail("Second document meta mismatch")
-        if result[1]["chunk_index"] != 0:
-            pytest.fail("Second document chunk index mismatch")
-        if result[1]["total_chunks"] != 1:
-            pytest.fail("Second document total chunks mismatch")
+        for chunk, doc in zip(result, documents, strict=False):
+            assert chunk["text"] == doc["text"], f"Text mismatch for {doc['id']}"
+            assert chunk["id"] == doc["id"], f"ID mismatch for {doc['id']}"
+            assert chunk["meta"] == doc["meta"], f"Meta mismatch for {doc['id']}"
+            assert chunk["chunk_index"] == 0, f"Chunk index mismatch for {doc['id']}"
+            assert chunk["total_chunks"] == 1, f"Total chunks mismatch for {doc['id']}"
 
     def test_document_requiring_chunking(self) -> None:
         """Test a document that requires multiple chunks."""
@@ -123,22 +107,14 @@ class TestChunkDocuments:
         result = chunk_documents(documents, chunk_size=50, chunk_overlap=10)
 
         # Should produce multiple chunks for the long document
-        if len(result) > 1:
-            # All chunks should have the same document ID
-            for chunk in result:
-                if chunk["id"] != "long_doc":
-                    pytest.fail("Document ID mismatch in chunks")
-                if "chunk_index" not in chunk:
-                    pytest.fail("Missing chunk_index in chunk")
-                if "total_chunks" not in chunk:
-                    pytest.fail("Missing total_chunks in chunk")
+        assert len(result) > 1, "Should produce multiple chunks for the long document"
 
-            # Check chunk indices are sequential
-            for i, chunk in enumerate(result):
-                if chunk["chunk_index"] != i:
-                    pytest.fail("Chunk index mismatch")
-                if chunk["total_chunks"] != len(result):
-                    pytest.fail("Total chunks mismatch")
+        for i, chunk in enumerate(result):
+            assert chunk["id"] == "long_doc", "Document ID mismatch in chunks"
+            assert "chunk_index" in chunk, "Missing chunk_index in chunk"
+            assert "total_chunks" in chunk, "Missing total_chunks in chunk"
+            assert chunk["chunk_index"] == i, "Chunk index mismatch"
+            assert chunk["total_chunks"] == len(result), "Total chunks mismatch"
 
     def test_missing_text_field(self) -> None:
         """Test handling of documents without text field."""
@@ -202,20 +178,20 @@ class TestChunkingEdgeCases:
 
     def test_zero_chunk_size(self) -> None:
         """Test handling of zero chunk size."""
-        with pytest.raises(IndexError):
+        with pytest.raises(ValueError):  # noqa: PT011
             chunk_text("test", chunk_size=0, chunk_overlap=10)
 
     def test_negative_chunk_size(self) -> None:
         """Test handling of negative chunk size."""
-        with pytest.raises(IndexError):
+        with pytest.raises(ValueError):  # noqa: PT011
             chunk_text("test", chunk_size=-1, chunk_overlap=10)
 
     def test_negative_overlap(self) -> None:
         """Test handling of negative overlap."""
-        with pytest.raises(IndexError):
+        with pytest.raises(ValueError):  # noqa: PT011
             chunk_text("test", chunk_size=100, chunk_overlap=-1)
 
     def test_overlap_greater_than_chunk_size(self) -> None:
         """Test handling of overlap greater than chunk size."""
-        with pytest.raises(IndexError):
+        with pytest.raises(ValueError):  # noqa: PT011
             chunk_text("test", chunk_size=50, chunk_overlap=100)

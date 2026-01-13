@@ -3,7 +3,7 @@
 import pytest
 from hypha_rpc.rpc import RemoteService
 
-from tests.weaviate_service.utils import APP_ID, create_test_application
+from tests.weaviate_service.utils import APP_ID, StandardMovie, create_test_application
 
 
 @pytest.mark.asyncio
@@ -13,19 +13,9 @@ async def test_collection_query_fetch_objects(weaviate_service: RemoteService) -
     await create_test_application(weaviate_service)
 
     # Add test objects
-    test_objects: list[dict[str, str | int]] = [
-        {
-            "title": "Inception",
-            "description": "A thief who steals corporate secrets through dream-sharing technology",
-            "genre": "Science Fiction",
-            "year": 2010,
-        },
-        {
-            "title": "The Dark Knight",
-            "description": "Batman fights the menace known as the Joker",
-            "genre": "Action",
-            "year": 2008,
-        },
+    test_objects: list[StandardMovie] = [
+        StandardMovie.INCEPTION,
+        StandardMovie.THE_DARK_KNIGHT,
     ]
 
     await weaviate_service.data.insert_many(
@@ -67,25 +57,10 @@ async def test_collection_query_hybrid(weaviate_service: RemoteService) -> None:
     await create_test_application(weaviate_service)
 
     # Add test objects
-    test_objects: list[dict[str, str | int]] = [
-        {
-            "title": "Inception",
-            "description": "A thief who steals corporate secrets through dream-sharing technology",
-            "genre": "Science Fiction",
-            "year": 2010,
-        },
-        {
-            "title": "The Dark Knight",
-            "description": "Batman fights the menace known as the Joker",
-            "genre": "Action",
-            "year": 2008,
-        },
-        {
-            "title": "Interstellar",
-            "description": "A team of explorers travel through a wormhole in space",
-            "genre": "Science Fiction",
-            "year": 2014,
-        },
+    test_objects: list[StandardMovie] = [
+        StandardMovie.INCEPTION,
+        StandardMovie.THE_DARK_KNIGHT,
+        StandardMovie.INTERSTELLAR,
     ]
 
     await weaviate_service.data.insert_many(
@@ -120,25 +95,10 @@ async def test_collection_query_near_text(weaviate_service: RemoteService) -> No
     await create_test_application(weaviate_service)
 
     # Add test objects
-    test_objects: list[dict[str, str | int]] = [
-        {
-            "title": "Inception",
-            "description": "A thief who steals corporate secrets through dream-sharing technology",
-            "genre": "Science Fiction",
-            "year": 2010,
-        },
-        {
-            "title": "The Dark Knight",
-            "description": "Batman fights the menace known as the Joker",
-            "genre": "Action",
-            "year": 2008,
-        },
-        {
-            "title": "Interstellar",
-            "description": "A team of explorers travel through a wormhole in space",
-            "genre": "Science Fiction",
-            "year": 2014,
-        },
+    test_objects: list[StandardMovie] = [
+        StandardMovie.INCEPTION,
+        StandardMovie.THE_DARK_KNIGHT,
+        StandardMovie.INTERSTELLAR,
     ]
 
     await weaviate_service.data.insert_many(
@@ -172,19 +132,9 @@ async def test_collection_query_near_vector(weaviate_service: RemoteService) -> 
     await create_test_application(weaviate_service)
 
     # Create test objects
-    test_objects: list[dict[str, str | int]] = [
-        {
-            "title": "The Matrix",
-            "description": "A computer hacker learns about the true nature of reality",
-            "genre": "Science Fiction",
-            "year": 1999,
-        },
-        {
-            "title": "The Godfather",
-            "description": "The aging patriarch of an organized crime dynasty transfers control to his son",
-            "genre": "Crime",
-            "year": 1972,
-        },
+    test_objects: list[StandardMovie] = [
+        StandardMovie.THE_MATRIX,
+        StandardMovie.THE_GODFATHER,
     ]
 
     # Insert data
@@ -194,8 +144,6 @@ async def test_collection_query_near_vector(weaviate_service: RemoteService) -> 
         objects=test_objects,
     )
 
-    # Get a vector to use for near_vector search
-    # This is a simplified example - in a real application we would use a proper embedding
     dummy_vector = [0.1] * 1024  # Assuming 3072-dimensional vectors
 
     # Perform near_vector search

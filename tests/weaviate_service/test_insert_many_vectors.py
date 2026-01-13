@@ -5,15 +5,12 @@ and validate that objects are transformed into DataObject with vectors/uuids
 kept out of properties.
 """
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import pytest
 from weaviate.collections.classes.data import DataObject
 
 from hypha_startup_services.weaviate_service import methods as w_methods
-
-if TYPE_CHECKING:
-    from utils import MovieInfo
 
 
 class _FakeBatchReturn:
@@ -59,7 +56,7 @@ async def test_insert_many_accepts_top_level_vector_and_uuid(monkeypatch: Any) -
         _fake_prepare_tenant_collection,
     )
 
-    objs: list[MovieInfo] = [
+    objs: list[dict[str, object]] = [
         {
             "title": "With Vector",
             "description": "desc",
@@ -111,7 +108,7 @@ async def test_insert_many_accepts_legacy_id_key(monkeypatch: Any) -> None:
         _fake_prepare_tenant_collection,
     )
 
-    objs: list[MovieInfo] = [
+    objs: list[dict[str, object]] = [
         {
             "title": "Legacy ID",
             "description": "desc",

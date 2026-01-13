@@ -1,7 +1,9 @@
 """Common utilities for Weaviate tests."""
 
 import logging
-from typing import TypedDict
+from dataclasses import dataclass
+from enum import Enum
+from typing import Any, TypedDict
 
 from hypha_rpc.rpc import RemoteException, RemoteService
 
@@ -12,6 +14,129 @@ USER1_APP_ID = "User1App"
 USER2_APP_ID = "User2App"
 USER3_APP_ID = "User3App"
 SHARED_APP_ID = "SharedApp"
+
+
+@dataclass(frozen=True)
+class StandardMovieInfo:
+    """Standard movie information for tests."""
+
+    title: str
+    description: str
+    genre: str
+    year: int
+
+
+class Genre(Enum):
+    """Movie genres used in tests."""
+
+    SCIENCE_FICTION = "Science Fiction"
+    ACTION = "Action"
+    CRIME = "Crime"
+    DRAMA = "Drama"
+
+
+class StandardMovie(Enum):
+    """Standard movies used in tests."""
+
+    INCEPTION = StandardMovieInfo(
+        title="Inception",
+        description=(
+            "A thief who steals corporate secrets through dream-sharing technology"
+        ),
+        genre=Genre.SCIENCE_FICTION.value,
+        year=2010,
+    )
+    THE_DARK_KNIGHT = StandardMovieInfo(
+        title="The Dark Knight",
+        description="Batman fights the menace known as the Joker",
+        genre=Genre.ACTION.value,
+        year=2008,
+    )
+    INTERSTELLAR = StandardMovieInfo(
+        title="Interstellar",
+        description=(
+            "A team of explorers travel through a wormhole in"
+            " space in an attempt to ensure humanity's survival"
+        ),
+        genre=Genre.SCIENCE_FICTION.value,
+        year=2014,
+    )
+    THE_GODFATHER = StandardMovieInfo(
+        title="The Godfather",
+        description=(
+            "The aging patriarch of an organized"
+            " crime dynasty transfers control to his son"
+        ),
+        genre=Genre.CRIME.value,
+        year=1972,
+    )
+    THE_MATRIX = StandardMovieInfo(
+        title="The Matrix",
+        description="A computer hacker learns about the true nature of reality",
+        genre=Genre.SCIENCE_FICTION.value,
+        year=1999,
+    )
+    AVATAR = StandardMovieInfo(
+        title="Avatar",
+        description=(
+            "A paraplegic Marine dispatched to the moon Pandora on a unique mission"
+        ),
+        genre=Genre.SCIENCE_FICTION.value,
+        year=2009,
+    )
+    PULP_FICTION = StandardMovieInfo(
+        title="Pulp Fiction",
+        description=(
+            "The lives of two mob hitmen, a boxer, a gangster's wife, and"
+            " a pair of diner bandits intertwine"
+        ),
+        genre=Genre.CRIME.value,
+        year=1994,
+    )
+    STAR_WARS_A_NEW_HOPE = StandardMovieInfo(
+        title="Star Wars: A New Hope",
+        description="Luke Skywalker joins forces with a Jedi Knight",
+        genre=Genre.SCIENCE_FICTION.value,
+        year=1977,
+    )
+    STAR_WARS_THE_EMPIRE_STRIKES_BACK = StandardMovieInfo(
+        title="Star Wars: The Empire Strikes Back",
+        description="After the Rebels are overpowered by the Empire",
+        genre=Genre.SCIENCE_FICTION.value,
+        year=1980,
+    )
+    THE_SHAWSHANK_REDEMPTION = StandardMovieInfo(
+        title="The Shawshank Redemption",
+        description="Two imprisoned men bond over a number of years",
+        genre=Genre.DRAMA.value,
+        year=1994,
+    )
+    GOODFELLAS = StandardMovieInfo(
+        title="Goodfellas",
+        description="The story of Henry Hill and his life in the mob",
+        genre=Genre.CRIME.value,
+        year=1990,
+    )
+    ARRIVAL = StandardMovieInfo(
+        title="Arrival",
+        description=(
+            "A linguist works with the military to communicate with alien lifeforms."
+        ),
+        genre=Genre.SCIENCE_FICTION.value,
+        year=2016,
+    )
+    BLADE_RUNNER = StandardMovieInfo(
+        title="Blade Runner",
+        description="A blade runner must pursue and terminate four replicants.",
+        genre=Genre.SCIENCE_FICTION.value,
+        year=1982,
+    )
+    GRAVITY = StandardMovieInfo(
+        title="Gravity",
+        description="Two astronauts work together to survive after an accident.",
+        genre=Genre.SCIENCE_FICTION.value,
+        year=2013,
+    )
 
 
 class MovieInfo(TypedDict, total=False):
@@ -27,10 +152,7 @@ class MovieInfo(TypedDict, total=False):
 
 
 # Common test objects
-MOVIE_COLLECTION_CONFIG: dict[
-    str,
-    str | dict[str, bool] | list[dict[str, str | list[str]]],
-] = {
+MOVIE_COLLECTION_CONFIG: dict[str, object] = {
     "class": "Movie",
     "description": "A movie class",
     "multiTenancyConfig": {
@@ -67,7 +189,7 @@ MOVIE_COLLECTION_CONFIG: dict[
 
 
 # Common test helpers
-async def create_test_collection(weaviate_service: RemoteService):
+async def create_test_collection(weaviate_service: RemoteService) -> dict[str, Any]:
     """Create a test collection for Weaviate tests."""
     ollama_endpoint = "https://hypha-ollama.scilifelab-2-dev.sys.kth.se"
     ollama_model = (
@@ -77,8 +199,8 @@ async def create_test_collection(weaviate_service: RemoteService):
     # Try to delete if it exists - ignore errors
     try:
         await weaviate_service.collections.delete("Movie")
-    except RemoteException as e:
-        logger.exception("Error deleting collection: %s", e)
+    except RemoteException:
+        logger.exception("Error deleting collection")
 
     class_obj = MOVIE_COLLECTION_CONFIG.copy()
     # Add vector configurations

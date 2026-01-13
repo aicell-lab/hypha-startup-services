@@ -7,6 +7,7 @@ from tests.weaviate_service.utils import (
     APP_ID,
     USER1_APP_ID,
     MovieInfo,
+    StandardMovie,
     create_test_application,
     create_test_collection,
 )
@@ -49,14 +50,7 @@ async def test_application_delete(weaviate_service: RemoteService) -> None:
     await create_test_application(weaviate_service)
 
     # Add some data to the application
-    test_object: MovieInfo = {
-        "title": "Avatar",
-        "description": (
-            "A paraplegic Marine dispatched to the moon Pandora on a unique mission"
-        ),
-        "genre": "Science Fiction",
-        "year": 2009,
-    }
+    test_object: StandardMovie = StandardMovie.AVATAR
 
     await weaviate_service.data.insert(
         collection_name="Movie",
