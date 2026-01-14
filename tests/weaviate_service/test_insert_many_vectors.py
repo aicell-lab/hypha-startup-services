@@ -5,14 +5,14 @@ and validate that objects are transformed into DataObject with vectors/uuids
 kept out of properties.
 """
 
+from collections.abc import Callable, Coroutine
 from typing import Any
 
 import pytest
 from weaviate.collections.classes.data import DataObject
 
 from hypha_startup_services.weaviate_service import methods as w_methods
-
-# ruff: noqa: S101  (Allow assert statements in test module)
+from tests.weaviate_service.utils import APP_ID
 
 
 class _FakeBatchReturn:
@@ -27,7 +27,11 @@ class _FakeData:
     def __init__(self) -> None:
         self.received_objects: list[Any] = []
 
-    async def insert_many(self, *, objects: list[Any]) -> _FakeBatchReturn:
+    async def insert_many(  # NOSONAR S7503
+        self,
+        *,
+        objects: list[Any],
+    ) -> _FakeBatchReturn:
         self.received_objects = objects
         return _FakeBatchReturn()
 
@@ -37,16 +41,25 @@ class _FakeTenantCollection:
         self.data = _FakeData()
 
 
-@pytest.mark.asyncio
-async def test_insert_many_accepts_top_level_vector_and_uuid(monkeypatch: Any) -> None:
-    """Ensure vector and uuid top-level fields are kept out of properties."""
-    fake_tenant = _FakeTenantCollection()
+def get_fake_prepare_tenant_collection(
+    fake_tenant: _FakeTenantCollection,
+) -> Callable[..., Coroutine[None, None, _FakeTenantCollection]]:
+    """Return a fake prepare_tenant_collection function."""
 
-    async def _fake_prepare_tenant_collection(
+    async def _fake_prepare_tenant_collection(  # NOSONAR S7503
         *_args: Any,
         **_kwargs: Any,
     ) -> _FakeTenantCollection:
         return fake_tenant
+
+    return _fake_prepare_tenant_collection
+
+
+@pytest.mark.asyncio
+async def test_insert_many_accepts_top_level_vector_and_uuid(monkeypatch: Any) -> None:
+    """Ensure vector and uuid top-level fields are kept out of properties."""
+    fake_tenant = _FakeTenantCollection()
+    _fake_prepare_tenant_collection = get_fake_prepare_tenant_collection(fake_tenant)
 
     monkeypatch.setattr(
         w_methods,
@@ -54,7 +67,7 @@ async def test_insert_many_accepts_top_level_vector_and_uuid(monkeypatch: Any) -
         _fake_prepare_tenant_collection,
     )
 
-    objs: list[dict[str, Any]] = [
+    objs: list[dict[str, object]] = [
         {
             "title": "With Vector",
             "description": "desc",
@@ -67,7 +80,7 @@ async def test_insert_many_accepts_top_level_vector_and_uuid(monkeypatch: Any) -
     result = await w_methods.data_insert_many(
         client=None,  # type: ignore[arg-type]
         collection_name="Movie",
-        application_id="TestApp",
+        application_id=APP_ID,
         objects=objs,
         context=None,
     )
@@ -93,12 +106,7 @@ async def test_insert_many_accepts_top_level_vector_and_uuid(monkeypatch: Any) -
 async def test_insert_many_accepts_legacy_id_key(monkeypatch: Any) -> None:
     """Ensure legacy 'id' key is treated as uuid and not a property."""
     fake_tenant = _FakeTenantCollection()
-
-    async def _fake_prepare_tenant_collection(
-        *_args: Any,
-        **_kwargs: Any,
-    ) -> _FakeTenantCollection:
-        return fake_tenant
+    _fake_prepare_tenant_collection = get_fake_prepare_tenant_collection(fake_tenant)
 
     monkeypatch.setattr(
         w_methods,
@@ -106,7 +114,7 @@ async def test_insert_many_accepts_legacy_id_key(monkeypatch: Any) -> None:
         _fake_prepare_tenant_collection,
     )
 
-    objs: list[dict[str, Any]] = [
+    objs: list[dict[str, object]] = [
         {
             "title": "Legacy ID",
             "description": "desc",
@@ -118,7 +126,7 @@ async def test_insert_many_accepts_legacy_id_key(monkeypatch: Any) -> None:
     await w_methods.data_insert_many(
         client=None,  # type: ignore[arg-type]
         collection_name="Movie",
-        application_id="TestApp",
+        application_id=APP_ID,
         objects=objs,
         context=None,
     )
@@ -130,4 +138,4 @@ async def test_insert_many_accepts_legacy_id_key(monkeypatch: Any) -> None:
     props: dict[str, Any] = dobj.properties  # type: ignore[attr-defined]
     assert "id" not in props
     assert "uuid" not in props
-    assert props["application_id"] == "TestApp"
+    assert props["application_id"] == APP_ID

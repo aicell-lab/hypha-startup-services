@@ -16,21 +16,21 @@ USER3_WS = "ws-user-google-oauth2|101564907182096510974"  # Regular user
 
 # Token environments for different users
 TOKEN_ENVS = ["PERSONAL_TOKEN", "PERSONAL_TOKEN2", "PERSONAL_TOKEN3"]
+DEFAULT_TOKEN_NAME = TOKEN_ENVS[0]
 
 
-async def get_user_server(token_env="PERSONAL_TOKEN"):
+async def get_user_server(token_env: str = DEFAULT_TOKEN_NAME) -> RemoteService:
     """Get a user server connection with the specified token."""
     load_dotenv(override=True)
     token = os.environ.get(token_env)
-    assert token is not None, f"{token_env} environment variable is not set"
-    server = await connect_to_server(
+
+    if token is None:
+        error_msg = f"{token_env} environment variable is not set"
+        raise ValueError(error_msg)
+
+    return await connect_to_server(
         {
             "server_url": SERVER_URL,
             "token": token,
         },
     )
-
-    if not isinstance(server, RemoteService):
-        raise TypeError("connect_to_server did not return a RemoteService instance")
-
-    return server

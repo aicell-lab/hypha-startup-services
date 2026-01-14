@@ -3,7 +3,7 @@
 import uuid as uuid_module
 
 import pytest
-from hypha_rpc.rpc import RemoteException
+from hypha_rpc.rpc import RemoteException, RemoteService
 
 from tests.conftest import USER1_WS
 from tests.weaviate_service.utils import (
@@ -11,16 +11,17 @@ from tests.weaviate_service.utils import (
     USER1_APP_ID,
     USER2_APP_ID,
     USER3_APP_ID,
+    MovieInfo,
     create_test_collection,
 )
 
 
 @pytest.mark.asyncio
 async def test_cross_application_data_sharing(
-    weaviate_service,
-    weaviate_service2,
-    weaviate_service3,
-):
+    weaviate_service: RemoteService,
+    weaviate_service2: RemoteService,
+    weaviate_service3: RemoteService,
+) -> None:
     """Test sharing data between applications owned by different users."""
     # Create collection
     await create_test_collection(weaviate_service)
@@ -44,16 +45,18 @@ async def test_cross_application_data_sharing(
         description="User 3's application",
     )
 
+    movie_to_insert: MovieInfo = {
+        "title": "User 1's Movie",
+        "description": "Original movie from User 1",
+        "genre": "Action",
+        "year": 2023,
+    }
+
     # User 1 inserts data
     user1_uuid = await weaviate_service.data.insert(
         collection_name="Movie",
         application_id=USER1_APP_ID,
-        properties={
-            "title": "User 1's Movie",
-            "description": "Original movie from User 1",
-            "genre": "Action",
-            "year": 2023,
-        },
+        properties=movie_to_insert,
     )
 
     # User 2 can retrieve User 1's data with explicit user_ws
@@ -73,7 +76,8 @@ async def test_cross_application_data_sharing(
         # This may fail depending on the permission model
         print(f"Note: Cross-user access failed: {e!s}")
 
-    # User 3 tries to modify User 1's data with explicit user_ws (may fail based on permissions)
+    # User 3 tries to modify User 1's data with explicit user_ws
+    # (may fail based on permissions)
     try:
         await weaviate_service3.data.update(
             collection_name="Movie",
@@ -101,9 +105,9 @@ async def test_cross_application_data_sharing(
 
 @pytest.mark.asyncio
 async def test_multi_tenant_access_with_correct_workspaces(
-    weaviate_service,
-    weaviate_service2,
-):
+    weaviate_service: RemoteService,
+    weaviate_service2: RemoteService,
+) -> None:
     """Test multi-tenant access using the correct workspace IDs."""
     # Create collection
     await create_test_collection(weaviate_service)
@@ -134,9 +138,7 @@ async def test_multi_tenant_access_with_correct_workspaces(
             application_id=SHARED_APP_ID,
             limit=10,
         )
-        assert (
-            False
-        ), "User 2 should not be able to access User 1's data without user_ws"
+        pytest.fail("User 2 should not be able to access User 1's data without user_ws")
     except (RemoteException, PermissionError, ValueError):
         # Expected failure due to permission settings
         pass
@@ -184,7 +186,10 @@ async def test_multi_tenant_access_with_correct_workspaces(
 
 
 @pytest.mark.asyncio
-async def test_uuid_collision_between_tenants(weaviate_service, weaviate_service2):
+async def test_uuid_collision_between_tenants(
+    weaviate_service: RemoteService,
+    weaviate_service2: RemoteService,
+) -> None:
     """Test that UUIDs don't collide between different tenants."""
     # Create collection with multi-tenancy enabled
     await create_test_collection(weaviate_service)

@@ -1,5 +1,6 @@
 """Helper functions to register the Weaviate service with proper API endpoints."""
 
+import asyncio
 import logging
 from functools import partial
 
@@ -42,6 +43,9 @@ from .service_codecs import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Set to keep references to background tasks to prevent garbage collection
+_background_tasks: set[asyncio.Task[None]] = set()
 
 
 async def register_weaviate(

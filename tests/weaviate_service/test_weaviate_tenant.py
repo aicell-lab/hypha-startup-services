@@ -1,7 +1,7 @@
 """Tests for cross-user and tenant functionality in Weaviate service."""
 
 import pytest
-from hypha_rpc.rpc import RemoteException
+from hypha_rpc.rpc import RemoteException, RemoteService
 from weaviate.classes.query import Filter
 
 from tests.conftest import USER1_WS, USER2_WS, USER3_WS
@@ -15,7 +15,10 @@ from tests.weaviate_service.utils import (
 
 
 @pytest.mark.asyncio
-async def test_shared_application_access(weaviate_service, weaviate_service2):
+async def test_shared_application_access(
+    weaviate_service: RemoteService,
+    weaviate_service2: RemoteService,
+) -> None:
     """Test access to a shared application with explicit user_ws parameter.
 
     This test simulates User 1 sharing an application with User 2 by allowing
@@ -32,7 +35,7 @@ async def test_shared_application_access(weaviate_service, weaviate_service2):
     )
 
     # User 1 adds data
-    shared_movie1 = {
+    shared_movie1: dict[str, str | int] = {
         "title": "User 1's Shared Movie",
         "description": "Movie added by User 1 to shared app",
         "genre": "Drama",
@@ -45,9 +48,10 @@ async def test_shared_application_access(weaviate_service, weaviate_service2):
         properties=shared_movie1,
     )
 
-    # User 2 tries to add data to User 1's application using the user_ws parameter to specify User 1
+    # User 2 tries to add data to User 1's application using the user_ws parameter
+    # to specify User 1
     # Note: In a real application, you would have proper permission management
-    user2_movie = {
+    user2_movie: dict[str, str | int] = {
         "title": "User 2's Movie in Shared App",
         "description": "Movie added by User 2 to shared app",
         "genre": "Sci-Fi",
@@ -85,9 +89,9 @@ async def test_shared_application_access(weaviate_service, weaviate_service2):
 
 @pytest.mark.asyncio
 async def test_data_operations_permission_boundaries(
-    weaviate_service,
-    weaviate_service2,
-):
+    weaviate_service: RemoteService,
+    weaviate_service2: RemoteService,
+) -> None:
     """Test permission boundaries for various data operations."""
     # Create collection
     await create_test_collection(weaviate_service)
@@ -155,9 +159,7 @@ async def test_data_operations_permission_boundaries(
     for op_name, operation in operations:
         try:
             await operation()
-            assert (
-                False
-            ), f"Operation {op_name} should have failed with permission error"
+            pytest.fail(f"Operation {op_name} should have failed with permission error")
         except (RemoteException, PermissionError, ValueError):
             # Expected failure due to permission settings
             pass
@@ -171,11 +173,11 @@ async def test_data_operations_permission_boundaries(
 
 @pytest.mark.asyncio
 async def test_cross_user_application_access(
-    weaviate_service,
-    weaviate_service2,
-    weaviate_service3,
-):
-    """Test that users can access applications across workspaces using the user_ws parameter."""
+    weaviate_service: RemoteService,
+    weaviate_service2: RemoteService,
+    weaviate_service3: RemoteService,
+) -> None:
+    """Test user application access across workspaces using user_ws parameter."""
     # Create collection
     await create_test_collection(weaviate_service)
 
@@ -247,7 +249,8 @@ async def test_cross_user_application_access(
         # If successful, verify the data
         assert user2_from_user1["objects"][0]["properties"]["title"] == "User 2's Movie"
     except (RemoteException, PermissionError, ValueError) as e:
-        # If it fails, it should be due to permission settings, not because the approach is wrong
+        # If it fails, it should be due to permission settings, not because the
+        # approach is wrong
         print(f"Note: Admin accessing data with user_ws parameter failed: {e!s}")
 
     # Clean up
@@ -267,10 +270,10 @@ async def test_cross_user_application_access(
 
 @pytest.mark.asyncio
 async def test_cross_application_data_isolation(
-    weaviate_service,
-    weaviate_service2,
-    weaviate_service3,
-):
+    weaviate_service: RemoteService,
+    weaviate_service2: RemoteService,
+    weaviate_service3: RemoteService,
+) -> None:
     """Test data isolation between applications across different users/tenants."""
     # Create collection (only admin can do this)
     await create_test_collection(weaviate_service)
@@ -294,8 +297,9 @@ async def test_cross_application_data_isolation(
         description="User 3's movie application",
     )
 
-    # Each user adds data to their own application with identical properties but different titles
-    movie_props = {
+    # Each user adds data to their own application with identical properties but
+    # different titles
+    movie_props: dict[str, str | int] = {
         "description": "A test movie with identical properties across tenants",
         "genre": "Science Fiction",
         "year": 2025,

@@ -716,8 +716,7 @@ async def query_near_vector(
     application_id: str,
     user_ws: str | None = None,
     context: dict[str, object] | None = None,
-    *,
-    return_metadata: bool = True,
+    return_metadata: dict[str, Any] | None = None,
     **kwargs: Any,
 ) -> dict[str, object]:
     """Query the collection using vector similarity search.
@@ -732,7 +731,7 @@ async def query_near_vector(
         application_id: ID of the application to filter results by
         user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
-        return_metadata: Whether to return metadata in the results
+        return_metadata: Whether to return metadata (bool) or specific fields (dict)
         **kwargs: Additional arguments to pass to near_vector()
 
     Returns:
@@ -750,10 +749,10 @@ async def query_near_vector(
     kwargs["filters"] = and_app_filter(application_id, kwargs.get("filters"))
 
     if return_metadata:
-        kwargs["return_metadata"] = MetadataQuery.full()
+        kwargs["return_metadata"] = MetadataQuery(**return_metadata)
 
     response = cast(
-        "QueryReturn[object, object]",
+        "QueryReturn[object, object]",  # NOSONAR (S1192) Repeated literal necessary
         await tenant_collection.query.near_vector(**kwargs),
     )
 
@@ -769,7 +768,7 @@ async def query_fetch_objects(
     user_ws: str | None = None,
     context: dict[str, object] | None = None,
     *,
-    return_metadata: bool = True,
+    return_metadata: dict[str, Any] | None = None,
     **kwargs: Any,
 ) -> dict[str, object]:
     """Query the collection to fetch objects based on filters.
@@ -784,7 +783,7 @@ async def query_fetch_objects(
         application_id: ID of the application to filter results by (optional)
         user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
-        return_metadata: Whether to return metadata in the results
+        return_metadata: Dictionary of specific metadata fields to return
         **kwargs: Additional arguments to pass to fetch_objects()
 
     Returns:
@@ -802,10 +801,10 @@ async def query_fetch_objects(
     kwargs["filters"] = and_app_filter(application_id, kwargs.get("filters"))
 
     if return_metadata:
-        kwargs["return_metadata"] = MetadataQuery.full()
+        kwargs["return_metadata"] = MetadataQuery(**return_metadata)
 
     response = cast(
-        "QueryReturn[object, object]",
+        "QueryReturn[object, object]",  # NOSONAR (S1192) Repeated literal necessary
         await tenant_collection.query.fetch_objects(**kwargs),
     )
 
@@ -821,7 +820,7 @@ async def query_hybrid(
     user_ws: str | None = None,
     context: dict[str, object] | None = None,
     *,
-    return_metadata: bool = True,
+    return_metadata: dict[str, Any] | None = None,
     **kwargs: Any,
 ) -> dict[str, object]:
     """Query collection using hybrid search (combination of vector and keyword search).
@@ -837,7 +836,7 @@ async def query_hybrid(
         application_id: ID of the application to filter results by (optional)
         user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
-        return_metadata: Whether to return metadata in the results
+        return_metadata: Dictionary of specific metadata fields to return
         **kwargs: Additional arguments to pass to hybrid()
 
     Returns:
@@ -855,7 +854,7 @@ async def query_hybrid(
     kwargs["filters"] = and_app_filter(application_id, kwargs.get("filters"))
 
     if return_metadata:
-        kwargs["return_metadata"] = MetadataQuery.full()
+        kwargs["return_metadata"] = MetadataQuery(**return_metadata)
 
     response = cast(
         "QueryReturn[object, object]",

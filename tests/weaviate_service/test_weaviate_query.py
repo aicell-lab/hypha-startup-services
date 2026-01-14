@@ -1,30 +1,21 @@
 """Tests for Weaviate query functionality."""
 
 import pytest
+from hypha_rpc.rpc import RemoteService
 
-from tests.weaviate_service.utils import APP_ID, create_test_application
+from tests.weaviate_service.utils import APP_ID, StandardMovie, create_test_application
 
 
 @pytest.mark.asyncio
-async def test_collection_query_fetch_objects(weaviate_service):
+async def test_collection_query_fetch_objects(weaviate_service: RemoteService) -> None:
     """Test fetching objects from a collection using kwargs."""
     # First insert test data by running another test
     await create_test_application(weaviate_service)
 
     # Add test objects
-    test_objects = [
-        {
-            "title": "Inception",
-            "description": "A thief who steals corporate secrets through dream-sharing technology",
-            "genre": "Science Fiction",
-            "year": 2010,
-        },
-        {
-            "title": "The Dark Knight",
-            "description": "Batman fights the menace known as the Joker",
-            "genre": "Action",
-            "year": 2008,
-        },
+    test_objects: list[StandardMovie] = [
+        StandardMovie.INCEPTION,
+        StandardMovie.THE_DARK_KNIGHT,
     ]
 
     await weaviate_service.data.insert_many(
@@ -56,35 +47,20 @@ async def test_collection_query_fetch_objects(weaviate_service):
         limit=10,
     )
 
-    assert len(all_results["objects"]) == 2
+    assert len(all_results["objects"]) == len(test_objects)
 
 
 @pytest.mark.asyncio
-async def test_collection_query_hybrid(weaviate_service):
+async def test_collection_query_hybrid(weaviate_service: RemoteService) -> None:
     """Test hybrid query on a collection using kwargs."""
     # First insert test data
     await create_test_application(weaviate_service)
 
     # Add test objects
-    test_objects = [
-        {
-            "title": "Inception",
-            "description": "A thief who steals corporate secrets through dream-sharing technology",
-            "genre": "Science Fiction",
-            "year": 2010,
-        },
-        {
-            "title": "The Dark Knight",
-            "description": "Batman fights the menace known as the Joker",
-            "genre": "Action",
-            "year": 2008,
-        },
-        {
-            "title": "Interstellar",
-            "description": "A team of explorers travel through a wormhole in space",
-            "genre": "Science Fiction",
-            "year": 2014,
-        },
+    test_objects: list[StandardMovie] = [
+        StandardMovie.INCEPTION,
+        StandardMovie.THE_DARK_KNIGHT,
+        StandardMovie.INTERSTELLAR,
     ]
 
     await weaviate_service.data.insert_many(
@@ -104,40 +80,25 @@ async def test_collection_query_hybrid(weaviate_service):
 
     assert result is not None
     assert "objects" in result
-    assert len(result["objects"]) <= 2  # Should respect the limit
+    assert len(result["objects"]) <= len(test_objects)  # Should respect the limit
 
     # Results should be relevant to the query
     assert any(
-        "Science Fiction" in obj["properties"]["genre"] for obj in result["objects"]
+        "Science Fiction" in obj["properties"].value.genre for obj in result["objects"]
     )
 
 
 @pytest.mark.asyncio
-async def test_collection_query_near_text(weaviate_service):
+async def test_collection_query_near_text(weaviate_service: RemoteService) -> None:
     """Test near_text query on a collection using kwargs."""
     # First insert test data
     await create_test_application(weaviate_service)
 
     # Add test objects
-    test_objects = [
-        {
-            "title": "Inception",
-            "description": "A thief who steals corporate secrets through dream-sharing technology",
-            "genre": "Science Fiction",
-            "year": 2010,
-        },
-        {
-            "title": "The Dark Knight",
-            "description": "Batman fights the menace known as the Joker",
-            "genre": "Action",
-            "year": 2008,
-        },
-        {
-            "title": "Interstellar",
-            "description": "A team of explorers travel through a wormhole in space",
-            "genre": "Science Fiction",
-            "year": 2014,
-        },
+    test_objects: list[StandardMovie] = [
+        StandardMovie.INCEPTION,
+        StandardMovie.THE_DARK_KNIGHT,
+        StandardMovie.INTERSTELLAR,
     ]
 
     await weaviate_service.data.insert_many(
@@ -157,33 +118,23 @@ async def test_collection_query_near_text(weaviate_service):
 
     assert result is not None
     assert "objects" in result
-    assert len(result["objects"]) <= 2  # Should respect the limit
+    assert len(result["objects"]) <= len(test_objects)  # Should respect the limit
 
     # Results should be relevant to the query - Interstellar should be included
-    titles = [obj["properties"]["title"] for obj in result["objects"]]
+    titles = [obj["properties"].value.title for obj in result["objects"]]
     assert "Interstellar" in titles
 
 
 @pytest.mark.asyncio
-async def test_collection_query_near_vector(weaviate_service):
+async def test_collection_query_near_vector(weaviate_service: RemoteService) -> None:
     """Test querying a collection using near_vector with kwargs."""
     # First create a collection and application
     await create_test_application(weaviate_service)
 
     # Create test objects
-    test_objects = [
-        {
-            "title": "The Matrix",
-            "description": "A computer hacker learns about the true nature of reality",
-            "genre": "Science Fiction",
-            "year": 1999,
-        },
-        {
-            "title": "The Godfather",
-            "description": "The aging patriarch of an organized crime dynasty transfers control to his son",
-            "genre": "Crime",
-            "year": 1972,
-        },
+    test_objects: list[StandardMovie] = [
+        StandardMovie.THE_MATRIX,
+        StandardMovie.THE_GODFATHER,
     ]
 
     # Insert data
@@ -193,8 +144,6 @@ async def test_collection_query_near_vector(weaviate_service):
         objects=test_objects,
     )
 
-    # Get a vector to use for near_vector search
-    # This is a simplified example - in a real application we would use a proper embedding
     dummy_vector = [0.1] * 1024  # Assuming 3072-dimensional vectors
 
     # Perform near_vector search
@@ -209,7 +158,7 @@ async def test_collection_query_near_vector(weaviate_service):
 
     assert result is not None
     assert "objects" in result
-    assert len(result["objects"]) <= 2  # Should respect the limit
+    assert len(result["objects"]) <= len(test_objects)  # Should respect the limit
 
     # Check that vector was included in results
     assert all(

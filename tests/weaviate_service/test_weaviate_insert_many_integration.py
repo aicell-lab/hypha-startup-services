@@ -10,13 +10,14 @@ vector separation logic at the service boundary.
 """
 
 import uuid as uuid_module
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
 from tests.weaviate_service import utils as weav_utils
 
-# ruff: noqa: S101
+if TYPE_CHECKING:
+    from utils import MovieInfo
 
 
 @pytest.mark.asyncio
@@ -38,9 +39,6 @@ async def test_insert_many_with_top_level_vector_and_uuid(
     u2 = str(uuid_module.uuid4())
     u3 = str(uuid_module.uuid4())
 
-    # Mix of 'uuid' and legacy 'id' to validate both are accepted.
-    # Provide named vectors matching collection config (title_vector, description_vector).
-    # Dimension inferred from previous error trace (300). Generate simple deterministic floats.
     dim = 300
     title_vector = [float(i) / dim for i in range(dim)]
     description_vector = [float(dim - i) / dim for i in range(dim)]
@@ -48,7 +46,7 @@ async def test_insert_many_with_top_level_vector_and_uuid(
         "title_vector": title_vector,
         "description_vector": description_vector,
     }
-    objects: list[dict[str, object]] = [
+    objects: list[MovieInfo] = [
         {
             "title": "Vector One",
             "description": "Custom vector + uuid",

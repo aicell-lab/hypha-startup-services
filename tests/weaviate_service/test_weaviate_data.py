@@ -1,26 +1,27 @@
 """Tests for Weaviate data operations functionality."""
 
 import uuid as uuid_module
+from dataclasses import asdict
 
 import pytest
+from hypha_rpc.rpc import RemoteService
 from weaviate.classes.query import Filter
 
-from tests.weaviate_service.utils import APP_ID, create_test_application
+from tests.weaviate_service.utils import (
+    APP_ID,
+    StandardMovie,
+    create_test_application,
+)
 
 
 @pytest.mark.asyncio
-async def test_collection_data_insert(weaviate_service):
+async def test_collection_data_insert(weaviate_service: RemoteService) -> None:
     """Test inserting a single object into a collection."""
     # First create a collection and application
     await create_test_application(weaviate_service)
 
     # Create a test object
-    test_object = {
-        "title": "The Matrix",
-        "description": "A computer hacker learns about the true nature of reality",
-        "genre": "Science Fiction",
-        "year": 1999,
-    }
+    test_object: StandardMovie = StandardMovie.THE_MATRIX
 
     # Insert the object
     uuid = await weaviate_service.data.insert(
@@ -46,33 +47,17 @@ async def test_collection_data_insert(weaviate_service):
 
 
 @pytest.mark.asyncio
-async def test_collection_data_insert_many(weaviate_service):
+async def test_collection_data_insert_many(weaviate_service: RemoteService) -> None:
     """Test inserting multiple objects into a collection using kwargs."""
     # First create a collection and application
     await create_test_application(weaviate_service)
 
     # Create test objects
-    test_objects = [
-        {
-            "title": "Inception",
-            "description": "A thief who steals corporate secrets through dream-sharing technology",
-            "genre": "Science Fiction",
-            "year": 2010,
-        },
-        {
-            "title": "The Dark Knight",
-            "description": "Batman fights the menace known as the Joker",
-            "genre": "Action",
-            "year": 2008,
-        },
-        {
-            "title": "Interstellar",
-            "description": "A team of explorers travel through a wormhole in space",
-            "genre": "Science Fiction",
-            "year": 2014,
-        },
+    test_objects: list[StandardMovie] = [
+        StandardMovie.INCEPTION,
+        StandardMovie.THE_DARK_KNIGHT,
+        StandardMovie.INTERSTELLAR,
     ]
-
     # Insert the objects
     result = await weaviate_service.data.insert_many(
         collection_name="Movie",
@@ -100,29 +85,22 @@ async def test_collection_data_insert_many(weaviate_service):
 
 
 @pytest.mark.asyncio
-async def test_collection_data_update(weaviate_service):
+async def test_collection_data_update(weaviate_service: RemoteService) -> None:
     """Test updating an object in a collection."""
     # First insert a test object
     await create_test_application(weaviate_service)
 
-    test_object = {
-        "title": "Pulp Fiction",
-        "description": (
-            "The lives of two mob hitmen, a boxer, a gangster's wife, and"
-            " a pair of diner bandits intertwine"
-        ),
-        "genre": "Crime",
-        "year": 1994,
-    }
+    # Use dict to avoid codec decoding back to immutable Enum
+    test_object_dict = asdict(StandardMovie.PULP_FICTION.value)
 
     uuid = await weaviate_service.data.insert(
         collection_name="Movie",
         application_id=APP_ID,
-        properties=test_object,
+        properties=test_object_dict,
     )
 
     # Update the object
-    updated_properties = {
+    updated_properties: dict[str, str | int] = {
         "description": "Updated description for Pulp Fiction",
         "year": 1995,  # Deliberately changing for test purposes
     }
@@ -149,22 +127,17 @@ async def test_collection_data_update(weaviate_service):
     assert updated_obj["properties"]["description"] == updated_properties["description"]
     assert updated_obj["properties"]["year"] == updated_properties["year"]
     # Original fields not mentioned in the update should remain unchanged
-    assert updated_obj["properties"]["title"] == test_object["title"]
-    assert updated_obj["properties"]["genre"] == test_object["genre"]
+    assert updated_obj["properties"]["title"] == test_object_dict["title"]
+    assert updated_obj["properties"]["genre"] == test_object_dict["genre"]
 
 
 @pytest.mark.asyncio
-async def test_collection_data_exists(weaviate_service):
+async def test_collection_data_exists(weaviate_service: RemoteService) -> None:
     """Test checking if an object exists in a collection."""
     # First create a collection and application with a test object
     await create_test_application(weaviate_service)
 
-    test_object = {
-        "title": "The Godfather",
-        "description": "The aging patriarch of an organized crime dynasty transfers control to his son",
-        "genre": "Crime",
-        "year": 1972,
-    }
+    test_object: StandardMovie = StandardMovie.THE_GODFATHER
 
     uuid = await weaviate_service.data.insert(
         collection_name="Movie",
@@ -193,17 +166,12 @@ async def test_collection_data_exists(weaviate_service):
 
 
 @pytest.mark.asyncio
-async def test_collection_data_delete_by_id(weaviate_service):
+async def test_collection_data_delete_by_id(weaviate_service: RemoteService) -> None:
     """Test deleting an object by ID from a collection."""
     # First create a collection and application with a test object
     await create_test_application(weaviate_service)
 
-    test_object = {
-        "title": "Goodfellas",
-        "description": "The story of Henry Hill and his life in the mob",
-        "genre": "Crime",
-        "year": 1990,
-    }
+    test_object: StandardMovie = StandardMovie.GOODFELLAS
 
     uuid = await weaviate_service.data.insert(
         collection_name="Movie",
@@ -236,31 +204,16 @@ async def test_collection_data_delete_by_id(weaviate_service):
 
 
 @pytest.mark.asyncio
-async def test_collection_data_delete_many(weaviate_service):
+async def test_collection_data_delete_many(weaviate_service: RemoteService) -> None:
     """Test deleting multiple objects using filters."""
     # First create a collection and application
     await create_test_application(weaviate_service)
 
     # Add some test data
-    test_objects = [
-        {
-            "title": "Star Wars: A New Hope",
-            "description": "Luke Skywalker joins forces with a Jedi Knight",
-            "genre": "Science Fiction",
-            "year": 1977,
-        },
-        {
-            "title": "Star Wars: The Empire Strikes Back",
-            "description": "After the Rebels are overpowered by the Empire",
-            "genre": "Science Fiction",
-            "year": 1980,
-        },
-        {
-            "title": "The Shawshank Redemption",
-            "description": "Two imprisoned men bond over a number of years",
-            "genre": "Drama",
-            "year": 1994,
-        },
+    test_objects: list[StandardMovie] = [
+        StandardMovie.STAR_WARS_A_NEW_HOPE,
+        StandardMovie.STAR_WARS_THE_EMPIRE_STRIKES_BACK,
+        StandardMovie.THE_SHAWSHANK_REDEMPTION,
     ]
 
     # Insert data
@@ -276,7 +229,8 @@ async def test_collection_data_delete_many(weaviate_service):
         application_id=APP_ID,
         limit=10,
     )
-    assert len(query_result["objects"]) == 3
+
+    assert len(query_result["objects"]) == len(test_objects)
 
     # Delete objects with science fiction genre
     result = await weaviate_service.data.delete_many(
@@ -287,7 +241,9 @@ async def test_collection_data_delete_many(weaviate_service):
 
     assert result is not None
     assert "successful" in result
-    assert result["successful"] == 2  # Should have deleted 2 Star Wars movies
+    assert (
+        result["successful"] == len(test_objects) - 1
+    )  # Should have deleted 2 Star Wars movies
 
     # Verify the remaining objects
     query_result = await weaviate_service.query.fetch_objects(
@@ -298,5 +254,6 @@ async def test_collection_data_delete_many(weaviate_service):
 
     assert len(query_result["objects"]) == 1
     assert (
-        query_result["objects"][0]["properties"]["title"] == "The Shawshank Redemption"
+        query_result["objects"][0]["properties"].value.title
+        == "The Shawshank Redemption"
     )

@@ -1,5 +1,7 @@
 """Text chunking utilities."""
 
+from collections.abc import Mapping, Sequence
+
 import tiktoken
 
 
@@ -65,7 +67,7 @@ def chunk_text(
 
 
 def chunk_documents(
-    documents: list[dict[str, object]],
+    documents: Sequence[Mapping[str, object]],
     chunk_size: int = 512,
     chunk_overlap: int = 50,
     encoding_name: str = "cl100k_base",
@@ -98,7 +100,7 @@ def chunk_documents(
         # Create new document for each chunk, preserving all original metadata
         for chunk_idx, chunk in enumerate(chunks):
             # Copy all original document fields
-            chunked_doc = doc.copy()
+            chunked_doc = dict(doc)
 
             # Update text and add chunk metadata
             chunked_doc["text"] = chunk
