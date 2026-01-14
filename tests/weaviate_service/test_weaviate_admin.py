@@ -56,6 +56,7 @@ async def test_admin_access_to_other_users_data(
         application_id=USER2_APP_ID,
         user_ws=USER2_WS,
         limit=10,
+        return_metadata={"creation_time": True},
     )
 
     assert len(admin_query["objects"]) == 1
@@ -77,6 +78,7 @@ async def test_admin_access_to_other_users_data(
         application_id=USER2_APP_ID,
         user_ws=USER2_WS,
         limit=10,
+        return_metadata=False,
     )
 
     assert admin_query["objects"][0]["properties"]["title"] == "Modified by Admin"

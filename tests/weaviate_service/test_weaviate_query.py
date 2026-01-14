@@ -84,7 +84,7 @@ async def test_collection_query_hybrid(weaviate_service: RemoteService) -> None:
 
     # Results should be relevant to the query
     assert any(
-        "Science Fiction" in obj["properties"]["genre"] for obj in result["objects"]
+        "Science Fiction" in obj["properties"].value.genre for obj in result["objects"]
     )
 
 
@@ -121,7 +121,7 @@ async def test_collection_query_near_text(weaviate_service: RemoteService) -> No
     assert len(result["objects"]) <= len(test_objects)  # Should respect the limit
 
     # Results should be relevant to the query - Interstellar should be included
-    titles = [obj["properties"]["title"] for obj in result["objects"]]
+    titles = [obj["properties"].value.title for obj in result["objects"]]
     assert "Interstellar" in titles
 
 

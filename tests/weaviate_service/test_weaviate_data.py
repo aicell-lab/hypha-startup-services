@@ -1,6 +1,7 @@
 """Tests for Weaviate data operations functionality."""
 
 import uuid as uuid_module
+from dataclasses import asdict
 
 import pytest
 from hypha_rpc.rpc import RemoteService
@@ -89,12 +90,13 @@ async def test_collection_data_update(weaviate_service: RemoteService) -> None:
     # First insert a test object
     await create_test_application(weaviate_service)
 
-    test_object: StandardMovie = StandardMovie.PULP_FICTION
+    # Use dict to avoid codec decoding back to immutable Enum
+    test_object_dict = asdict(StandardMovie.PULP_FICTION.value)
 
     uuid = await weaviate_service.data.insert(
         collection_name="Movie",
         application_id=APP_ID,
-        properties=test_object,
+        properties=test_object_dict,
     )
 
     # Update the object
@@ -125,8 +127,8 @@ async def test_collection_data_update(weaviate_service: RemoteService) -> None:
     assert updated_obj["properties"]["description"] == updated_properties["description"]
     assert updated_obj["properties"]["year"] == updated_properties["year"]
     # Original fields not mentioned in the update should remain unchanged
-    assert updated_obj["properties"]["title"] == test_object.value.title
-    assert updated_obj["properties"]["genre"] == test_object.value.genre
+    assert updated_obj["properties"]["title"] == test_object_dict["title"]
+    assert updated_obj["properties"]["genre"] == test_object_dict["genre"]
 
 
 @pytest.mark.asyncio
@@ -252,5 +254,6 @@ async def test_collection_data_delete_many(weaviate_service: RemoteService) -> N
 
     assert len(query_result["objects"]) == 1
     assert (
-        query_result["objects"][0]["properties"]["title"] == "The Shawshank Redemption"
+        query_result["objects"][0]["properties"].value.title
+        == "The Shawshank Redemption"
     )

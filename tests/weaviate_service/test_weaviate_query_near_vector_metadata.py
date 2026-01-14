@@ -39,6 +39,7 @@ async def test_query_near_vector_metadata_not_all_none(weaviate_service: Any) ->
             near_vector=query_vector,
             target_vector="title_vector",
             include_vector=True,
+            return_metadata={"distance": True, "score": True},
             limit=3,
         ),
     )
