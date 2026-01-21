@@ -1,6 +1,6 @@
 """Tests for the Weaviate collection functionality."""
 
-from typing import Any, cast
+from typing import cast
 
 import pytest
 from hypha_rpc.rpc import RemoteException, RemoteService
@@ -35,7 +35,7 @@ async def test_list_collections(weaviate_service: RemoteService) -> None:
 
     # List collections
     collections_result = await weaviate_service.collections.list_all()
-    collections = cast("dict[str, Any]", collections_result)
+    collections = cast("dict[str, object]", collections_result)
 
     assert len(collections) >= 1
     assert isinstance(collections, dict)

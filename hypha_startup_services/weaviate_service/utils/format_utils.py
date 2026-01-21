@@ -1,11 +1,14 @@
 """Utilities for formatting Weaviate collection names and configurations."""
 
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol, cast
 
 from weaviate.collections import CollectionAsync
 
 from hypha_startup_services.common.constants import COLLECTION_DELIMITER
 from hypha_startup_services.common.utils import get_full_collection_name
+
+if TYPE_CHECKING:
+    from .models import CollectionConfig
 
 
 class SupportsToDict(Protocol):
@@ -29,7 +32,7 @@ def get_short_name(collection_name: str) -> str:
 
 def config_with_short_name(
     collection_config: SupportsToDict,
-) -> dict[str, object]:
+) -> "CollectionConfig":
     """Remove workspace from collection config."""
     config_dict = collection_config.to_dict()
     class_name = config_dict.get("class")
@@ -38,10 +41,10 @@ def config_with_short_name(
         raise TypeError(error_msg)
 
     config_dict["class"] = get_short_name(class_name)
-    return config_dict
+    return cast("CollectionConfig", config_dict)
 
 
-async def collection_to_config_dict(collection: CollectionAsync) -> dict[str, object]:
+async def collection_to_config_dict(collection: CollectionAsync) -> "CollectionConfig":
     """Convert collection to a dictionary with shortened collection name.
 
     Gets the collection's configuration and converts the full collection name
@@ -63,10 +66,10 @@ def get_full_collection_names(short_names: list[str]) -> list[str]:
     return [get_full_collection_name(short_name) for short_name in short_names]
 
 
-def get_settings_full_name(settings: dict[str, object]) -> dict[str, object]:
+def get_settings_full_name(settings: "CollectionConfig") -> "CollectionConfig":
     """Add workspace prefix to the collection name in settings."""
     settings_full_name = settings.copy()
-    original_class_name = settings_full_name["class"]
+    original_class_name = settings_full_name.get("class")
 
     if not isinstance(original_class_name, str):
         error_msg = "The 'class' field in settings must be a string."

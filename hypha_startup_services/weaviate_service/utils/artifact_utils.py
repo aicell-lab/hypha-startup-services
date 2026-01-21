@@ -18,7 +18,9 @@ from .format_utils import (
 )
 from .models import (
     ApplicationArtifactParams,
+    ApplicationArtifactReturn,
     CollectionArtifactParams,
+    CollectionConfig,
 )
 
 logger = logging.getLogger(__name__)
@@ -73,7 +75,7 @@ async def delete_collection_artifacts(short_names: list[str]) -> None:
 
 
 async def create_collection_artifact(
-    settings: dict[str, object],
+    settings: CollectionConfig,
 ) -> None:
     """Create a collection artifact using the model-based approach."""
     permissions = make_artifact_permissions(owners=ADMIN_WORKSPACES)
@@ -102,7 +104,7 @@ async def create_application_artifact(
     description: str,
     user_ws: str,
     caller_ws: str,
-) -> dict[str, object]:
+) -> ApplicationArtifactReturn:
     """Create an application artifact.
 
     Args:

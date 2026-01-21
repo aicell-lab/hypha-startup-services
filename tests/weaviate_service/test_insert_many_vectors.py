@@ -95,7 +95,7 @@ async def test_insert_many_accepts_top_level_vector_and_uuid(monkeypatch: Any) -
     assert isinstance(dobj, DataObject)
 
     # Verify properties got application_id and do not contain vector/uuid
-    props: dict[str, Any] = dobj.properties  # type: ignore[attr-defined]
+    props: dict[str, object] = dobj.properties  # type: ignore[attr-defined]
     assert "application_id" in props
     assert "vector" not in props
     assert "uuid" not in props
@@ -135,7 +135,7 @@ async def test_insert_many_accepts_legacy_id_key(monkeypatch: Any) -> None:
     assert len(fake_tenant.data.received_objects) == 1
     dobj = fake_tenant.data.received_objects[0]
     assert isinstance(dobj, DataObject)
-    props: dict[str, Any] = dobj.properties  # type: ignore[attr-defined]
+    props: dict[str, object] = dobj.properties  # type: ignore[attr-defined]
     assert "id" not in props
     assert "uuid" not in props
     assert props["application_id"] == APP_ID

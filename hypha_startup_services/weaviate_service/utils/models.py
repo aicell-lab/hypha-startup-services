@@ -1,6 +1,7 @@
 """Models for Weaviate artifact parameters."""
 
-from typing import Any, Literal
+from collections.abc import Sequence
+from typing import Any, Literal, TypedDict
 
 from pydantic import BaseModel, Field
 
@@ -29,6 +30,67 @@ PermissionOperation = Literal[
     "rw+",
     "*",
 ]
+
+PermissionMap = dict[str, PermissionOperation]
+
+
+# Define CollectionConfig using functional syntax to support "class" key
+CollectionConfig = TypedDict(
+    "CollectionConfig",
+    {
+        "class": str,
+        "description": str,
+        "vectorizer": str,
+        "properties": list[dict[str, Any]],
+        "multiTenancyConfig": dict[str, Any],
+        "vectorIndexConfig": dict[str, Any],
+        "moduleConfig": dict[str, Any],
+        "vectorConfig": dict[str, Any],
+        "invertedIndexConfig": dict[str, Any],
+        "replicationConfig": dict[str, Any],
+        "shardingConfig": dict[str, Any],
+        "vectorIndexType": str,
+    },
+    total=False,
+)
+
+
+class ApplicationReturn(TypedDict):
+    """Return type for application creation."""
+
+    application_id: str
+    collection_name: str
+    description: str
+    owner: str
+    artifact_name: str
+    result: dict[str, Any]
+
+
+class ApplicationArtifactReturn(TypedDict):
+    """Return type for application artifact helpers."""
+
+    artifact_name: str
+    # Add other keys if available/known
+    parent_id: str | None
+
+
+class DataDeleteManyReturn(TypedDict):
+    """Return type for delete many operation."""
+
+    failed: int
+    matches: int
+    objects: Sequence[Any] | None
+    successful: int
+
+
+class ServiceQueryReturn(TypedDict, total=False):
+    """Return type for query operations."""
+
+    objects: Sequence[Any]
+    generated: str | None
+
+
+HyphaContext = dict[str, Any]
 
 
 class WeaviateArtifactParams(BaseModel, BaseArtifactParams):
@@ -133,6 +195,7 @@ class ApplicationArtifactParams(WeaviateArtifactParams):
     )
 
     def __init__(self, **data: Any) -> None:
+        """Initialize ApplicationArtifactParams."""
         # Auto-generate artifact_name and parent_id if not provided
         if "artifact_name" not in data:
             full_collection_name = get_full_collection_name(data["collection_name"])

@@ -1,5 +1,7 @@
 """Tests for Weaviate application functionality."""
 
+from dataclasses import asdict
+
 import pytest
 from hypha_rpc.rpc import RemoteException, RemoteService
 
@@ -55,7 +57,7 @@ async def test_application_delete(weaviate_service: RemoteService) -> None:
     await weaviate_service.data.insert(
         collection_name="Movie",
         application_id=APP_ID,
-        properties=test_object,
+        properties=asdict(test_object.value),
     )
 
     # Delete the application

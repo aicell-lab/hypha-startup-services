@@ -7,6 +7,9 @@ from dataclasses import asdict
 import pytest_asyncio
 from hypha_rpc.rpc import RemoteException, RemoteService
 
+from hypha_startup_services.weaviate_service.register_service import (
+    register_weaviate,
+)
 from hypha_startup_services.weaviate_service.service_codecs import (
     register_weaviate_codecs,
 )
@@ -20,6 +23,15 @@ from tests.weaviate_service.utils import (
 )
 
 WEAVIATE_TEST_ID = "hypha-agents/weaviate-test"
+
+
+async def get_or_register_service(server: RemoteService) -> RemoteService:
+    """Get the weaviate service or register it if missing."""
+    try:
+        return await server.get_service(WEAVIATE_TEST_ID)
+    except RemoteException:
+        await register_weaviate(server, "weaviate-test")
+        return await server.get_service("weaviate-test")
 
 
 async def cleanup_weaviate_service(service: RemoteService) -> None:
@@ -41,7 +53,7 @@ def register_test_codecs(server: RemoteService) -> None:
     """Register test codecs for weaviate service."""
     register_weaviate_codecs(server)
 
-    def standard_movie_encoder(standard_movie: StandardMovie) -> dict[str, object]:
+    def standard_movie_encoder(standard_movie: StandardMovie) -> dict[str, str]:
         """Encode StandardMovie to dict."""
         encoded_dict = asdict(standard_movie.value)
         encoded_dict["enum_name"] = standard_movie.name
@@ -74,7 +86,7 @@ async def weaviate_service() -> AsyncGenerator[RemoteService, None]:
     """Create Weaviate service fixture for user 1."""
     server = await get_user_server("PERSONAL_TOKEN")
     register_test_codecs(server)
-    service = await server.get_service(WEAVIATE_TEST_ID)
+    service = await get_or_register_service(server)
     try:
         yield service
     finally:
@@ -87,7 +99,7 @@ async def weaviate_service2() -> AsyncGenerator[RemoteService, None]:
     """Weaviate service fixture for user 2."""
     server = await get_user_server("PERSONAL_TOKEN2")
     register_test_codecs(server)
-    service = await server.get_service(WEAVIATE_TEST_ID)
+    service = await get_or_register_service(server)
     yield service
     await server.disconnect()
 
@@ -97,6 +109,6 @@ async def weaviate_service3() -> AsyncGenerator[RemoteService, None]:
     """Weaviate service fixture for user 3."""
     server = await get_user_server("PERSONAL_TOKEN3")
     register_test_codecs(server)
-    service = await server.get_service(WEAVIATE_TEST_ID)
+    service = await get_or_register_service(server)
     yield service
     await server.disconnect()

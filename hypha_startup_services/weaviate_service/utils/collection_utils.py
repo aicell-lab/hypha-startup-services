@@ -2,7 +2,7 @@
 
 import uuid as uuid_class
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, TypedDict, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypedDict, TypeVar, cast
 
 from weaviate import WeaviateAsyncClient
 from weaviate.classes.data import DataObject
@@ -42,7 +42,7 @@ class InsertManyReturn(TypedDict):
 
 
 def to_data_object(
-    obj: dict[str, object],
+    obj: dict[str, Any],
 ) -> DataObject[WeaviateProperties, ReferenceInputs]:
     """Convert a dictionary to a DataObject."""
     props = dict(obj)

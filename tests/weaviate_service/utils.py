@@ -3,9 +3,11 @@
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, TypedDict
+from typing import TypedDict
 
 from hypha_rpc.rpc import RemoteException, RemoteService
+
+from hypha_startup_services.weaviate_service.utils.models import CollectionConfig
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -151,8 +153,14 @@ class MovieInfo(TypedDict, total=False):
     vector: list[float] | dict[str, list[float]] | None
 
 
+class MovieCollectionConfig(CollectionConfig):
+    """Structure for the movie collection configuration."""
+
+    # Additional specific fields could be added here if needed
+
+
 # Common test objects
-MOVIE_COLLECTION_CONFIG: dict[str, object] = {
+MOVIE_COLLECTION_CONFIG: MovieCollectionConfig = {
     "class": "Movie",
     "description": "A movie class",
     "multiTenancyConfig": {
@@ -189,7 +197,7 @@ MOVIE_COLLECTION_CONFIG: dict[str, object] = {
 
 
 # Common test helpers
-async def create_test_collection(weaviate_service: RemoteService) -> dict[str, Any]:
+async def create_test_collection(weaviate_service: RemoteService) -> CollectionConfig:
     """Create a test collection for Weaviate tests."""
     ollama_endpoint = "https://hypha-ollama.scilifelab-2-dev.sys.kth.se"
     ollama_model = (

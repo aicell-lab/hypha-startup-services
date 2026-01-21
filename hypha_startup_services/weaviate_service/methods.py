@@ -78,11 +78,21 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+if TYPE_CHECKING:
+    from .utils.models import (
+        ApplicationReturn,
+        CollectionConfig,
+        DataDeleteManyReturn,
+        HyphaContext,
+        PermissionMap,
+        ServiceQueryReturn,
+    )
+
 
 async def collections_exists(
     client: WeaviateAsyncClient,
     collection_name: str,
-    context: dict[str, object] | None = None,  # noqa: ARG001
+    context: HyphaContext | None = None,  # noqa: ARG001
 ) -> bool:
     """Check if a collection exists by its name.
 
@@ -109,9 +119,9 @@ async def collections_exists(
 
 async def collections_create(
     client: WeaviateAsyncClient,
-    settings: dict[str, object],
-    context: dict[str, object] | None = None,
-) -> dict[str, object]:
+    settings: CollectionConfig,
+    context: HyphaContext | None = None,
+) -> CollectionConfig:
     """Create a new collection.
 
     Verifies that the caller has admin permissions.
@@ -137,7 +147,7 @@ async def collections_create(
 
     settings_full_name = get_settings_full_name(settings)
     collection = await client.collections.create_from_dict(  # type: ignore[reportUnknownMemberType]
-        settings_full_name,
+        cast("dict[str, Any]", settings_full_name),
     )
 
     return await collection_to_config_dict(collection)
@@ -145,8 +155,8 @@ async def collections_create(
 
 async def collections_list_all(
     client: WeaviateAsyncClient,
-    context: dict[str, object] | None = None,
-) -> dict[str, dict[str, object]]:
+    context: HyphaContext | None = None,
+) -> dict[str, CollectionConfig]:
     """List all collections in the database.
 
     Verifies that the caller has admin permissions.
@@ -177,8 +187,8 @@ async def collections_list_all(
 async def collections_get(
     client: WeaviateAsyncClient,
     name: str,
-    context: dict[str, object] | None = None,
-) -> dict[str, object]:
+    context: HyphaContext | None = None,
+) -> CollectionConfig:
     """Get a collection's configuration by name.
 
     Verifies that the caller has permission to access the collection.
@@ -201,7 +211,7 @@ async def collections_get(
 async def collections_delete(
     client: WeaviateAsyncClient,
     name: str | list[str],
-    context: dict[str, object] | None = None,
+    context: HyphaContext | None = None,
 ) -> dict[str, object] | None:
     """Delete one or multiple collections by name.
 
@@ -235,7 +245,7 @@ async def collections_delete(
 async def collections_get_artifact(
     client: WeaviateAsyncClient,
     collection_name: str,
-    context: dict[str, object] | None = None,
+    context: HyphaContext | None = None,
 ) -> str:
     """Get the artifact for a collection.
 
@@ -267,8 +277,8 @@ async def applications_create(
     application_id: str,
     description: str,
     user_ws: str | None = None,
-    context: dict[str, object] | None = None,
-) -> dict[str, object]:
+    context: HyphaContext | None = None,
+) -> ApplicationReturn:
     """Create a new application.
 
     Prepares the collection by ensuring it exists and adding the user as a tenant if
@@ -295,6 +305,17 @@ async def applications_create(
 
     await prepare_application_creation(client, collection_name, user_ws)
 
+    # Ensure collection artifact exists
+    full_collection_name = get_full_collection_name(collection_name)
+    if not await artifact_exists(full_collection_name):
+        logger.info(
+            "Collection artifact for '%s' missing, creating it.",
+            collection_name,
+        )
+        collection_obj = client.collections.get(full_collection_name)
+        collection_config = await collection_to_config_dict(collection_obj)
+        await create_collection_artifact(collection_config)
+
     result = await create_application_artifact(
         collection_name,
         application_id,
@@ -303,14 +324,17 @@ async def applications_create(
         caller_ws=caller_ws,
     )
 
-    return {
-        "application_id": application_id,
-        "collection_name": collection_name,
-        "description": description,
-        "owner": caller_ws,
-        "artifact_name": result["artifact_name"],
-        "result": result,
-    }
+    return cast(
+        "ApplicationReturn",
+        {
+            "application_id": application_id,
+            "collection_name": collection_name,
+            "description": description,
+            "owner": caller_ws,
+            "artifact_name": result["artifact_name"],
+            "result": result,
+        },
+    )
 
 
 async def applications_delete(
@@ -318,8 +342,8 @@ async def applications_delete(
     collection_name: str,
     application_id: str,
     user_ws: str | None = None,
-    context: dict[str, object] | None = None,
-) -> dict[str, object]:
+    context: HyphaContext | None = None,
+) -> DataDeleteManyReturn:
     """Delete an application by ID from the collection.
 
     Deletes the application artifact and all associated objects in the collection.
@@ -378,7 +402,7 @@ async def applications_get(
     collection_name: str,
     application_id: str,
     user_ws: str | None = None,
-    context: dict[str, object] | None = None,
+    context: HyphaContext | None = None,
 ) -> dict[str, object]:
     """Get application metadata by retrieving its artifact.
 
@@ -411,7 +435,7 @@ async def applications_exists(
     collection_name: str,
     application_id: str,
     user_ws: str | None = None,
-    context: dict[str, object] | None = None,
+    context: HyphaContext | None = None,
 ) -> bool:
     """Check if an application exists by checking if its artifact exists.
 
@@ -454,7 +478,7 @@ async def applications_get_artifact(
     collection_name: str,
     application_id: str,
     user_ws: str | None = None,
-    context: dict[str, object] | None = None,
+    context: HyphaContext | None = None,
 ) -> str:
     """Get the artifact for an application.
 
@@ -495,9 +519,9 @@ async def applications_set_permissions(
     client: WeaviateAsyncClient,
     collection_name: str,
     application_id: str,
-    permissions: dict[str, str],
+    permissions: PermissionMap,
     user_ws: str | None = None,
-    context: dict[str, object] | None = None,
+    context: HyphaContext | None = None,
     *,
     merge: bool = True,
 ) -> None:
@@ -538,12 +562,12 @@ async def applications_set_permissions(
     logger.info(info_msg)
 
     # Get current permissions from config
-    config_dict = cast("dict[str, object]", artifact_data.get("config", {}))
-    current_permissions = cast("dict[str, str]", config_dict.get("permissions", {}))
+    config_dict = cast("dict[str, Any]", artifact_data.get("config", {}))
+    current_permissions = cast("PermissionMap", config_dict.get("permissions", {}))
 
     if merge:
         # Merge new permissions with existing ones
-        updated_permissions: dict[str, str] = {
+        updated_permissions: PermissionMap = {
             **current_permissions,
             **permissions,
         }
@@ -562,12 +586,12 @@ async def data_insert_many(
     client: WeaviateAsyncClient,
     collection_name: str,
     application_id: str,
-    objects: list[dict[str, object]],
+    objects: list[dict[str, Any]],
     user_ws: str | None = None,
     chunk_size: int = 512,
     chunk_overlap: int = 50,
     text_field: str = "text",
-    context: dict[str, object] | None = None,
+    context: HyphaContext | None = None,
     *,
     enable_chunking: bool = False,
 ) -> InsertManyReturn:
@@ -603,7 +627,7 @@ async def data_insert_many(
 
     # Process objects with optional chunking
     if enable_chunking:
-        chunked_objects: list[dict[str, object]] = []
+        chunked_objects: list[dict[str, Any]] = []
         for obj in objects:
             text_value = obj.get(text_field)
             if isinstance(text_value, str):
@@ -641,12 +665,12 @@ async def data_insert(
     client: WeaviateAsyncClient,
     collection_name: str,
     application_id: str,
-    properties: dict[str, object],
+    properties: dict[str, Any],
     user_ws: str | None = None,
     chunk_size: int = 512,
     chunk_overlap: int = 50,
     text_field: str = "text",
-    context: dict[str, object] | None = None,
+    context: HyphaContext | None = None,
     *,
     enable_chunking: bool = False,
     **kwargs: Any,
@@ -715,10 +739,10 @@ async def query_near_vector(
     collection_name: str,
     application_id: str,
     user_ws: str | None = None,
-    context: dict[str, object] | None = None,
-    return_metadata: dict[str, Any] | None = None,
+    context: HyphaContext | None = None,
+    return_metadata: dict[str, bool] | None = None,
     **kwargs: Any,
-) -> dict[str, object]:
+) -> ServiceQueryReturn:
     """Query the collection using vector similarity search.
 
     Gets a tenant-specific collection after verifying permissions.
@@ -766,11 +790,11 @@ async def query_fetch_objects(
     collection_name: str,
     application_id: str,
     user_ws: str | None = None,
-    context: dict[str, object] | None = None,
+    context: HyphaContext | None = None,
     *,
-    return_metadata: dict[str, Any] | None = None,
+    return_metadata: dict[str, bool] | None = None,
     **kwargs: Any,
-) -> dict[str, object]:
+) -> ServiceQueryReturn:
     """Query the collection to fetch objects based on filters.
 
     Gets a tenant-specific collection after verifying permissions.
@@ -818,11 +842,11 @@ async def query_hybrid(
     collection_name: str,
     application_id: str,
     user_ws: str | None = None,
-    context: dict[str, object] | None = None,
+    context: HyphaContext | None = None,
     *,
-    return_metadata: dict[str, Any] | None = None,
+    return_metadata: dict[str, bool] | None = None,
     **kwargs: Any,
-) -> dict[str, object]:
+) -> ServiceQueryReturn:
     """Query collection using hybrid search (combination of vector and keyword search).
 
     Gets a tenant-specific collection after verifying permissions.
@@ -871,9 +895,9 @@ async def generate_near_text(
     collection_name: str,
     application_id: str,
     user_ws: str | None = None,
-    context: dict[str, object] | None = None,
+    context: HyphaContext | None = None,
     **kwargs: Any,
-) -> dict[str, object]:
+) -> ServiceQueryReturn:
     """Generate content based on query text and similar objects in the collection.
 
     Gets a tenant-specific collection after verifying permissions.
@@ -920,7 +944,7 @@ async def data_update(
     collection_name: str,
     application_id: str,
     user_ws: str | None = None,
-    context: dict[str, object] | None = None,
+    context: HyphaContext | None = None,
     **kwargs: Any,
 ) -> None:
     """Update an object in the collection.
@@ -957,7 +981,7 @@ async def data_delete_by_id(
     application_id: str,
     uuid: uuid_class.UUID,
     user_ws: str | None = None,
-    context: dict[str, object] | None = None,
+    context: HyphaContext | None = None,
 ) -> None:
     """Delete an object by ID from the collection.
 
@@ -992,9 +1016,9 @@ async def data_delete_many(
     collection_name: str,
     application_id: str,
     user_ws: str | None = None,
-    context: dict[str, object] | None = None,
+    context: HyphaContext | None = None,
     **kwargs: Any,
-) -> dict[str, object]:
+) -> DataDeleteManyReturn:
     """Delete many objects from the collection based on filter criteria.
 
     Gets a tenant-specific collection after verifying permissions.
@@ -1044,7 +1068,7 @@ async def data_exists(
     application_id: str,
     uuid: uuid_class.UUID,
     user_ws: str | None = None,
-    context: dict[str, object] | None = None,
+    context: HyphaContext | None = None,
 ) -> bool:
     """Check if an object with the specified UUID exists in the collection.
 

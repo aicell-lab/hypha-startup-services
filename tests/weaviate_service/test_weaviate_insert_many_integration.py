@@ -10,9 +10,10 @@ vector separation logic at the service boundary.
 """
 
 import uuid as uuid_module
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 import pytest
+from hypha_rpc.rpc import RemoteService
 
 from tests.weaviate_service import utils as weav_utils
 
@@ -27,13 +28,13 @@ def _normalize_uuid(u: str) -> str:
 
 @pytest.mark.asyncio
 async def test_insert_many_with_top_level_vector_and_uuid(
-    weaviate_service: Any,
+    weaviate_service: RemoteService,
 ) -> None:
     """Insert many objects providing vectors and uuids at top-level and verify results.
 
     Ensures custom vectors are accepted and top-level uuid/id preserved (normalized).
     """
-    await cast("Any", weav_utils.create_test_application)(weaviate_service)  # type: ignore[no-untyped-call]
+    await weav_utils.create_test_application(weaviate_service)  # type: ignore[no-untyped-call]
 
     u1 = str(uuid_module.uuid4())
     u2 = str(uuid_module.uuid4())

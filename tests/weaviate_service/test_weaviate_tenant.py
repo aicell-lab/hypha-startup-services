@@ -10,6 +10,7 @@ from tests.weaviate_service.utils import (
     USER1_APP_ID,
     USER2_APP_ID,
     USER3_APP_ID,
+    MovieInfo,
     create_test_collection,
 )
 
@@ -35,7 +36,7 @@ async def test_shared_application_access(
     )
 
     # User 1 adds data
-    shared_movie1: dict[str, str | int] = {
+    shared_movie1: MovieInfo = {
         "title": "User 1's Shared Movie",
         "description": "Movie added by User 1 to shared app",
         "genre": "Drama",
@@ -51,7 +52,7 @@ async def test_shared_application_access(
     # User 2 tries to add data to User 1's application using the user_ws parameter
     # to specify User 1
     # Note: In a real application, you would have proper permission management
-    user2_movie: dict[str, str | int] = {
+    user2_movie: MovieInfo = {
         "title": "User 2's Movie in Shared App",
         "description": "Movie added by User 2 to shared app",
         "genre": "Sci-Fi",
@@ -103,16 +104,18 @@ async def test_data_operations_permission_boundaries(
         description="User 1's movie application",
     )
 
+    user1_private_movie: MovieInfo = {
+        "title": "User 1's Private Movie",
+        "description": "A movie that only User 1 should access",
+        "genre": "Thriller",
+        "year": 2025,
+    }
+
     # User 1 adds a movie
     movie_uuid = await weaviate_service.data.insert(
         collection_name="Movie",
         application_id=USER1_APP_ID,
-        properties={
-            "title": "User 1's Private Movie",
-            "description": "A movie that only User 1 should access",
-            "genre": "Thriller",
-            "year": 2025,
-        },
+        properties=user1_private_movie,
     )
 
     # User 2 attempts to perform operations on User 1's data

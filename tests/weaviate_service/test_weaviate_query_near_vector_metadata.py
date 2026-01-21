@@ -31,22 +31,19 @@ async def test_query_near_vector_metadata_not_all_none(weaviate_service: Any) ->
     # Use a 300-dim vector to match named vector configuration
     query_vector: list[float] = [0.0] * 1024
 
-    vector_results = cast(
-        "dict[str, Any]",
-        await weaviate_service.query.near_vector(
-            collection_name="Movie",
-            application_id=APP_ID,
-            near_vector=query_vector,
-            target_vector="title_vector",
-            include_vector=True,
-            return_metadata={"distance": True, "score": True},
-            limit=3,
-        ),
+    vector_results = await weaviate_service.query.near_vector(
+        collection_name="Movie",
+        application_id=APP_ID,
+        near_vector=query_vector,
+        target_vector="title_vector",
+        include_vector=True,
+        return_metadata={"distance": True, "score": True},
+        limit=3,
     )
 
     assert vector_results is not None
     assert "objects" in vector_results
-    objs = cast("list[dict[str, Any]]", vector_results["objects"])
+    objs = vector_results["objects"]
     assert 1 <= len(objs) <= len(test_objects)
 
     # Metadata should not be entirely None
