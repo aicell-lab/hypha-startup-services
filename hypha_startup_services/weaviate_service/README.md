@@ -446,7 +446,7 @@ Hybrid (vector + keyword) search. Returns dict with `objects`.
 **Returns:** Hybrid search results
 
 **Metadata Note:**
-By default, this method returns full metadata (distance, score, creation time, etc.) for each object. You can control this by passing a `return_metadata` argument (see `query.near_vector` for details).
+You can request specific metadata fields using the `return_metadata` argument (e.g., `{"distance": True}`). By default, no additional metadata is returned.
 
 **Example:**
 
@@ -455,6 +455,7 @@ result = await weaviate.query.hybrid(
     collection_name="Movie",
     application_id="movie-recommender", 
     query="science fiction movies",
+    return_metadata={"score": True, "explain_score": True},
     limit=5
 )
 ```
@@ -472,13 +473,13 @@ Vector similarity search. Returns dict with `objects`.
 - `include_vector` (bool): Include vectors in response
 - `filters` (Filter, optional): Filter conditions
 - `limit` (int): Max results (default 10)
-- `return_metadata` (bool, optional): Whether to return full metadata (default: True)
+- `return_metadata` (dict, optional): Dictionary specifying metadata fields to return (e.g., `{"distance": True}`).
 - `**kwargs`: Additional weaviate near_vector kwargs
 
 **Returns:** Dict with `objects`
 
 **Metadata Behavior:**
-This method automatically requests full metadata (`MetadataQuery.full()`) if you do not provide a `return_metadata` argument. This ensures fields like `distance`, `certainty`, `creation_time`, etc., are populated in the response instead of being `None`.
+The `return_metadata` parameter allows you to specify exactly which metadata fields you want included in the response (e.g. distance, score, creation_time). If not provided, no metadata is returned by default.
 
 **Example:**
 
@@ -489,6 +490,7 @@ result = await weaviate.query.near_vector(
     near_vector=[0.1, 0.2, 0.3],
     target_vector="title_vector",
     include_vector=False,
+    return_metadata={"distance": True},
     limit=5,
 )
 ```
@@ -508,13 +510,13 @@ Generate content (retrieval augmented). Returns dict with `objects` and `generat
 - `grouped_task` (str, optional): Task description for grouped response
 - `filters` (Filter, optional): Weaviate filter conditions
 - `limit` (int): Maximum number of results (default: 10)
-- `return_metadata` (bool, optional): Whether to return full metadata (default: True)
+- `return_metadata` (dict, optional): Dictionary specifying metadata fields to return.
 - `**kwargs`: Additional arguments
 
 **Returns:** Generated text response with source objects
 
 **Metadata Note:**
-Like other query methods, this supports `return_metadata`. If not specified, it defaults to returning full metadata for the source objects used in generation.
+Like other query methods, this supports `return_metadata` to request specific fields (e.g., `{"distance": True}`).
 
 **Example:**
 
@@ -524,6 +526,7 @@ result = await weaviate.generate.near_text(
     application_id="movie-recommender",
     query="What are good sci-fi movies?",
     grouped_task="Recommend science fiction movies based on the data",
+    return_metadata={"distance": True},
     limit=5,
 )
 print(result["generated"])  # RAG answer

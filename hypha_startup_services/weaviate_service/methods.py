@@ -731,7 +731,7 @@ async def query_near_vector(
         application_id: ID of the application to filter results by
         user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
-        return_metadata: Whether to return metadata (bool) or specific fields (dict)
+        return_metadata: Dictionary of specific metadata fields to return
         **kwargs: Additional arguments to pass to near_vector()
 
     Returns:
