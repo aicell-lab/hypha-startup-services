@@ -212,7 +212,7 @@ async def collections_delete(
     client: WeaviateAsyncClient,
     name: str | list[str],
     context: HyphaContext | None = None,
-) -> dict[str, object] | None:
+) -> None:
     """Delete one or multiple collections by name.
 
     Verifies that the caller has permission to access the collections.
@@ -225,7 +225,7 @@ async def collections_delete(
         context: Context containing caller information
 
     Returns:
-        Success dictionary or None if operation fails
+        None
 
     """
     if context is None:

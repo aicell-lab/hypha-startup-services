@@ -44,6 +44,7 @@ class BaseArtifactParams(ABC):
         raise NotImplementedError
 
 
+# TODO: add artifact manifest class
 async def get_artifact(
     artifact_id: str,
 ) -> dict[str, object]:

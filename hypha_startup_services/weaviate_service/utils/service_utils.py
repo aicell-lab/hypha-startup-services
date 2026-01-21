@@ -18,6 +18,7 @@ from hypha_startup_services.common.utils import (
     get_full_collection_name,
 )
 from hypha_startup_services.common.workspace_utils import ws_from_context
+from hypha_startup_services.weaviate_service.utils.models import HyphaContext
 
 from .collection_utils import (
     add_tenant_if_not_exists,
@@ -141,7 +142,7 @@ async def prepare_tenant_collection(
     collection_name: str,
     application_id: str,
     user_ws: str | None = None,
-    context: dict[str, object] | None = None,
+    context: HyphaContext | None = None,
 ) -> CollectionAsync:
     """Validate that the Weaviate client is properly configured.
 

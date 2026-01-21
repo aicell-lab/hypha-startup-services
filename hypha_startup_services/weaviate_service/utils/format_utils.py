@@ -1,6 +1,6 @@
 """Utilities for formatting Weaviate collection names and configurations."""
 
-from typing import TYPE_CHECKING, Protocol, cast
+from typing import TYPE_CHECKING, Protocol, TypeVar, cast
 
 from weaviate.collections import CollectionAsync
 
@@ -79,10 +79,13 @@ def get_settings_full_name(settings: "CollectionConfig") -> "CollectionConfig":
     return settings_full_name
 
 
+T = TypeVar("T")
+
+
 def add_app_id(
-    objects: list[dict[str, object]],
+    objects: list[dict[str, T]],
     application_id: str,
-) -> list[dict[str, object]]:
+) -> list[dict[str, T | str]]:
     """Append the application ID to each object in the list or to a single object.
 
     If objects is a single dictionary, it gets converted to a list with one item.
@@ -96,6 +99,11 @@ def add_app_id(
         List of objects with application_id added
 
     """
+    objects_with_app_id: list[dict[str, T | str]] = []
     for obj in objects:
-        obj["application_id"] = application_id
-    return objects
+        obj_with_app_id: dict[str, T | str] = {
+            "application_id": application_id,
+            **obj.copy(),
+        }
+        objects_with_app_id.append(obj_with_app_id)
+    return objects_with_app_id
