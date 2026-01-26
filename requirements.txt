@@ -1,6 +1,6 @@
 mem0ai==0.1.116
 pydantic==2.12.3
-weaviate-client==4.14.0
+weaviate-client==4.19.2
 setuptools==80.9.0
 hypha==0.21.29
 hypha-rpc==0.20.85
