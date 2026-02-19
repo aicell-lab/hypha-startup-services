@@ -1,10 +1,14 @@
+"""Background offloader for unused applications."""
+
 import time
 
 OFFLOAD_AFTER = 600
 RUN_FREQUENCY = 60
 
 
-def background_offloader():
+# TODO: actually implement and integrate this offloader
+def background_offloader() -> None:
+    """Background thread that offloads unused applications."""
     while True:
         time.sleep(RUN_FREQUENCY)
         now = time.time()

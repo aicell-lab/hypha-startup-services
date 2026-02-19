@@ -8,7 +8,7 @@ def validate_run_id(run_id: str) -> None:
 
     Valid: non-empty, no spaces, no slashes, not too long).
     """
-    if not isinstance(run_id, str) or not run_id.strip():
+    if not run_id.strip():
         error_msg = "Run ID must be a non-empty string."
         raise ValueError(error_msg)
     if len(run_id) > RUN_ID_MAX_LENGTH:

@@ -21,7 +21,7 @@ from hypha_startup_services.weaviate_bioimage_service.methods import (
 class TestFactoryFunctionSchemas:
     """Test that factory functions create schema functions correctly."""
 
-    def test_weaviate_factory_functions_create_schemas(self):
+    def test_weaviate_factory_functions_create_schemas(self) -> None:
         """Test that weaviate factory functions create functions with schemas."""
         # Create mock dependencies
         mock_client = Mock()
@@ -63,7 +63,7 @@ class TestFactoryFunctionSchemas:
             get_related_func.__schema__ is not None
         ), "get_related_func schema should not be None"
 
-    def test_mem0_factory_functions_create_schemas(self):
+    def test_mem0_factory_functions_create_schemas(self) -> None:
         """Test that mem0 factory functions create functions with schemas."""
         # Create mock dependencies
         mock_memory = Mock()
@@ -99,11 +99,10 @@ class TestFactoryFunctionSchemas:
             get_related_entities_func.__schema__ is not None
         ), "get_related_entities_func schema should not be None"
 
-    def test_factory_functions_have_correct_parameters(self):
+    def test_factory_functions_have_correct_parameters(self) -> None:
         """Test that factory-created functions have the expected parameters."""
         # Create mock dependencies
         mock_client = Mock()
-        bioimage_index = load_external_data()
 
         # Create query function
         query_func = create_query(mock_client)
@@ -141,7 +140,7 @@ class TestFactoryFunctionSchemas:
             "client" not in required
         ), "client should NOT be required (injected by factory)"
 
-    def test_factory_vs_original_function_schemas(self):
+    def test_factory_vs_original_function_schemas(self) -> None:
         """Test that factory functions create different schemas than raw functions would."""
         # Import the original function (without @schema_function decorator)
         from hypha_startup_services.weaviate_bioimage_service.methods import (
@@ -176,7 +175,7 @@ class TestFactoryFunctionSchemas:
             "client" not in properties
         ), "Factory function schema should not include client parameter"
 
-    def test_different_factories_create_different_schemas(self):
+    def test_different_factories_create_different_schemas(self) -> None:
         """Test that different factory functions create functions with different schemas."""
         mock_client = Mock()
         bioimage_index = load_external_data()

@@ -2,6 +2,12 @@
 
 A specialized AI memory service built on the core [Mem0 Service](../mem0_service/README.md) for bioimage data management. This service combines semantic memory capabilities with domain-specific bioimage knowledge, providing intelligent storage and retrieval of conversations, research context, and scientific relationships in the bioimage domain.
 
+## ⚠️ Client Setup: Codecs Required
+
+This service may accept complex objects. If you want to use those, you must register custom codecs in your client to handle these calls correctly.
+
+👉 **[See the Codecs Guide](../../codecs.md)** for setup instructions.
+
 ## Service Endpoints
 
 ### `search(query_text: str, entity_types: list | None = None, include_related: bool = True, limit: int = 10)`

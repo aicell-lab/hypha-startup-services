@@ -1,19 +1,23 @@
 """Tests for multi-user Weaviate functionality."""
 
 import pytest
-from hypha_rpc.rpc import RemoteException
+from hypha_rpc.rpc import RemoteException, RemoteService
 
 from tests.conftest import USER2_WS, USER3_WS
 from tests.weaviate_service.utils import (
     APP_ID,
     USER2_APP_ID,
     USER3_APP_ID,
+    MovieInfo,
     create_test_collection,
 )
 
 
 @pytest.mark.asyncio
-async def test_multi_user_application(weaviate_service, weaviate_service2):
+async def test_multi_user_application(
+    weaviate_service: RemoteService,
+    weaviate_service2: RemoteService,
+) -> None:
     """Test multi-user application access using separate service instances."""
     # First create a collection and application
     await create_test_collection(weaviate_service)
@@ -26,14 +30,14 @@ async def test_multi_user_application(weaviate_service, weaviate_service2):
     )
 
     # Create test data
-    test_object_owner = {
+    test_object_owner: MovieInfo = {
         "title": "Owner's Movie",
         "description": "This movie belongs to the application owner",
         "genre": "Drama",
         "year": 2020,
     }
 
-    test_object_user = {
+    test_object_user: MovieInfo = {
         "title": "User's Movie",
         "description": "This movie belongs to another user",
         "genre": "Comedy",
@@ -62,8 +66,9 @@ async def test_multi_user_application(weaviate_service, weaviate_service2):
             limit=10,
         )
 
+        num_added_objects = 2
         # Admin should see both their data and User 2's data
-        assert len(owner_results["objects"]) >= 2
+        assert len(owner_results["objects"]) >= num_added_objects
         assert any(
             obj["properties"]["title"] == "Owner's Movie"
             for obj in owner_results["objects"]
@@ -98,11 +103,11 @@ async def test_multi_user_application(weaviate_service, weaviate_service2):
 
 @pytest.mark.asyncio
 async def test_separate_user_applications(
-    weaviate_service,
-    weaviate_service2,
-    weaviate_service3,
-):
-    """Test that non-admin users can create and access their own applications independently."""
+    weaviate_service: RemoteService,
+    weaviate_service2: RemoteService,
+    weaviate_service3: RemoteService,
+) -> None:
+    """Test nonadmin users can create and access owned applications independently."""
     # Create collection (must use admin user for this)
     await create_test_collection(weaviate_service)
 
@@ -121,7 +126,7 @@ async def test_separate_user_applications(
     )
 
     # User 2 inserts data
-    user2_movie = {
+    user2_movie: MovieInfo = {
         "title": "User 2's Movie",
         "description": "This belongs to User 2",
         "genre": "Comedy",
@@ -135,7 +140,7 @@ async def test_separate_user_applications(
     )
 
     # User 3 inserts data
-    user3_movie = {
+    user3_movie: MovieInfo = {
         "title": "User 3's Movie",
         "description": "This belongs to User 3",
         "genre": "Drama",
@@ -211,7 +216,9 @@ async def test_separate_user_applications(
 
 
 @pytest.mark.asyncio
-async def test_data_isolation_between_applications(weaviate_service):
+async def test_data_isolation_between_applications(
+    weaviate_service: RemoteService,
+) -> None:
     """Test that data is isolated between different applications of the same user."""
     # Create collection
     await create_test_collection(weaviate_service)
@@ -230,7 +237,7 @@ async def test_data_isolation_between_applications(weaviate_service):
     )
 
     # Insert data into App A
-    movie_a = {
+    movie_a: MovieInfo = {
         "title": "Movie in App A",
         "description": "This movie is in Application A",
         "genre": "Drama",
@@ -244,7 +251,7 @@ async def test_data_isolation_between_applications(weaviate_service):
     )
 
     # Insert data into App B
-    movie_b = {
+    movie_b: MovieInfo = {
         "title": "Movie in App B",
         "description": "This movie is in Application B",
         "genre": "Action",

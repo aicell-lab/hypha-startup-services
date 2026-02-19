@@ -1,6 +1,6 @@
 """Text chunking utilities."""
 
-from typing import Any
+from collections.abc import Mapping, Sequence
 
 import tiktoken
 
@@ -67,11 +67,11 @@ def chunk_text(
 
 
 def chunk_documents(
-    documents: list[dict[str, Any]],
+    documents: Sequence[Mapping[str, object]],
     chunk_size: int = 512,
     chunk_overlap: int = 50,
     encoding_name: str = "cl100k_base",
-) -> list[dict[str, Any]]:
+) -> list[dict[str, object]]:
     """Chunk multiple documents and return with metadata.
 
     Args:
@@ -84,11 +84,15 @@ def chunk_documents(
         List of document chunks with preserved metadata and chunk information
 
     """
-    chunked_docs = []
+    chunked_docs: list[dict[str, object]] = []
 
     for doc in documents:
         # Get text from document, default to empty string if missing
         doc_text = doc.get("text", "")
+
+        if not isinstance(doc_text, str):
+            error_msg = "Document 'text' field must be a string."
+            raise TypeError(error_msg)
 
         # Chunk the text
         chunks = chunk_text(doc_text, chunk_size, chunk_overlap, encoding_name)
@@ -96,7 +100,7 @@ def chunk_documents(
         # Create new document for each chunk, preserving all original metadata
         for chunk_idx, chunk in enumerate(chunks):
             # Copy all original document fields
-            chunked_doc = doc.copy()
+            chunked_doc = dict(doc)
 
             # Update text and add chunk metadata
             chunked_doc["text"] = chunk

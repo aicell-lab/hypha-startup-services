@@ -1,10 +1,15 @@
 """Helper functions to register the Weaviate service with proper API endpoints."""
 
+import asyncio
 import logging
 from functools import partial
 
 from hypha_rpc.rpc import RemoteService
 from weaviate import WeaviateAsyncClient
+
+from hypha_startup_services.common.constants import (
+    DEFAULT_WEAVIATE_SERVICE_ID as DEFAULT_SERVICE_ID,
+)
 
 from .client import (
     instantiate_and_connect,
@@ -36,9 +41,11 @@ from .methods import (
 from .service_codecs import (
     register_weaviate_codecs,
 )
-from .utils.constants import DEFAULT_SERVICE_ID
 
 logger = logging.getLogger(__name__)
+
+# Set to keep references to background tasks to prevent garbage collection
+_background_tasks: set[asyncio.Task[None]] = set()
 
 
 async def register_weaviate(
@@ -73,36 +80,36 @@ async def register_weaviate_service(
                 "require_context": True,
             },
             "collections": {
-                "create": partial(collections_create, client),
-                "delete": partial(collections_delete, client),
+                "create": partial(collections_create, client, server=server),
+                "delete": partial(collections_delete, client, server=server),
                 "list_all": partial(collections_list_all, client),
                 "get": partial(collections_get, client),
-                "exists": partial(collections_exists, client),
-                "get_artifact": partial(collections_get_artifact, client),
+                "exists": partial(collections_exists, client, server=server),
+                "get_artifact": partial(collections_get_artifact, client, server=server),
             },
             "applications": {
-                "create": partial(applications_create, client),
-                "delete": partial(applications_delete, client),
-                "get": partial(applications_get, client),
-                "exists": partial(applications_exists, client),
-                "get_artifact": partial(applications_get_artifact, client),
-                "set_permissions": partial(applications_set_permissions, client),
+                "create": partial(applications_create, client, server=server),
+                "delete": partial(applications_delete, client, server=server),
+                "get": partial(applications_get, client, server=server),
+                "exists": partial(applications_exists, client, server=server),
+                "get_artifact": partial(applications_get_artifact, client, server=server),
+                "set_permissions": partial(applications_set_permissions, client, server=server),
             },
             "data": {
-                "insert_many": partial(data_insert_many, client),
-                "insert": partial(data_insert, client),
-                "update": partial(data_update, client),
-                "delete_by_id": partial(data_delete_by_id, client),
-                "delete_many": partial(data_delete_many, client),
-                "exists": partial(data_exists, client),
+                "insert_many": partial(data_insert_many, client, server=server),
+                "insert": partial(data_insert, client, server=server),
+                "update": partial(data_update, client, server=server),
+                "delete_by_id": partial(data_delete_by_id, client, server=server),
+                "delete_many": partial(data_delete_many, client, server=server),
+                "exists": partial(data_exists, client, server=server),
             },
             "query": {
-                "near_vector": partial(query_near_vector, client),
-                "fetch_objects": partial(query_fetch_objects, client),
-                "hybrid": partial(query_hybrid, client),
+                "near_vector": partial(query_near_vector, client, server=server),
+                "fetch_objects": partial(query_fetch_objects, client, server=server),
+                "hybrid": partial(query_hybrid, client, server=server),
             },
             "generate": {
-                "near_text": partial(generate_near_text, client),
+                "near_text": partial(generate_near_text, client, server=server),
             },
         },
     )

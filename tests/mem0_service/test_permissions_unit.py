@@ -94,7 +94,7 @@ class TestGetUserPermissions:
 
         result = await get_user_permissions(permission_params)
 
-        assert result == {}  # Unknown user should have no permissions
+        assert result == ""  # Unknown user should have no permissions
         patch_get_artifact.assert_called_once_with(permission_params.artifact_id)
 
     @pytest.mark.asyncio
@@ -113,7 +113,7 @@ class TestGetUserPermissions:
         with patch("hypha_startup_services.common.permissions.logger") as mock_logger:
             result = await get_user_permissions(permission_params)
 
-            assert result == {}
+            assert result == ""
             error_msg = (
                 f"Failed to retrieve artifact {permission_params.artifact_id}: {error}"
             )
@@ -135,7 +135,7 @@ class TestGetUserPermissions:
 
         result = await get_user_permissions(permission_params)
 
-        assert result == {}
+        assert result == ""
 
 
 class TestUserHasOperationPermission:

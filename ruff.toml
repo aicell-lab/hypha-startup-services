@@ -3,3 +3,5 @@ ignore = ["PLR0913", "ANN401"]
 extend-exclude = [
 	"typings/**",
 ]
+[lint.per-file-ignores]
+"tests/**" = ["S101", "T201"]

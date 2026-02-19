@@ -86,7 +86,7 @@ async def cleanup_mem0_memories(
     agent_id: str,
     workspace: str,
     run_id: str | None = None,
-):
+) -> None:
     """Clean up memories for a specific agent and workspace."""
     try:
         # Delete all memories for this workspace/agent combination
@@ -113,7 +113,7 @@ async def init_user(
     workspace: str,
     description: str | None = None,
     metadata: dict[str, Any] | None = None,
-):
+) -> None:
     """Initialize a user agent in the specified workspace."""
     if description is None:
         description = f"User agent {agent_id}"
@@ -137,7 +137,7 @@ async def init_run(
     workspace: str,
     description: str | None = None,
     metadata: dict[str, Any] | None = None,
-):
+) -> None:
     """Initialize a run for the specified agent in the given workspace."""
     if metadata is None:
         metadata = {"is_test": True, "target_agent": agent_id}

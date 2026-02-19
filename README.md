@@ -176,6 +176,12 @@ Each service provides comprehensive documentation:
 - **[Weaviate BioImage Service](./hypha_startup_services/weaviate_bioimage_service/README.md)** - BioImage vector search and retrieval
 - **[Mem0 BioImage Service](./hypha_startup_services/mem0_bioimage_service/README.md)** - BioImage memory and semantic search
 
+## ⚠️ Important: Client-Side Codecs
+
+Some services return complex objects (like UUIDs or Weaviate Objects) that require custom codecs to be registered on your client.
+
+👉 **[Read the Codecs Guide](./codecs.md)** to learn how to set up your client correctly.
+
 ## 🤝 Contributing
 
 1. Fork the repository

@@ -4,11 +4,13 @@ This module provides functionality to interface with Weaviate vector database,
 handling collections, data operations, and query functionality with user isolation.
 """
 
-import logging
-import uuid as uuid_class
-from typing import TYPE_CHECKING, Any
+from __future__ import annotations
 
-from weaviate import WeaviateAsyncClient
+import logging
+from typing import TYPE_CHECKING, Any, cast
+
+from hypha_rpc.rpc import RemoteService
+from weaviate.classes.query import MetadataQuery
 
 from hypha_startup_services.common.artifacts import (
     artifact_edit,
@@ -40,8 +42,10 @@ from .utils.artifact_utils import (
     delete_collection_artifacts,
 )
 from .utils.collection_utils import (
+    InsertManyReturn,
     add_tenant_if_not_exists,
     is_multitenancy_enabled,
+    to_data_object,
 )
 from .utils.format_utils import (
     add_app_id,
@@ -51,6 +55,7 @@ from .utils.format_utils import (
     get_settings_full_name,
 )
 from .utils.service_utils import (
+    MissingContextError,
     collection_exists,
     get_permitted_collection,
     prepare_application_creation,
@@ -59,16 +64,37 @@ from .utils.service_utils import (
 )
 
 if TYPE_CHECKING:
-    from weaviate.collections.classes.batch import DeleteManyReturn
-    from weaviate.collections.classes.internal import GenerativeReturn, QueryReturn
+    import uuid as uuid_class
+
+    from weaviate import WeaviateAsyncClient
+    from weaviate.collections.classes.batch import (
+        BatchObjectReturn,
+        DeleteManyReturn,
+    )
+    from weaviate.collections.classes.internal import (
+        GenerativeReturn,
+        QueryReturn,
+    )
+    from weaviate.collections.classes.types import WeaviateField
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from .utils.models import (
+        ApplicationReturn,
+        CollectionConfig,
+        DataDeleteManyReturn,
+        HyphaContext,
+        PermissionMap,
+        ServiceQueryReturn,
+    )
 
 
 async def collections_exists(
     client: WeaviateAsyncClient,
     collection_name: str,
-    context: dict[str, Any] | None = None,  # noqa: ARG001
+    context: HyphaContext | None = None,  # noqa: ARG001
+    server: RemoteService | None = None,
 ) -> bool:
     """Check if a collection exists by its name.
 
@@ -77,9 +103,9 @@ async def collections_exists(
 
     Args:
         client: WeaviateAsyncClient instance
-        name: Short collection name to check
-        context: Context containing caller information
         collection_name: Full collection name to check
+        context: Context containing caller information
+        server: Optional server instance to reuse connection
 
     Returns:
         True if the collection exists, False otherwise
@@ -90,14 +116,16 @@ async def collections_exists(
         collection_name=collection_name,
     ) and await artifact_exists(
         artifact_id=get_full_collection_name(collection_name),
+        server=server,
     )
 
 
 async def collections_create(
     client: WeaviateAsyncClient,
-    settings: dict[str, Any],
-    context: dict[str, Any] | None = None,
-) -> dict[str, Any]:
+    settings: CollectionConfig,
+    context: HyphaContext | None = None,
+    server: RemoteService | None = None,
+) -> CollectionConfig:
     """Create a new collection.
 
     Verifies that the caller has admin permissions.
@@ -108,23 +136,23 @@ async def collections_create(
         client: WeaviateAsyncClient instance
         settings: Collection configuration settings
         context: Context containing caller information
+        server: Optional server instance to reuse connection
 
     Returns:
         The collection configuration with the short collection name
 
     """
     if context is None:
-        error_msg = "Context must be provided to determine the tenant workspace"
-        raise ValueError(error_msg)
+        raise MissingContextError
 
     caller_ws = ws_from_context(context)
     assert_is_admin_ws(caller_ws)
 
-    await create_collection_artifact(settings)
+    await create_collection_artifact(settings, server=server)
 
     settings_full_name = get_settings_full_name(settings)
-    collection = await client.collections.create_from_dict(
-        settings_full_name,
+    collection = await client.collections.create_from_dict(  # type: ignore[reportUnknownMemberType]
+        cast("dict[str, Any]", settings_full_name),
     )
 
     return await collection_to_config_dict(collection)
@@ -132,8 +160,8 @@ async def collections_create(
 
 async def collections_list_all(
     client: WeaviateAsyncClient,
-    context: dict[str, Any] | None = None,
-) -> dict[str, dict[str, Any]]:
+    context: HyphaContext | None = None,
+) -> dict[str, CollectionConfig]:
     """List all collections in the database.
 
     Verifies that the caller has admin permissions.
@@ -149,8 +177,7 @@ async def collections_list_all(
 
     """
     if context is None:
-        error_msg = "Context must be provided to determine the tenant workspace"
-        raise ValueError(error_msg)
+        raise MissingContextError
 
     caller_ws = ws_from_context(context)
     assert_is_admin_ws(caller_ws)
@@ -165,8 +192,8 @@ async def collections_list_all(
 async def collections_get(
     client: WeaviateAsyncClient,
     name: str,
-    context: dict[str, Any] | None = None,
-) -> dict[str, Any]:
+    context: HyphaContext | None = None,
+) -> CollectionConfig:
     """Get a collection's configuration by name.
 
     Verifies that the caller has permission to access the collection.
@@ -177,8 +204,7 @@ async def collections_get(
 
     """
     if context is None:
-        error_msg = "Context must be provided to determine the tenant workspace"
-        raise ValueError(error_msg)
+        raise MissingContextError
 
     caller_ws = ws_from_context(context)
     await assert_has_collection_permission(caller_ws, name)
@@ -190,8 +216,9 @@ async def collections_get(
 async def collections_delete(
     client: WeaviateAsyncClient,
     name: str | list[str],
-    context: dict[str, Any] | None = None,
-) -> dict | None:
+    context: HyphaContext | None = None,
+    server: RemoteService | None = None,
+) -> None:
     """Delete one or multiple collections by name.
 
     Verifies that the caller has permission to access the collections.
@@ -202,14 +229,14 @@ async def collections_delete(
         client: WeaviateAsyncClient instance
         name: Collection name(s) to delete
         context: Context containing caller information
+        server: Optional server instance to reuse connection
 
     Returns:
-        Success dictionary or None if operation fails
+        None
 
     """
     if context is None:
-        error_msg = "Context must be provided to determine the tenant workspace"
-        raise ValueError(error_msg)
+        raise MissingContextError
 
     caller_ws = ws_from_context(context)
 
@@ -219,13 +246,14 @@ async def collections_delete(
 
     full_names = get_full_collection_names(short_names)
     await client.collections.delete(full_names)
-    await delete_collection_artifacts(short_names)
+    await delete_collection_artifacts(short_names, server=server)
 
 
 async def collections_get_artifact(
     client: WeaviateAsyncClient,
     collection_name: str,
-    context: dict[str, Any] | None = None,
+    context: HyphaContext | None = None,
+    server: RemoteService | None = None,
 ) -> str:
     """Get the artifact for a collection.
 
@@ -235,6 +263,7 @@ async def collections_get_artifact(
         collection_name: Name of the collection to retrieve the artifact for
         context: Context containing caller information
         client: WeaviateAsyncClient instance
+        server: Optional server instance to reuse connection
 
     Returns:
         Dictionary with collection artifact information
@@ -244,6 +273,7 @@ async def collections_get_artifact(
         client,
         collection_name,
         context=context,
+        server=server,
     ):
         error_msg = f"Collection '{collection_name}' does not exist."
         raise ValueError(error_msg)
@@ -257,8 +287,9 @@ async def applications_create(
     application_id: str,
     description: str,
     user_ws: str | None = None,
-    context: dict[str, Any] | None = None,
-) -> dict[str, Any]:
+    context: HyphaContext | None = None,
+    server: RemoteService | None = None,
+) -> ApplicationReturn:
     """Create a new application.
 
     Prepares the collection by ensuring it exists and adding the user as a tenant if
@@ -271,14 +302,14 @@ async def applications_create(
         description: Description of the application
         user_ws: Workspace ID of the user creating the application
         context: Context containing user information
+        server: Optional server instance to reuse connection
 
     Returns:
         Dictionary with application details and artifact information
 
     """
     if context is None:
-        error_msg = "Context must be provided to determine the tenant workspace"
-        raise ValueError(error_msg)
+        raise MissingContextError
 
     caller_ws = ws_from_context(context)
     if user_ws is None:
@@ -286,22 +317,43 @@ async def applications_create(
 
     await prepare_application_creation(client, collection_name, user_ws)
 
+    # Ensure collection artifact exists
+    full_collection_name = get_full_collection_name(collection_name)
+    collection_artifact_id = full_collection_name
+    if server is not None:
+        collection_artifact_id = (
+            f"{server.config.workspace}/{full_collection_name}"
+        )
+
+    if not await artifact_exists(collection_artifact_id, server=server):
+        logger.info(
+            "Collection artifact for '%s' missing, creating it.",
+            collection_name,
+        )
+        collection_obj = client.collections.get(full_collection_name)
+        collection_config = await collection_to_config_dict(collection_obj)
+        await create_collection_artifact(collection_config, server=server)
+
     result = await create_application_artifact(
         collection_name,
         application_id,
         description,
         user_ws,
         caller_ws=caller_ws,
+        server=server,
     )
 
-    return {
-        "application_id": application_id,
-        "collection_name": collection_name,
-        "description": description,
-        "owner": caller_ws,
-        "artifact_name": result["artifact_name"],
-        "result": result,
-    }
+    return cast(
+        "ApplicationReturn",
+        {
+            "application_id": application_id,
+            "collection_name": collection_name,
+            "description": description,
+            "owner": caller_ws,
+            "artifact_name": result["artifact_name"],
+            "result": result,
+        },
+    )
 
 
 async def applications_delete(
@@ -309,8 +361,9 @@ async def applications_delete(
     collection_name: str,
     application_id: str,
     user_ws: str | None = None,
-    context: dict[str, Any] | None = None,
-) -> dict:
+    context: HyphaContext | None = None,
+    server: RemoteService | None = None,
+) -> DataDeleteManyReturn:
     """Delete an application by ID from the collection.
 
     Deletes the application artifact and all associated objects in the collection.
@@ -321,6 +374,7 @@ async def applications_delete(
         application_id: ID of the application to delete
         user_ws: Workspace ID of the user deleting the application
         context: Context containing user information
+        server: Optional server instance to reuse connection
 
     Returns:
         Dictionary with deletion operation results
@@ -332,12 +386,12 @@ async def applications_delete(
         application_id,
         user_ws=user_ws,
         context=context,
+        server=server,
     )
 
     if user_ws is None:
         if context is None:
-            error_msg = "Context must be provided to determine the tenant workspace"
-            raise ValueError(error_msg)
+            raise MissingContextError
         user_ws = ws_from_context(context)
 
     if await is_multitenancy_enabled(client, collection_name):
@@ -353,15 +407,15 @@ async def applications_delete(
         application_id,
         user_ws=user_ws,
         context=context,
+        server=server,
     )
 
     if context is None:
-        error_msg = "Context must be provided to determine the tenant workspace"
-        raise ValueError(error_msg)
+        raise MissingContextError
 
     full_collection_name = get_full_collection_name(collection_name)
     caller_ws = ws_from_context(context)
-    await delete_application_artifact(full_collection_name, application_id, caller_ws)
+    await delete_application_artifact(full_collection_name, application_id, caller_ws, server=server)
 
     return result
 
@@ -371,8 +425,9 @@ async def applications_get(
     collection_name: str,
     application_id: str,
     user_ws: str | None = None,
-    context: dict[str, Any] | None = None,
-) -> dict[str, Any]:
+    context: HyphaContext | None = None,
+    server: RemoteService | None = None,
+) -> dict[str, object]:
     """Get application metadata by retrieving its artifact.
 
     Retrieves the application artifact using the caller's ID and application ID.
@@ -383,6 +438,7 @@ async def applications_get(
         application_id: ID of the application to retrieve
         user_ws: Workspace ID of the user retrieving the application
         context: Context containing caller information
+        server: Optional server instance to reuse connection
 
     Returns:
         Dictionary with application artifact information
@@ -394,9 +450,10 @@ async def applications_get(
         application_id,
         user_ws=user_ws,
         context=context,
+        server=server,
     )
 
-    return await get_artifact(artifact_name)
+    return await get_artifact(artifact_name, server=server)
 
 
 async def applications_exists(
@@ -404,7 +461,8 @@ async def applications_exists(
     collection_name: str,
     application_id: str,
     user_ws: str | None = None,
-    context: dict[str, Any] | None = None,
+    context: HyphaContext | None = None,
+    server: RemoteService | None = None,
 ) -> bool:
     """Check if an application exists by checking if its artifact exists.
 
@@ -414,14 +472,14 @@ async def applications_exists(
         application_id: ID of the application to check
         user_ws: Workspace ID of the user checking the application
         context: Context containing caller information
+        server: Optional server instance to reuse connection
 
     Returns:
         Boolean indicating whether the application exists
 
     """
     if context is None:
-        error_msg = "Context must be provided to determine the tenant workspace"
-        raise ValueError(error_msg)
+        raise MissingContextError
 
     caller_ws = ws_from_context(context)
 
@@ -434,13 +492,16 @@ async def applications_exists(
         application_id,
         user_ws=user_ws,
         caller_ws=caller_ws,
+        server=server,
     )
 
-    return await ws_app_exists(
-        collection_name,
+    full_collection_name = get_full_collection_name(collection_name)
+    artifact_name = get_application_artifact_name(
+        full_collection_name,
+        user_ws,
         application_id,
-        workspace=user_ws,
     )
+    return await artifact_exists(artifact_name, server=server)
 
 
 async def applications_get_artifact(
@@ -448,7 +509,8 @@ async def applications_get_artifact(
     collection_name: str,
     application_id: str,
     user_ws: str | None = None,
-    context: dict[str, Any] | None = None,
+    context: HyphaContext | None = None,
+    server: RemoteService | None = None,
 ) -> str:
     """Get the artifact for an application.
 
@@ -460,14 +522,15 @@ async def applications_get_artifact(
         application_id: ID of the application to retrieve
         user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
+        server: Optional server instance to reuse connection
+
     Returns:
         Dictionary with application artifact information
 
     """
     if user_ws is None:
         if context is None:
-            error_msg = "Context must be provided to determine the tenant workspace"
-            raise ValueError(error_msg)
+            raise MissingContextError
         user_ws = ws_from_context(context)
 
     await prepare_tenant_collection(
@@ -476,6 +539,7 @@ async def applications_get_artifact(
         application_id,
         user_ws=user_ws,
         context=context,
+        server=server,
     )
 
     full_collection_name = get_full_collection_name(collection_name)
@@ -490,9 +554,10 @@ async def applications_set_permissions(
     client: WeaviateAsyncClient,
     collection_name: str,
     application_id: str,
-    permissions: dict[str, Any],
+    permissions: PermissionMap,
     user_ws: str | None = None,
-    context: dict[str, Any] | None = None,
+    context: HyphaContext | None = None,
+    server: RemoteService | None = None,
     *,
     merge: bool = True,
 ) -> None:
@@ -509,6 +574,7 @@ async def applications_set_permissions(
         user_ws: Optional user workspace to use as tenant (if different from caller)
         merge: If True, merge with existing permissions; if False, replace entirely
         context: Context containing caller information
+        server: Optional server instance to reuse connection
 
     Returns:
         Dictionary with updated application artifact information
@@ -520,9 +586,10 @@ async def applications_set_permissions(
         application_id,
         user_ws=user_ws,
         context=context,
+        server=server,
     )
 
-    artifact_data = await get_artifact(artifact_name)
+    artifact_data = await get_artifact(artifact_name, server=server)
 
     info_msg = (
         f"Updating permissions for application '{application_id}'"
@@ -533,11 +600,12 @@ async def applications_set_permissions(
     logger.info(info_msg)
 
     # Get current permissions from config
-    current_permissions = artifact_data.get("config", {}).get("permissions", {})
+    config_dict = cast("dict[str, Any]", artifact_data.get("config", {}))
+    current_permissions = cast("PermissionMap", config_dict.get("permissions", {}))
 
     if merge:
         # Merge new permissions with existing ones
-        updated_permissions = {
+        updated_permissions: PermissionMap = {
             **current_permissions,
             **permissions,
         }
@@ -549,7 +617,9 @@ async def applications_set_permissions(
     await artifact_edit(
         artifact_id=artifact_name,
         config={"permissions": updated_permissions},
+        server=server,
     )
+
 
 
 async def data_insert_many(
@@ -561,10 +631,11 @@ async def data_insert_many(
     chunk_size: int = 512,
     chunk_overlap: int = 50,
     text_field: str = "text",
-    context: dict[str, Any] | None = None,
+    context: HyphaContext | None = None,
+    server: RemoteService | None = None,
     *,
     enable_chunking: bool = False,
-) -> dict[str, Any]:
+) -> InsertManyReturn:
     """Insert multiple objects into the collection.
 
     Gets a tenant-specific collection after verifying permissions.
@@ -578,6 +649,7 @@ async def data_insert_many(
         objects: List of objects to insert
         user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
+        server: Optional server instance to reuse connection
         enable_chunking: Whether to chunk text content
         chunk_size: Maximum number of tokens per chunk (if chunking enabled)
         chunk_overlap: Number of tokens to overlap between chunks (if chunking enabled)
@@ -593,15 +665,16 @@ async def data_insert_many(
         application_id,
         user_ws=user_ws,
         context=context,
+        server=server,
     )
 
     # Process objects with optional chunking
     if enable_chunking:
-        chunked_objects = []
+        chunked_objects: list[dict[str, Any]] = []
         for obj in objects:
-            if obj.get(text_field):
-                text_content: str = obj[text_field]
-                chunks = chunk_text(text_content, chunk_size, chunk_overlap)
+            text_value = obj.get(text_field)
+            if isinstance(text_value, str):
+                chunks = chunk_text(text_value, chunk_size, chunk_overlap)
 
                 for chunk_idx, chunk in enumerate(chunks):
                     chunked_obj = obj.copy()
@@ -617,15 +690,18 @@ async def data_insert_many(
         processed_objects = objects
 
     app_objects = add_app_id(processed_objects, application_id)
+    data_objects = [to_data_object(obj) for obj in app_objects]
 
-    response = await tenant_collection.data.insert_many(objects=app_objects)
+    response: BatchObjectReturn = await tenant_collection.data.insert_many(
+        objects=data_objects,
+    )
 
-    return {
-        "elapsed_seconds": response.elapsed_seconds,
-        "errors": stringify_keys(response.errors),
-        "uuids": stringify_keys(response.uuids),
-        "has_errors": response.has_errors,
-    }
+    return InsertManyReturn(
+        elapsed_seconds=response.elapsed_seconds,
+        errors=stringify_keys(response.errors),
+        uuids=stringify_keys(response.uuids),
+        has_errors=response.has_errors,
+    )
 
 
 async def data_insert(
@@ -637,7 +713,8 @@ async def data_insert(
     chunk_size: int = 512,
     chunk_overlap: int = 50,
     text_field: str = "text",
-    context: dict[str, Any] | None = None,
+    context: HyphaContext | None = None,
+    server: RemoteService | None = None,
     *,
     enable_chunking: bool = False,
     **kwargs: Any,
@@ -656,6 +733,7 @@ async def data_insert(
         properties: Object properties to insert
         user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
+        server: Optional server instance to reuse connection
         enable_chunking: Whether to chunk text content
         chunk_size: Maximum number of tokens per chunk (if chunking enabled)
         chunk_overlap: Number of tokens to overlap between chunks (if chunking enabled)
@@ -672,6 +750,7 @@ async def data_insert(
         application_id,
         user_ws=user_ws,
         context=context,
+        server=server,
     )
 
     if enable_chunking and text_field in properties and properties[text_field]:
@@ -683,6 +762,7 @@ async def data_insert(
             objects=[properties],
             user_ws=user_ws,
             context=context,
+            server=server,
             enable_chunking=True,
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
@@ -695,7 +775,7 @@ async def data_insert(
         error_msg = "No UUIDs returned from chunked insert"
         raise RuntimeError(error_msg)
 
-    app_properties = properties.copy()
+    app_properties = cast("dict[str, WeaviateField]", properties).copy()
     app_properties["application_id"] = application_id
 
     return await tenant_collection.data.insert(app_properties, **kwargs)
@@ -706,9 +786,11 @@ async def query_near_vector(
     collection_name: str,
     application_id: str,
     user_ws: str | None = None,
-    context: dict[str, Any] | None = None,
+    context: HyphaContext | None = None,
+    server: RemoteService | None = None,
+    return_metadata: dict[str, bool] | None = None,
     **kwargs: Any,
-) -> dict[str, Any]:
+) -> ServiceQueryReturn:
     """Query the collection using vector similarity search.
 
     Gets a tenant-specific collection after verifying permissions.
@@ -721,6 +803,8 @@ async def query_near_vector(
         application_id: ID of the application to filter results by
         user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
+        server: Optional server instance to reuse connection
+        return_metadata: Dictionary of specific metadata fields to return
         **kwargs: Additional arguments to pass to near_vector()
 
     Returns:
@@ -733,11 +817,18 @@ async def query_near_vector(
         application_id,
         user_ws=user_ws,
         context=context,
+        server=server,
     )
 
     kwargs["filters"] = and_app_filter(application_id, kwargs.get("filters"))
 
-    response: QueryReturn = await tenant_collection.query.near_vector(**kwargs)
+    if return_metadata:
+        kwargs["return_metadata"] = MetadataQuery(**return_metadata)
+
+    response = cast(
+        "QueryReturn[object, object]",  # NOSONAR (S1192) Repeated literal necessary
+        await tenant_collection.query.near_vector(**kwargs),
+    )
 
     return {
         "objects": objects_part_coll_name(response.objects),
@@ -749,9 +840,12 @@ async def query_fetch_objects(
     collection_name: str,
     application_id: str,
     user_ws: str | None = None,
-    context: dict[str, Any] | None = None,
+    context: HyphaContext | None = None,
+    server: RemoteService | None = None,
+    *,
+    return_metadata: dict[str, bool] | None = None,
     **kwargs: Any,
-) -> dict[str, Any]:
+) -> ServiceQueryReturn:
     """Query the collection to fetch objects based on filters.
 
     Gets a tenant-specific collection after verifying permissions.
@@ -764,6 +858,8 @@ async def query_fetch_objects(
         application_id: ID of the application to filter results by (optional)
         user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
+        server: Optional server instance to reuse connection
+        return_metadata: Dictionary of specific metadata fields to return
         **kwargs: Additional arguments to pass to fetch_objects()
 
     Returns:
@@ -776,11 +872,18 @@ async def query_fetch_objects(
         application_id,
         user_ws=user_ws,
         context=context,
+        server=server,
     )
 
     kwargs["filters"] = and_app_filter(application_id, kwargs.get("filters"))
 
-    response: QueryReturn = await tenant_collection.query.fetch_objects(**kwargs)
+    if return_metadata:
+        kwargs["return_metadata"] = MetadataQuery(**return_metadata)
+
+    response = cast(
+        "QueryReturn[object, object]",  # NOSONAR (S1192) Repeated literal necessary
+        await tenant_collection.query.fetch_objects(**kwargs),
+    )
 
     return {
         "objects": objects_part_coll_name(response.objects),
@@ -792,9 +895,12 @@ async def query_hybrid(
     collection_name: str,
     application_id: str,
     user_ws: str | None = None,
-    context: dict[str, Any] | None = None,
+    context: HyphaContext | None = None,
+    server: RemoteService | None = None,
+    *,
+    return_metadata: dict[str, bool] | None = None,
     **kwargs: Any,
-) -> dict[str, Any]:
+) -> ServiceQueryReturn:
     """Query collection using hybrid search (combination of vector and keyword search).
 
     Gets a tenant-specific collection after verifying permissions.
@@ -808,6 +914,8 @@ async def query_hybrid(
         application_id: ID of the application to filter results by (optional)
         user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
+        server: Optional server instance to reuse connection
+        return_metadata: Dictionary of specific metadata fields to return
         **kwargs: Additional arguments to pass to hybrid()
 
     Returns:
@@ -820,11 +928,18 @@ async def query_hybrid(
         application_id,
         user_ws=user_ws,
         context=context,
+        server=server,
     )
 
     kwargs["filters"] = and_app_filter(application_id, kwargs.get("filters"))
 
-    response: QueryReturn = await tenant_collection.query.hybrid(**kwargs)
+    if return_metadata:
+        kwargs["return_metadata"] = MetadataQuery(**return_metadata)
+
+    response = cast(
+        "QueryReturn[object, object]",
+        await tenant_collection.query.hybrid(**kwargs),
+    )
 
     return {
         "objects": objects_part_coll_name(response.objects),
@@ -836,9 +951,10 @@ async def generate_near_text(
     collection_name: str,
     application_id: str,
     user_ws: str | None = None,
-    context: dict[str, Any] | None = None,
+    context: HyphaContext | None = None,
+    server: RemoteService | None = None,
     **kwargs: Any,
-) -> dict[str, Any]:
+) -> ServiceQueryReturn:
     """Generate content based on query text and similar objects in the collection.
 
     Gets a tenant-specific collection after verifying permissions.
@@ -852,6 +968,7 @@ async def generate_near_text(
         application_id: ID of the application to filter results by
         user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
+        server: Optional server instance to reuse connection
         **kwargs: Additional arguments to pass to near_text()
 
     Returns:
@@ -865,11 +982,15 @@ async def generate_near_text(
         application_id,
         user_ws=user_ws,
         context=context,
+        server=server,
     )
 
     kwargs["filters"] = and_app_filter(application_id, kwargs.get("filters"))
 
-    response: GenerativeReturn = await tenant_collection.generate.near_text(**kwargs)
+    response = cast(
+        "GenerativeReturn[object, object]",
+        await tenant_collection.generate.near_text(**kwargs),
+    )
 
     return {
         "objects": objects_part_coll_name(response.objects),
@@ -882,7 +1003,8 @@ async def data_update(
     collection_name: str,
     application_id: str,
     user_ws: str | None = None,
-    context: dict[str, Any] | None = None,
+    context: HyphaContext | None = None,
+    server: RemoteService | None = None,
     **kwargs: Any,
 ) -> None:
     """Update an object in the collection.
@@ -896,6 +1018,7 @@ async def data_update(
         application_id: ID of the application the object belongs to
         user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
+        server: Optional server instance to reuse connection
         **kwargs: Additional arguments to pass to update() including uuid and properties
 
     Returns:
@@ -908,6 +1031,7 @@ async def data_update(
         application_id,
         user_ws=user_ws,
         context=context,
+        server=server,
     )
 
     await tenant_collection.data.update(**kwargs)
@@ -919,7 +1043,8 @@ async def data_delete_by_id(
     application_id: str,
     uuid: uuid_class.UUID,
     user_ws: str | None = None,
-    context: dict[str, Any] | None = None,
+    context: HyphaContext | None = None,
+    server: RemoteService | None = None,
 ) -> None:
     """Delete an object by ID from the collection.
 
@@ -933,6 +1058,7 @@ async def data_delete_by_id(
         uuid: UUID of the object to delete
         user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
+        server: Optional server instance to reuse connection
 
     Returns:
         True if deletion was successful (implicitly, as no error is raised)
@@ -944,6 +1070,7 @@ async def data_delete_by_id(
         application_id,
         user_ws=user_ws,
         context=context,
+        server=server,
     )
 
     await tenant_collection.data.delete_by_id(uuid=uuid)
@@ -954,9 +1081,10 @@ async def data_delete_many(
     collection_name: str,
     application_id: str,
     user_ws: str | None = None,
-    context: dict[str, Any] | None = None,
+    context: HyphaContext | None = None,
+    server: RemoteService | None = None,
     **kwargs: Any,
-) -> dict[str, Any]:
+) -> DataDeleteManyReturn:
     """Delete many objects from the collection based on filter criteria.
 
     Gets a tenant-specific collection after verifying permissions.
@@ -970,6 +1098,7 @@ async def data_delete_many(
         application_id: ID of the application to filter objects by
         user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
+        server: Optional server instance to reuse connection
         **kwargs: Additional arguments to pass to delete_many() including where filters
 
     Returns:
@@ -982,10 +1111,14 @@ async def data_delete_many(
         application_id,
         user_ws=user_ws,
         context=context,
+        server=server,
     )
 
     kwargs["where"] = and_app_filter(application_id, kwargs.get("where"))
-    response: DeleteManyReturn = await tenant_collection.data.delete_many(**kwargs)
+    response = cast(
+        "DeleteManyReturn[None]",
+        await tenant_collection.data.delete_many(**kwargs),
+    )
 
     return {
         "failed": response.failed,
@@ -1003,7 +1136,8 @@ async def data_exists(
     application_id: str,
     uuid: uuid_class.UUID,
     user_ws: str | None = None,
-    context: dict[str, Any] | None = None,
+    context: HyphaContext | None = None,
+    server: RemoteService | None = None,
 ) -> bool:
     """Check if an object with the specified UUID exists in the collection.
 
@@ -1016,6 +1150,7 @@ async def data_exists(
         uuid: UUID of the object to check
         context: Context containing caller information
         user_ws: Optional user workspace to use as tenant (if different from caller)
+        server: Optional server instance to reuse connection
 
     Returns:
         Boolean indicating whether the object exists
@@ -1027,6 +1162,7 @@ async def data_exists(
         application_id,
         user_ws=user_ws,
         context=context,
+        server=server,
     )
 
     return await tenant_collection.data.exists(uuid=uuid)

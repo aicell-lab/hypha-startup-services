@@ -1,6 +1,7 @@
 """Common utility functions shared between services."""
 
-from typing import Any
+from collections.abc import Mapping
+from typing import Any, TypeVar
 
 from hypha_rpc.utils import ObjectProxy
 
@@ -10,8 +11,10 @@ from .constants import (
     SHARED_WORKSPACE,
 )
 
+T = TypeVar("T")
 
-def proxy_to_dict(proxy: dict[str, Any] | ObjectProxy) -> dict[Any, Any]:
+
+def proxy_to_dict(proxy: dict[str, object] | ObjectProxy) -> dict[str, object]:
     """Convert an ObjectProxy to a regular dictionary."""
     if isinstance(proxy, ObjectProxy):
         return proxy.toDict()
@@ -38,8 +41,8 @@ def get_application_artifact_name(
     )
 
 
-def stringify_keys(d: dict[Any, Any]) -> dict[str, Any]:
-    """Convert all keys in a dictionary to strings."""
+def stringify_keys(d: Mapping[Any, T]) -> dict[str, T]:
+    """Convert all keys in a mapping to strings."""
     return {str(k): v for k, v in d.items()}
 
 

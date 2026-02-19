@@ -15,7 +15,7 @@ async def get_mem0() -> AsyncMemory:
 
     Sets up all service endpoints for collections, data operations, and queries.
     """
-    load_dotenv()
+    load_dotenv(override=True)
 
     # Apply patches to fix Weaviate metadata and score issues
     patches_applied = apply_all_patches()

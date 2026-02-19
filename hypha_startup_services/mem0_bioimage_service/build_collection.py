@@ -46,7 +46,7 @@ from hypha_startup_services.mem0_bioimage_service.utils import (
 )
 from hypha_startup_services.mem0_service.mem0_client import get_mem0
 
-load_dotenv()
+load_dotenv(override=True)
 
 # Configure logging
 logging.basicConfig(
