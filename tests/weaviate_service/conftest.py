@@ -24,15 +24,18 @@ from tests.weaviate_service.utils import (
 )
 
 TEST_SESSION_ID = uuid.uuid4().hex[:10]
-WEAVIATE_TEST_SHORT_ID = f"weaviate-test-{TEST_SESSION_ID}"
+WEAVIATE_TEST_ID_USER1 = f"weaviate-test-{TEST_SESSION_ID}-u1"
+WEAVIATE_TEST_ID_USER2 = f"weaviate-test-{TEST_SESSION_ID}-u2"
+WEAVIATE_TEST_ID_USER3 = f"weaviate-test-{TEST_SESSION_ID}-u3"
 
 
-async def get_shared_service(
+async def register_and_get_service(
     server: RemoteService,
-    service_id: str,
+    service_name: str,
 ) -> RemoteService:
-    """Get a shared Weaviate service by fully-qualified service ID."""
-    return await server.get_service(service_id)
+    """Register and fetch a session-unique Weaviate service."""
+    await register_weaviate(server, service_name)
+    return await server.get_service(service_name)
 
 
 async def cleanup_weaviate_service(service: RemoteService) -> None:
@@ -77,26 +80,12 @@ def register_test_codecs(server: RemoteService) -> None:
     )
 
 @pytest_asyncio.fixture
-async def shared_weaviate_service_id() -> AsyncGenerator[str, None]:
-    """Register one shared, session-unique Weaviate service."""
-    server = await get_user_server("PERSONAL_TOKEN")
-    register_test_codecs(server)
-    await register_weaviate(server, WEAVIATE_TEST_SHORT_ID)
-    service_id = f"{server.config.workspace}/{WEAVIATE_TEST_SHORT_ID}"
-    try:
-        yield service_id
-    finally:
-        await server.disconnect()
-
-
-@pytest_asyncio.fixture
 async def weaviate_service(
-    shared_weaviate_service_id: str,
 ) -> AsyncGenerator[RemoteService, None]:
     """Create Weaviate service fixture for user 1."""
     server = await get_user_server("PERSONAL_TOKEN")
     register_test_codecs(server)
-    service = await get_shared_service(server, shared_weaviate_service_id)
+    service = await register_and_get_service(server, WEAVIATE_TEST_ID_USER1)
     try:
         yield service
     finally:
@@ -106,23 +95,21 @@ async def weaviate_service(
 
 @pytest_asyncio.fixture
 async def weaviate_service2(
-    shared_weaviate_service_id: str,
 ) -> AsyncGenerator[RemoteService, None]:
     """Weaviate service fixture for user 2."""
     server = await get_user_server("PERSONAL_TOKEN2")
     register_test_codecs(server)
-    service = await get_shared_service(server, shared_weaviate_service_id)
+    service = await register_and_get_service(server, WEAVIATE_TEST_ID_USER2)
     yield service
     await server.disconnect()
 
 
 @pytest_asyncio.fixture
 async def weaviate_service3(
-    shared_weaviate_service_id: str,
 ) -> AsyncGenerator[RemoteService, None]:
     """Weaviate service fixture for user 3."""
     server = await get_user_server("PERSONAL_TOKEN3")
     register_test_codecs(server)
-    service = await get_shared_service(server, shared_weaviate_service_id)
+    service = await register_and_get_service(server, WEAVIATE_TEST_ID_USER3)
     yield service
     await server.disconnect()
