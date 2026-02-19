@@ -1,7 +1,7 @@
 """Common test fixtures for weaviate tests."""
 
-import contextlib
 import asyncio
+import contextlib
 import uuid
 from collections.abc import AsyncGenerator
 from dataclasses import asdict
@@ -26,8 +26,8 @@ from tests.weaviate_service.utils import (
 
 TEST_SESSION_ID = uuid.uuid4().hex[:10]
 WEAVIATE_TEST_SERVICE_ID = f"weaviate-test-{TEST_SESSION_ID}"
-SERVICE_LOOKUP_RETRIES = 20
-SERVICE_LOOKUP_SLEEP_SECONDS = 0.5
+SERVICE_LOOKUP_RETRIES = 60
+SERVICE_LOOKUP_SLEEP_SECONDS = 1.0
 
 
 async def wait_for_service(
@@ -97,6 +97,7 @@ def register_test_codecs(server: RemoteService) -> None:
         },
     )
 
+
 @pytest_asyncio.fixture
 async def shared_weaviate_service_id() -> AsyncGenerator[str, None]:
     """Register one shared, session-unique Weaviate service."""
@@ -107,6 +108,7 @@ async def shared_weaviate_service_id() -> AsyncGenerator[str, None]:
         f"{server.config.workspace}/{server.config.client_id}:"
         f"{WEAVIATE_TEST_SERVICE_ID}"
     )
+    await wait_for_service(server, full_service_id)
     try:
         yield full_service_id
     finally:
