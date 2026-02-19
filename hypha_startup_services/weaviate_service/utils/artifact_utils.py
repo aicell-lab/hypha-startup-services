@@ -132,14 +132,21 @@ async def create_application_artifact(
         Result of artifact creation
 
     """
+    application_owners = [user_ws, *ADMIN_WORKSPACES]
+    full_collection_name = get_full_collection_name(collection_name)
+    parent_artifact_id = full_collection_name
+    if server is not None:
+        parent_artifact_id = f"{server.config.workspace}/{full_collection_name}"
+
     # Create artifact parameters using the model
     artifact_params = ApplicationArtifactParams(
         collection_name=collection_name,
         application_id=application_id,
         user_workspace=user_ws,
         creator_id=caller_ws,
+        parent_id=parent_artifact_id,
         desc=description,
-        permissions=make_artifact_permissions(owners=user_ws),
+        permissions=make_artifact_permissions(owners=application_owners),
         metadata={
             "application_id": application_id,
             "short_collection_name": collection_name,

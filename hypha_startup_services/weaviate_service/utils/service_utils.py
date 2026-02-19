@@ -139,6 +139,10 @@ async def ws_app_exists(
         workspace,
         application_id,
     )
+    workspace_scoped_artifact_id = f"{workspace}/{artifact_name}"
+    if await artifact_exists(workspace_scoped_artifact_id, server=server):
+        return True
+
     return await artifact_exists(artifact_name, server=server)
 
 

@@ -47,6 +47,12 @@ async def test_insert_many_with_top_level_vector_and_uuid(
         "title_vector": title_vector,
         "description_vector": description_vector,
     }
+    vector_payload: list[float] | dict[str, list[float]]
+    if weav_utils.embedding_enabled():
+        vector_payload = named_vectors
+    else:
+        vector_payload = title_vector
+
     objects: list[MovieInfo] = [
         {
             "title": "Vector One",
@@ -54,7 +60,7 @@ async def test_insert_many_with_top_level_vector_and_uuid(
             "genre": "Test",
             "year": 2024,
             "uuid": u1,
-            "vector": named_vectors,
+            "vector": vector_payload,
         },
         {
             "title": "Vector Two",
@@ -62,7 +68,7 @@ async def test_insert_many_with_top_level_vector_and_uuid(
             "genre": "Test",
             "year": 2024,
             "id": u2,
-            "vector": named_vectors,
+            "vector": vector_payload,
         },
         {
             "title": "Vector Three",
@@ -70,7 +76,7 @@ async def test_insert_many_with_top_level_vector_and_uuid(
             "genre": "Test",
             "year": 2024,
             "uuid": u3,
-            "vector": named_vectors,
+            "vector": vector_payload,
         },
     ]
 

@@ -14,6 +14,21 @@ from tests.weaviate_service.utils import (
 )
 
 
+def _title_from_result_object(result_object: object) -> str:
+    """Extract title from result object across property shapes."""
+    object_dict = result_object if isinstance(result_object, dict) else {}
+    properties = object_dict.get("properties", {})
+    if isinstance(properties, dict):
+        return str(properties.get("title", ""))
+
+    value = getattr(properties, "value", None)
+    if value is None:
+        return ""
+
+    title = getattr(value, "title", "")
+    return str(title)
+
+
 @pytest.mark.asyncio
 async def test_collection_data_insert(weaviate_service: RemoteService) -> None:
     """Test inserting a single object into a collection."""
@@ -253,7 +268,6 @@ async def test_collection_data_delete_many(weaviate_service: RemoteService) -> N
     )
 
     assert len(query_result["objects"]) == 1
-    assert (
-        query_result["objects"][0]["properties"].value.title
-        == "The Shawshank Redemption"
+    assert _title_from_result_object(query_result["objects"][0]) == (
+        "The Shawshank Redemption"
     )
