@@ -2,6 +2,8 @@
 
 import logging
 
+from hypha_rpc.rpc import RemoteService
+
 from hypha_startup_services.common.artifacts import (
     create_artifact,
     delete_artifact,
@@ -48,34 +50,43 @@ def make_artifact_permissions(owners: str | list[str]) -> dict[str, str]:
 
 async def delete_collection_artifact(
     collection_name: str,
+    server: RemoteService | None = None,
 ) -> None:
     """Delete artifact for a specific collection.
 
     Args:
         collection_name: The name of the collection to delete the artifact for
+        server: Optional server instance to reuse connection
 
     """
     full_name = get_collection_artifact_name(collection_name)
     await delete_artifact(
         full_name,
+        server=server,
     )
 
 
-async def delete_collection_artifacts(short_names: list[str]) -> None:
+async def delete_collection_artifacts(
+    short_names: list[str],
+    server: RemoteService | None = None,
+) -> None:
     """Delete artifacts for a list of collections.
 
     Args:
         short_names: List of collection names to delete artifacts for
+        server: Optional server instance to reuse connection
 
     """
     for coll_name in short_names:
         await delete_collection_artifact(
             coll_name,
+            server=server,
         )
 
 
 async def create_collection_artifact(
     settings: CollectionConfig,
+    server: RemoteService | None = None,
 ) -> None:
     """Create a collection artifact using the model-based approach."""
     permissions = make_artifact_permissions(owners=ADMIN_WORKSPACES)
@@ -95,6 +106,7 @@ async def create_collection_artifact(
 
     await create_artifact(
         artifact_params=artifact_params,
+        server=server,
     )
 
 
@@ -104,6 +116,7 @@ async def create_application_artifact(
     description: str,
     user_ws: str,
     caller_ws: str,
+    server: RemoteService | None = None,
 ) -> ApplicationArtifactReturn:
     """Create an application artifact.
 
@@ -113,6 +126,7 @@ async def create_application_artifact(
         description: Application description
         user_ws: User workspace
         caller_ws: Caller workspace
+        server: Optional server instance to reuse connection
 
     Returns:
         Result of artifact creation
@@ -134,6 +148,7 @@ async def create_application_artifact(
 
     result = await create_artifact(
         artifact_params=artifact_params,
+        server=server,
     )
 
     return {
@@ -149,13 +164,15 @@ async def delete_application_artifact(
     full_collection_name: str,
     application_id: str,
     user_ws: str,
+    server: RemoteService | None = None,
 ) -> None:
     """Delete an application artifact.
 
     Args:
         full_collection_name: Full collection name
-        application_id: str,
+        application_id: str
         user_ws: str
+        server: Optional server instance to reuse connection
 
     """
     artifact_name = get_application_artifact_name(
@@ -165,4 +182,5 @@ async def delete_application_artifact(
     )
     await delete_artifact(
         artifact_name,
+        server=server,
     )

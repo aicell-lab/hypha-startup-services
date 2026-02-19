@@ -2,14 +2,28 @@
 
 import logging
 from abc import ABC, abstractmethod
+from typing import AsyncGenerator
+from contextlib import asynccontextmanager
 
-from hypha_rpc.rpc import RemoteException
+from hypha_rpc.rpc import RemoteException, RemoteService
 
 from hypha_startup_services.common.server_utils import get_server
 
 from .constants import ARTIFACT_MANAGER_SERVICE_ID, DEFAULT_REMOTE_URL
 
 logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def _get_server_or_connect(
+    server: RemoteService | None = None,
+) -> AsyncGenerator[RemoteService, None]:
+    """Get the provided server or connect to a new one."""
+    if server:
+        yield server
+    else:
+        async with get_server(DEFAULT_REMOTE_URL) as new_server:
+            yield new_server
 
 
 class BaseArtifactParams(ABC):
@@ -44,15 +58,15 @@ class BaseArtifactParams(ABC):
         raise NotImplementedError
 
 
-# TODO: add artifact manifest class
 async def get_artifact(
     artifact_id: str,
+    server: RemoteService | None = None,
 ) -> dict[str, object]:
     """Get an artifact from the artifact manager.
 
     Args:
-        server: The RemoteService instance
         artifact_id: The ID of the artifact to retrieve
+        server: Optional RemoteService instance. If provided, reuses connection.
 
     Returns:
         The artifact data, or a dict with error information if retrieval fails
@@ -61,17 +75,19 @@ async def get_artifact(
         RemoteException: If there's a server communication error
 
     """
-    async with get_server(DEFAULT_REMOTE_URL) as server:
-        artifact_manager = await server.get_service(ARTIFACT_MANAGER_SERVICE_ID)
+    async with _get_server_or_connect(server) as s:
+        artifact_manager = await s.get_service(ARTIFACT_MANAGER_SERVICE_ID)
         return await artifact_manager.read(artifact_id=artifact_id)
 
 
 async def create_artifact(
     artifact_params: BaseArtifactParams,
+    server: RemoteService | None = None,
 ) -> dict[str, object]:
     """Create a new artifact using the model-based approach."""
     if await artifact_exists(
         artifact_id=artifact_params.artifact_id,
+        server=server,
     ):
         logger.warning(
             "Artifact with ID %s already exists. Skipping creation.",
@@ -82,8 +98,8 @@ async def create_artifact(
             "status": "already_exists",
         }
 
-    async with get_server(DEFAULT_REMOTE_URL) as server:
-        artifact_manager = await server.get_service(ARTIFACT_MANAGER_SERVICE_ID)
+    async with _get_server_or_connect(server) as s:
+        artifact_manager = await s.get_service(ARTIFACT_MANAGER_SERVICE_ID)
 
         await artifact_manager.create(**artifact_params.creation_dict)
         logger.info(
@@ -96,20 +112,22 @@ async def create_artifact(
 
 async def list_artifacts(
     parent_id: str | None = None,
+    server: RemoteService | None = None,
     **kwargs: object,
 ) -> list[dict[str, object]]:
     """List artifacts."""
-    async with get_server(DEFAULT_REMOTE_URL) as server:
-        artifact_manager = await server.get_service(ARTIFACT_MANAGER_SERVICE_ID)
+    async with _get_server_or_connect(server) as s:
+        artifact_manager = await s.get_service(ARTIFACT_MANAGER_SERVICE_ID)
         return await artifact_manager.list(parent_id=parent_id, **kwargs)
 
 
 async def delete_artifact(
     artifact_id: str,
+    server: RemoteService | None = None,
 ) -> None:
     """Delete an artifact."""
-    async with get_server(DEFAULT_REMOTE_URL) as server:
-        artifact_manager = await server.get_service(ARTIFACT_MANAGER_SERVICE_ID)
+    async with _get_server_or_connect(server) as s:
+        artifact_manager = await s.get_service(ARTIFACT_MANAGER_SERVICE_ID)
         try:
             await artifact_manager.delete(artifact_id=artifact_id, delete_files=True)
             logger.info("Artifact deleted: '%s'", artifact_id)
@@ -119,11 +137,13 @@ async def delete_artifact(
 
 async def artifact_exists(
     artifact_id: str,
+    server: RemoteService | None = None,
 ) -> bool:
     """Check if an artifact exists."""
     try:
         await get_artifact(
             artifact_id=artifact_id,
+            server=server,
         )
     except RemoteException:
         logger.debug("Artifact '%s' does not exist.", artifact_id)
@@ -136,6 +156,7 @@ async def artifact_edit(
     artifact_id: str,
     manifest: dict[str, object] | None = None,
     config: dict[str, object] | None = None,
+    server: RemoteService | None = None,
     **kwargs: object,
 ) -> None:
     """Edit an existing artifact's manifest, config, or other properties."""
@@ -146,11 +167,10 @@ async def artifact_edit(
         edit_params["config"] = config
     edit_params.update(kwargs)
 
-    if not await artifact_exists(artifact_id):
+    if not await artifact_exists(artifact_id, server=server):
         error_msg = f"Artifact '{artifact_id}' does not exist."
         raise ValueError(error_msg)
 
-    async with get_server(DEFAULT_REMOTE_URL) as server:
-        artifact_manager = await server.get_service("public/artifact-manager")
-
+    async with _get_server_or_connect(server) as s:
+        artifact_manager = await s.get_service(ARTIFACT_MANAGER_SERVICE_ID)
         await artifact_manager.edit(**edit_params)

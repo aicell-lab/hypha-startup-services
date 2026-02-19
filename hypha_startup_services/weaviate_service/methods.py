@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any, cast
 
+from hypha_rpc.rpc import RemoteService
 from weaviate.classes.query import MetadataQuery
 
 from hypha_startup_services.common.artifacts import (
@@ -93,6 +94,7 @@ async def collections_exists(
     client: WeaviateAsyncClient,
     collection_name: str,
     context: HyphaContext | None = None,  # noqa: ARG001
+    server: RemoteService | None = None,
 ) -> bool:
     """Check if a collection exists by its name.
 
@@ -101,9 +103,9 @@ async def collections_exists(
 
     Args:
         client: WeaviateAsyncClient instance
-        name: Short collection name to check
-        context: Context containing caller information
         collection_name: Full collection name to check
+        context: Context containing caller information
+        server: Optional server instance to reuse connection
 
     Returns:
         True if the collection exists, False otherwise
@@ -114,6 +116,7 @@ async def collections_exists(
         collection_name=collection_name,
     ) and await artifact_exists(
         artifact_id=get_full_collection_name(collection_name),
+        server=server,
     )
 
 
@@ -121,6 +124,7 @@ async def collections_create(
     client: WeaviateAsyncClient,
     settings: CollectionConfig,
     context: HyphaContext | None = None,
+    server: RemoteService | None = None,
 ) -> CollectionConfig:
     """Create a new collection.
 
@@ -132,6 +136,7 @@ async def collections_create(
         client: WeaviateAsyncClient instance
         settings: Collection configuration settings
         context: Context containing caller information
+        server: Optional server instance to reuse connection
 
     Returns:
         The collection configuration with the short collection name
@@ -143,7 +148,7 @@ async def collections_create(
     caller_ws = ws_from_context(context)
     assert_is_admin_ws(caller_ws)
 
-    await create_collection_artifact(settings)
+    await create_collection_artifact(settings, server=server)
 
     settings_full_name = get_settings_full_name(settings)
     collection = await client.collections.create_from_dict(  # type: ignore[reportUnknownMemberType]
@@ -212,6 +217,7 @@ async def collections_delete(
     client: WeaviateAsyncClient,
     name: str | list[str],
     context: HyphaContext | None = None,
+    server: RemoteService | None = None,
 ) -> None:
     """Delete one or multiple collections by name.
 
@@ -223,6 +229,7 @@ async def collections_delete(
         client: WeaviateAsyncClient instance
         name: Collection name(s) to delete
         context: Context containing caller information
+        server: Optional server instance to reuse connection
 
     Returns:
         None
@@ -239,13 +246,14 @@ async def collections_delete(
 
     full_names = get_full_collection_names(short_names)
     await client.collections.delete(full_names)
-    await delete_collection_artifacts(short_names)
+    await delete_collection_artifacts(short_names, server=server)
 
 
 async def collections_get_artifact(
     client: WeaviateAsyncClient,
     collection_name: str,
     context: HyphaContext | None = None,
+    server: RemoteService | None = None,
 ) -> str:
     """Get the artifact for a collection.
 
@@ -255,6 +263,7 @@ async def collections_get_artifact(
         collection_name: Name of the collection to retrieve the artifact for
         context: Context containing caller information
         client: WeaviateAsyncClient instance
+        server: Optional server instance to reuse connection
 
     Returns:
         Dictionary with collection artifact information
@@ -264,6 +273,7 @@ async def collections_get_artifact(
         client,
         collection_name,
         context=context,
+        server=server,
     ):
         error_msg = f"Collection '{collection_name}' does not exist."
         raise ValueError(error_msg)
@@ -278,6 +288,7 @@ async def applications_create(
     description: str,
     user_ws: str | None = None,
     context: HyphaContext | None = None,
+    server: RemoteService | None = None,
 ) -> ApplicationReturn:
     """Create a new application.
 
@@ -291,6 +302,7 @@ async def applications_create(
         description: Description of the application
         user_ws: Workspace ID of the user creating the application
         context: Context containing user information
+        server: Optional server instance to reuse connection
 
     Returns:
         Dictionary with application details and artifact information
@@ -307,14 +319,20 @@ async def applications_create(
 
     # Ensure collection artifact exists
     full_collection_name = get_full_collection_name(collection_name)
-    if not await artifact_exists(full_collection_name):
+    collection_artifact_id = full_collection_name
+    if server is not None:
+        collection_artifact_id = (
+            f"{server.config.workspace}/{full_collection_name}"
+        )
+
+    if not await artifact_exists(collection_artifact_id, server=server):
         logger.info(
             "Collection artifact for '%s' missing, creating it.",
             collection_name,
         )
         collection_obj = client.collections.get(full_collection_name)
         collection_config = await collection_to_config_dict(collection_obj)
-        await create_collection_artifact(collection_config)
+        await create_collection_artifact(collection_config, server=server)
 
     result = await create_application_artifact(
         collection_name,
@@ -322,6 +340,7 @@ async def applications_create(
         description,
         user_ws,
         caller_ws=caller_ws,
+        server=server,
     )
 
     return cast(
@@ -343,6 +362,7 @@ async def applications_delete(
     application_id: str,
     user_ws: str | None = None,
     context: HyphaContext | None = None,
+    server: RemoteService | None = None,
 ) -> DataDeleteManyReturn:
     """Delete an application by ID from the collection.
 
@@ -354,6 +374,7 @@ async def applications_delete(
         application_id: ID of the application to delete
         user_ws: Workspace ID of the user deleting the application
         context: Context containing user information
+        server: Optional server instance to reuse connection
 
     Returns:
         Dictionary with deletion operation results
@@ -365,6 +386,7 @@ async def applications_delete(
         application_id,
         user_ws=user_ws,
         context=context,
+        server=server,
     )
 
     if user_ws is None:
@@ -385,6 +407,7 @@ async def applications_delete(
         application_id,
         user_ws=user_ws,
         context=context,
+        server=server,
     )
 
     if context is None:
@@ -392,7 +415,7 @@ async def applications_delete(
 
     full_collection_name = get_full_collection_name(collection_name)
     caller_ws = ws_from_context(context)
-    await delete_application_artifact(full_collection_name, application_id, caller_ws)
+    await delete_application_artifact(full_collection_name, application_id, caller_ws, server=server)
 
     return result
 
@@ -403,6 +426,7 @@ async def applications_get(
     application_id: str,
     user_ws: str | None = None,
     context: HyphaContext | None = None,
+    server: RemoteService | None = None,
 ) -> dict[str, object]:
     """Get application metadata by retrieving its artifact.
 
@@ -414,6 +438,7 @@ async def applications_get(
         application_id: ID of the application to retrieve
         user_ws: Workspace ID of the user retrieving the application
         context: Context containing caller information
+        server: Optional server instance to reuse connection
 
     Returns:
         Dictionary with application artifact information
@@ -425,9 +450,10 @@ async def applications_get(
         application_id,
         user_ws=user_ws,
         context=context,
+        server=server,
     )
 
-    return await get_artifact(artifact_name)
+    return await get_artifact(artifact_name, server=server)
 
 
 async def applications_exists(
@@ -436,6 +462,7 @@ async def applications_exists(
     application_id: str,
     user_ws: str | None = None,
     context: HyphaContext | None = None,
+    server: RemoteService | None = None,
 ) -> bool:
     """Check if an application exists by checking if its artifact exists.
 
@@ -445,6 +472,7 @@ async def applications_exists(
         application_id: ID of the application to check
         user_ws: Workspace ID of the user checking the application
         context: Context containing caller information
+        server: Optional server instance to reuse connection
 
     Returns:
         Boolean indicating whether the application exists
@@ -464,13 +492,16 @@ async def applications_exists(
         application_id,
         user_ws=user_ws,
         caller_ws=caller_ws,
+        server=server,
     )
 
-    return await ws_app_exists(
-        collection_name,
+    full_collection_name = get_full_collection_name(collection_name)
+    artifact_name = get_application_artifact_name(
+        full_collection_name,
+        user_ws,
         application_id,
-        workspace=user_ws,
     )
+    return await artifact_exists(artifact_name, server=server)
 
 
 async def applications_get_artifact(
@@ -479,6 +510,7 @@ async def applications_get_artifact(
     application_id: str,
     user_ws: str | None = None,
     context: HyphaContext | None = None,
+    server: RemoteService | None = None,
 ) -> str:
     """Get the artifact for an application.
 
@@ -490,6 +522,8 @@ async def applications_get_artifact(
         application_id: ID of the application to retrieve
         user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
+        server: Optional server instance to reuse connection
+
     Returns:
         Dictionary with application artifact information
 
@@ -505,6 +539,7 @@ async def applications_get_artifact(
         application_id,
         user_ws=user_ws,
         context=context,
+        server=server,
     )
 
     full_collection_name = get_full_collection_name(collection_name)
@@ -522,6 +557,7 @@ async def applications_set_permissions(
     permissions: PermissionMap,
     user_ws: str | None = None,
     context: HyphaContext | None = None,
+    server: RemoteService | None = None,
     *,
     merge: bool = True,
 ) -> None:
@@ -538,6 +574,7 @@ async def applications_set_permissions(
         user_ws: Optional user workspace to use as tenant (if different from caller)
         merge: If True, merge with existing permissions; if False, replace entirely
         context: Context containing caller information
+        server: Optional server instance to reuse connection
 
     Returns:
         Dictionary with updated application artifact information
@@ -549,9 +586,10 @@ async def applications_set_permissions(
         application_id,
         user_ws=user_ws,
         context=context,
+        server=server,
     )
 
-    artifact_data = await get_artifact(artifact_name)
+    artifact_data = await get_artifact(artifact_name, server=server)
 
     info_msg = (
         f"Updating permissions for application '{application_id}'"
@@ -579,7 +617,9 @@ async def applications_set_permissions(
     await artifact_edit(
         artifact_id=artifact_name,
         config={"permissions": updated_permissions},
+        server=server,
     )
+
 
 
 async def data_insert_many(
@@ -592,6 +632,7 @@ async def data_insert_many(
     chunk_overlap: int = 50,
     text_field: str = "text",
     context: HyphaContext | None = None,
+    server: RemoteService | None = None,
     *,
     enable_chunking: bool = False,
 ) -> InsertManyReturn:
@@ -608,6 +649,7 @@ async def data_insert_many(
         objects: List of objects to insert
         user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
+        server: Optional server instance to reuse connection
         enable_chunking: Whether to chunk text content
         chunk_size: Maximum number of tokens per chunk (if chunking enabled)
         chunk_overlap: Number of tokens to overlap between chunks (if chunking enabled)
@@ -623,6 +665,7 @@ async def data_insert_many(
         application_id,
         user_ws=user_ws,
         context=context,
+        server=server,
     )
 
     # Process objects with optional chunking
@@ -671,6 +714,7 @@ async def data_insert(
     chunk_overlap: int = 50,
     text_field: str = "text",
     context: HyphaContext | None = None,
+    server: RemoteService | None = None,
     *,
     enable_chunking: bool = False,
     **kwargs: Any,
@@ -689,6 +733,7 @@ async def data_insert(
         properties: Object properties to insert
         user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
+        server: Optional server instance to reuse connection
         enable_chunking: Whether to chunk text content
         chunk_size: Maximum number of tokens per chunk (if chunking enabled)
         chunk_overlap: Number of tokens to overlap between chunks (if chunking enabled)
@@ -705,6 +750,7 @@ async def data_insert(
         application_id,
         user_ws=user_ws,
         context=context,
+        server=server,
     )
 
     if enable_chunking and text_field in properties and properties[text_field]:
@@ -716,6 +762,7 @@ async def data_insert(
             objects=[properties],
             user_ws=user_ws,
             context=context,
+            server=server,
             enable_chunking=True,
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
@@ -740,6 +787,7 @@ async def query_near_vector(
     application_id: str,
     user_ws: str | None = None,
     context: HyphaContext | None = None,
+    server: RemoteService | None = None,
     return_metadata: dict[str, bool] | None = None,
     **kwargs: Any,
 ) -> ServiceQueryReturn:
@@ -755,6 +803,7 @@ async def query_near_vector(
         application_id: ID of the application to filter results by
         user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
+        server: Optional server instance to reuse connection
         return_metadata: Dictionary of specific metadata fields to return
         **kwargs: Additional arguments to pass to near_vector()
 
@@ -768,6 +817,7 @@ async def query_near_vector(
         application_id,
         user_ws=user_ws,
         context=context,
+        server=server,
     )
 
     kwargs["filters"] = and_app_filter(application_id, kwargs.get("filters"))
@@ -791,6 +841,7 @@ async def query_fetch_objects(
     application_id: str,
     user_ws: str | None = None,
     context: HyphaContext | None = None,
+    server: RemoteService | None = None,
     *,
     return_metadata: dict[str, bool] | None = None,
     **kwargs: Any,
@@ -807,6 +858,7 @@ async def query_fetch_objects(
         application_id: ID of the application to filter results by (optional)
         user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
+        server: Optional server instance to reuse connection
         return_metadata: Dictionary of specific metadata fields to return
         **kwargs: Additional arguments to pass to fetch_objects()
 
@@ -820,6 +872,7 @@ async def query_fetch_objects(
         application_id,
         user_ws=user_ws,
         context=context,
+        server=server,
     )
 
     kwargs["filters"] = and_app_filter(application_id, kwargs.get("filters"))
@@ -843,6 +896,7 @@ async def query_hybrid(
     application_id: str,
     user_ws: str | None = None,
     context: HyphaContext | None = None,
+    server: RemoteService | None = None,
     *,
     return_metadata: dict[str, bool] | None = None,
     **kwargs: Any,
@@ -860,6 +914,7 @@ async def query_hybrid(
         application_id: ID of the application to filter results by (optional)
         user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
+        server: Optional server instance to reuse connection
         return_metadata: Dictionary of specific metadata fields to return
         **kwargs: Additional arguments to pass to hybrid()
 
@@ -873,6 +928,7 @@ async def query_hybrid(
         application_id,
         user_ws=user_ws,
         context=context,
+        server=server,
     )
 
     kwargs["filters"] = and_app_filter(application_id, kwargs.get("filters"))
@@ -896,6 +952,7 @@ async def generate_near_text(
     application_id: str,
     user_ws: str | None = None,
     context: HyphaContext | None = None,
+    server: RemoteService | None = None,
     **kwargs: Any,
 ) -> ServiceQueryReturn:
     """Generate content based on query text and similar objects in the collection.
@@ -911,6 +968,7 @@ async def generate_near_text(
         application_id: ID of the application to filter results by
         user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
+        server: Optional server instance to reuse connection
         **kwargs: Additional arguments to pass to near_text()
 
     Returns:
@@ -924,6 +982,7 @@ async def generate_near_text(
         application_id,
         user_ws=user_ws,
         context=context,
+        server=server,
     )
 
     kwargs["filters"] = and_app_filter(application_id, kwargs.get("filters"))
@@ -945,6 +1004,7 @@ async def data_update(
     application_id: str,
     user_ws: str | None = None,
     context: HyphaContext | None = None,
+    server: RemoteService | None = None,
     **kwargs: Any,
 ) -> None:
     """Update an object in the collection.
@@ -958,6 +1018,7 @@ async def data_update(
         application_id: ID of the application the object belongs to
         user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
+        server: Optional server instance to reuse connection
         **kwargs: Additional arguments to pass to update() including uuid and properties
 
     Returns:
@@ -970,6 +1031,7 @@ async def data_update(
         application_id,
         user_ws=user_ws,
         context=context,
+        server=server,
     )
 
     await tenant_collection.data.update(**kwargs)
@@ -982,6 +1044,7 @@ async def data_delete_by_id(
     uuid: uuid_class.UUID,
     user_ws: str | None = None,
     context: HyphaContext | None = None,
+    server: RemoteService | None = None,
 ) -> None:
     """Delete an object by ID from the collection.
 
@@ -995,6 +1058,7 @@ async def data_delete_by_id(
         uuid: UUID of the object to delete
         user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
+        server: Optional server instance to reuse connection
 
     Returns:
         True if deletion was successful (implicitly, as no error is raised)
@@ -1006,6 +1070,7 @@ async def data_delete_by_id(
         application_id,
         user_ws=user_ws,
         context=context,
+        server=server,
     )
 
     await tenant_collection.data.delete_by_id(uuid=uuid)
@@ -1017,6 +1082,7 @@ async def data_delete_many(
     application_id: str,
     user_ws: str | None = None,
     context: HyphaContext | None = None,
+    server: RemoteService | None = None,
     **kwargs: Any,
 ) -> DataDeleteManyReturn:
     """Delete many objects from the collection based on filter criteria.
@@ -1032,6 +1098,7 @@ async def data_delete_many(
         application_id: ID of the application to filter objects by
         user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
+        server: Optional server instance to reuse connection
         **kwargs: Additional arguments to pass to delete_many() including where filters
 
     Returns:
@@ -1044,6 +1111,7 @@ async def data_delete_many(
         application_id,
         user_ws=user_ws,
         context=context,
+        server=server,
     )
 
     kwargs["where"] = and_app_filter(application_id, kwargs.get("where"))
@@ -1069,6 +1137,7 @@ async def data_exists(
     uuid: uuid_class.UUID,
     user_ws: str | None = None,
     context: HyphaContext | None = None,
+    server: RemoteService | None = None,
 ) -> bool:
     """Check if an object with the specified UUID exists in the collection.
 
@@ -1081,6 +1150,7 @@ async def data_exists(
         uuid: UUID of the object to check
         context: Context containing caller information
         user_ws: Optional user workspace to use as tenant (if different from caller)
+        server: Optional server instance to reuse connection
 
     Returns:
         Boolean indicating whether the object exists
@@ -1092,6 +1162,7 @@ async def data_exists(
         application_id,
         user_ws=user_ws,
         context=context,
+        server=server,
     )
 
     return await tenant_collection.data.exists(uuid=uuid)

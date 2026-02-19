@@ -4,6 +4,7 @@ This module contains helper functions for Weaviate service operations
 that need to be shared across different parts of the service.
 """
 
+from hypha_rpc.rpc import RemoteService
 from weaviate import WeaviateAsyncClient
 from weaviate.collections import CollectionAsync
 
@@ -73,6 +74,7 @@ async def get_permitted_collection(
     application_id: str,
     caller_ws: str,
     user_ws: str | None = None,
+    server: RemoteService | None = None,
 ) -> CollectionAsync:
     """Get a collection with appropriate tenant permissions.
 
@@ -81,11 +83,11 @@ async def get_permitted_collection(
 
     Args:
         client: WeaviateAsyncClient instance
-        server: RemoteService instance for permission checking
         collection_name: Name of the collection to access
         application_id: ID of the application being accessed
         caller_ws: Workspace of the caller
         user_ws: Optional user workspace to use as tenant (if different from caller)
+        server: RemoteService instance for permission checking (passed to permissions)
 
     Returns:
         Collection object with tenant permissions configured
@@ -97,6 +99,7 @@ async def get_permitted_collection(
             application_id,
             caller_ws,
             user_ws,
+            server=server,
         )
         return await get_tenant_collection(client, collection_name, user_ws)
 
@@ -116,6 +119,7 @@ async def ws_app_exists(
     collection_name: str,
     application_id: str,
     workspace: str,
+    server: RemoteService | None = None,
 ) -> bool:
     """Check if an application exists for a specific user workspace.
 
@@ -123,6 +127,7 @@ async def ws_app_exists(
         collection_name: Name of the collection to check
         application_id: ID of the application to check
         workspace: User workspace to check against
+        server: Optional server instance to reuse connection
 
     Returns:
         Boolean indicating whether the application exists for the user workspace
@@ -134,7 +139,7 @@ async def ws_app_exists(
         workspace,
         application_id,
     )
-    return await artifact_exists(artifact_name)
+    return await artifact_exists(artifact_name, server=server)
 
 
 async def prepare_tenant_collection(
@@ -143,6 +148,7 @@ async def prepare_tenant_collection(
     application_id: str,
     user_ws: str | None = None,
     context: HyphaContext | None = None,
+    server: RemoteService | None = None,
 ) -> CollectionAsync:
     """Validate that the Weaviate client is properly configured.
 
@@ -155,6 +161,7 @@ async def prepare_tenant_collection(
         application_id: ID of the application to validate
         user_ws: Optional user workspace to use as tenant (if different from caller)
         context: Context containing caller information
+        server: Optional server instance to reuse connection
 
     Raises:
         Exception: If the Weaviate client is not properly configured
@@ -172,6 +179,7 @@ async def prepare_tenant_collection(
         collection_name,
         application_id,
         workspace=user_ws,
+        server=server,
     ):
         error_msg = (
             f"Application {application_id}"
@@ -185,4 +193,5 @@ async def prepare_tenant_collection(
         application_id,
         user_ws=user_ws,
         caller_ws=caller_ws,
+        server=server,
     )

@@ -206,7 +206,9 @@ async def create_test_collection(weaviate_service: RemoteService) -> CollectionC
 
     # Try to delete if it exists - ignore errors
     try:
-        await weaviate_service.collections.delete("Movie")
+        # Verify existence before delete to be sure
+        if await weaviate_service.collections.exists("Movie"):
+             await weaviate_service.collections.delete("Movie")
     except RemoteException:
         logger.exception("Error deleting collection")
 
@@ -243,7 +245,8 @@ async def create_test_collection(weaviate_service: RemoteService) -> CollectionC
         },
     }
 
-    return await weaviate_service.collections.create(class_obj)
+    res = await weaviate_service.collections.create(class_obj)
+    return res
 
 
 async def create_test_application(weaviate_service: RemoteService) -> None:
