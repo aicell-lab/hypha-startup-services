@@ -23,38 +23,45 @@ jobs:
           pip install -r requirements_test.txt
 
       - name: Check required tokens
-        id: token_check
         env:
           PERSONAL_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
           PERSONAL_TOKEN2: ${{ secrets.PERSONAL_TOKEN2 }}
           PERSONAL_TOKEN3: ${{ secrets.PERSONAL_TOKEN3 }}
+          USER1_WS: ${{ vars.USER1_WS }}
+          USER2_WS: ${{ vars.USER2_WS }}
+          USER3_WS: ${{ vars.USER3_WS }}
+          WEAVIATE_ADMIN_KEY: ${{ secrets.WEAVIATE_ADMIN_KEY }}
         run: |
           missing=0
-          for token_name in PERSONAL_TOKEN PERSONAL_TOKEN2 PERSONAL_TOKEN3; do
-            if [ -z "${!token_name}" ]; then
-              echo "Missing secret: $token_name"
+          for required_name in \
+            PERSONAL_TOKEN \
+            PERSONAL_TOKEN2 \
+            PERSONAL_TOKEN3 \
+            USER1_WS \
+            USER2_WS \
+            USER3_WS \
+            WEAVIATE_ADMIN_KEY; do
+            if [ -z "${!required_name}" ]; then
+              echo "Missing required CI value: $required_name"
               missing=1
             fi
           done
 
           if [ "$missing" -eq 1 ]; then
-            echo "run_tests=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "run_tests=true" >> "$GITHUB_OUTPUT"
+            echo "Required secrets/variables are missing. Failing workflow."
+            exit 1
           fi
 
       - name: Run weaviate_service test suite
-        if: steps.token_check.outputs.run_tests == 'true'
         env:
           PERSONAL_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
           PERSONAL_TOKEN2: ${{ secrets.PERSONAL_TOKEN2 }}
           PERSONAL_TOKEN3: ${{ secrets.PERSONAL_TOKEN3 }}
+          USER1_WS: ${{ vars.USER1_WS }}
+          USER2_WS: ${{ vars.USER2_WS }}
+          USER3_WS: ${{ vars.USER3_WS }}
+          WEAVIATE_ADMIN_KEY: ${{ secrets.WEAVIATE_ADMIN_KEY }}
           HYPHA_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
           WEAVIATE_TEST_ENABLE_EMBEDDING: "true"
         run: |
           pytest tests/weaviate_service -v
-
-      - name: Skip summary
-        if: steps.token_check.outputs.run_tests != 'true'
-        run: |
-          echo "Skipping weaviate_service tests because required secrets are missing."
