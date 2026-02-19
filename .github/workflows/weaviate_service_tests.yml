@@ -14,7 +14,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install dependencies
         run: |
@@ -30,7 +30,6 @@ jobs:
           USER1_WS: ${{ vars.USER1_WS }}
           USER2_WS: ${{ vars.USER2_WS }}
           USER3_WS: ${{ vars.USER3_WS }}
-          WEAVIATE_ADMIN_KEY: ${{ secrets.WEAVIATE_ADMIN_KEY }}
         run: |
           missing=0
           for required_name in \
@@ -39,8 +38,7 @@ jobs:
             PERSONAL_TOKEN3 \
             USER1_WS \
             USER2_WS \
-            USER3_WS \
-            WEAVIATE_ADMIN_KEY; do
+            USER3_WS; do
             if [ -z "${!required_name}" ]; then
               echo "Missing required CI value: $required_name"
               missing=1
@@ -60,7 +58,6 @@ jobs:
           USER1_WS: ${{ vars.USER1_WS }}
           USER2_WS: ${{ vars.USER2_WS }}
           USER3_WS: ${{ vars.USER3_WS }}
-          WEAVIATE_ADMIN_KEY: ${{ secrets.WEAVIATE_ADMIN_KEY }}
           HYPHA_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
           WEAVIATE_TEST_ENABLE_EMBEDDING: "true"
         run: |
