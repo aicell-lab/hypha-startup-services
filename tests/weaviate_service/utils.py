@@ -1,5 +1,6 @@
 """Common utilities for Weaviate tests."""
 
+import asyncio
 import logging
 import os
 from dataclasses import dataclass
@@ -18,6 +19,13 @@ USER2_APP_ID = "User2App"
 USER3_APP_ID = "User3App"
 SHARED_APP_ID = "SharedApp"
 EMBEDDING_ENV_VAR = "WEAVIATE_TEST_ENABLE_EMBEDDING"
+COLLECTION_SETUP_RETRIES = 5
+COLLECTION_SETUP_SLEEP_SECONDS = 1.0
+COLLECTION_TRANSIENT_ERRORS = (
+    "already exists",
+    "configuration could not be retrieved",
+    "unexpected status code: 404",
+)
 
 
 def embedding_enabled() -> bool:
@@ -212,11 +220,23 @@ async def create_test_collection(weaviate_service: RemoteService) -> CollectionC
         "mxbai-embed-large:latest"  # For embeddings - using an available model
     )
 
-    # Try to delete if it exists - ignore errors
-    try:
-        await weaviate_service.collections.delete("Movie")
-    except RemoteException:
-        logger.exception("Error deleting collection")
+    for _ in range(COLLECTION_SETUP_RETRIES):
+        try:
+            await weaviate_service.collections.delete("Movie")
+        except RemoteException:
+            logger.warning("Collection delete failed during setup retry")
+
+        try:
+            movie_collection_exists = await weaviate_service.collections.exists(
+                "Movie",
+            )
+        except RemoteException:
+            movie_collection_exists = True
+
+        if not movie_collection_exists:
+            break
+
+        await asyncio.sleep(COLLECTION_SETUP_SLEEP_SECONDS)
 
     class_obj = MOVIE_COLLECTION_CONFIG.copy()
     if embedding_enabled():
@@ -251,6 +271,31 @@ async def create_test_collection(weaviate_service: RemoteService) -> CollectionC
                 "apiEndpoint": ollama_endpoint,
             },
         }
+
+    for _ in range(COLLECTION_SETUP_RETRIES):
+        try:
+            return await weaviate_service.collections.create(class_obj)
+        except (RemoteException, ValueError) as error:
+            error_message = str(error).lower()
+            has_transient_error = any(
+                transient_error in error_message
+                for transient_error in COLLECTION_TRANSIENT_ERRORS
+            )
+            if not has_transient_error:
+                raise
+
+            try:
+                movie_collection_exists = await weaviate_service.collections.exists(
+                    "Movie",
+                )
+            except RemoteException:
+                movie_collection_exists = False
+
+            if movie_collection_exists:
+                return class_obj
+
+            await weaviate_service.collections.delete("Movie")
+            await asyncio.sleep(COLLECTION_SETUP_SLEEP_SECONDS)
 
     return await weaviate_service.collections.create(class_obj)
 

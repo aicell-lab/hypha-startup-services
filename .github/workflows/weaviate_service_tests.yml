@@ -22,7 +22,7 @@ jobs:
           pip install -e .
           pip install -r requirements_test.txt
 
-      - name: Check required tokens
+      - name: Validate CI test environment
         env:
           PERSONAL_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
           PERSONAL_TOKEN2: ${{ secrets.PERSONAL_TOKEN2 }}
@@ -30,25 +30,9 @@ jobs:
           USER1_WS: ${{ vars.USER1_WS }}
           USER2_WS: ${{ vars.USER2_WS }}
           USER3_WS: ${{ vars.USER3_WS }}
+          WEAVIATE_TEST_ENABLE_EMBEDDING: "true"
         run: |
-          missing=0
-          for required_name in \
-            PERSONAL_TOKEN \
-            PERSONAL_TOKEN2 \
-            PERSONAL_TOKEN3 \
-            USER1_WS \
-            USER2_WS \
-            USER3_WS; do
-            if [ -z "${!required_name}" ]; then
-              echo "Missing required CI value: $required_name"
-              missing=1
-            fi
-          done
-
-          if [ "$missing" -eq 1 ]; then
-            echo "Required secrets/variables are missing. Failing workflow."
-            exit 1
-          fi
+          python scripts/validate_weaviate_ci_env.py
 
       - name: Run weaviate_service test suite
         env:
