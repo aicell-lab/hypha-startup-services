@@ -8,9 +8,10 @@ from typing import Any
 
 import pytest
 
-from hypha_startup_services.common.artifacts import artifact_exists
-from hypha_startup_services.common.constants import DEFAULT_REMOTE_URL
-from hypha_startup_services.common.server_utils import get_server as get_internal_server
+from hypha_startup_services.common.artifacts import (
+    artifact_exists,
+    get_artifact,
+)
 from hypha_startup_services.common.utils import get_full_collection_name
 from hypha_startup_services.weaviate_service.client import instantiate_and_connect
 from hypha_startup_services.weaviate_service.register_service import (
@@ -50,16 +51,16 @@ async def test_create_application_restore_collection_artifact() -> None:
         await create_test_collection(weaviate_service)
 
         # 2. Delete the collection artifact
-        await delete_collection_artifact("Movie")
+        await delete_collection_artifact("Movie", server=server)
 
         # Verify it's gone
         full_collection_name = get_full_collection_name("Movie")
         # In test context, we might need a moment for deletion to propagate if async
         # consistency is involved, but usually delete is immediate for subsequent reads.
-        if await artifact_exists(full_collection_name):
+        if await artifact_exists(full_collection_name, server=server):
             # Force Wait/Retry if environment is slow
             await asyncio.sleep(1)
-            if await artifact_exists(full_collection_name):
+            if await artifact_exists(full_collection_name, server=server):
                 pytest.fail("Failed to delete collection artifact for test setup")
 
         # 3. Create application - should trigger repair
@@ -74,7 +75,7 @@ async def test_create_application_restore_collection_artifact() -> None:
         await asyncio.sleep(2)
 
         # 4. Verify collection artifact exists again
-        if not await artifact_exists(full_collection_name):
+        if not await artifact_exists(full_collection_name, server=server):
             pytest.fail(
                 f"Collection artifact {full_collection_name} should have been restored",
             )
@@ -85,16 +86,11 @@ async def test_create_application_restore_collection_artifact() -> None:
             application_id=APP_ID,
         )
 
-        # Use fresh connection for verification to avoid state issues in test server
-        async with get_internal_server(DEFAULT_REMOTE_URL) as validation_server:
-            val_am = await validation_server.get_service("public/artifact-manager")
-            app_artifact = await val_am.read(artifact_id=app_artifact_id)
-            # Parent ID should match or be a fully qualified version
-            # of the collection name
-            parent_id = app_artifact["parent_id"]
-            assert parent_id == full_collection_name or parent_id.endswith(
-                f"/{full_collection_name}",
-            ), f"Parent ID {parent_id} does not match {full_collection_name}"
+        app_artifact = await get_artifact(app_artifact_id, server=server)
+        parent_id = app_artifact["parent_id"]
+        assert parent_id == full_collection_name or parent_id.endswith(
+            f"/{full_collection_name}",
+        ), f"Parent ID {parent_id} does not match {full_collection_name}"
 
     finally:
         # Cleanup
