@@ -50,6 +50,7 @@ jobs:
           PERSONAL_TOKEN2: ${{ secrets.PERSONAL_TOKEN2 }}
           PERSONAL_TOKEN3: ${{ secrets.PERSONAL_TOKEN3 }}
           HYPHA_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
+          WEAVIATE_TEST_ENABLE_EMBEDDING: "true"
         run: |
           pytest tests/weaviate_service -v
 

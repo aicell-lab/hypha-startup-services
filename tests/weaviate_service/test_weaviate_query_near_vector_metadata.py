@@ -7,7 +7,17 @@ from typing import Any, cast
 
 import pytest
 
-from tests.weaviate_service.utils import APP_ID, StandardMovie, create_test_application
+from tests.weaviate_service.utils import (
+    APP_ID,
+    StandardMovie,
+    create_test_application,
+    embedding_enabled,
+)
+
+pytestmark = pytest.mark.skipif(
+    not embedding_enabled(),
+    reason="Embedding disabled for manual runs. Set WEAVIATE_TEST_ENABLE_EMBEDDING=true.",
+)
 
 
 @pytest.mark.asyncio

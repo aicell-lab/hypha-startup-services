@@ -25,7 +25,6 @@ from tests.weaviate_service.utils import (
 
 TEST_SESSION_ID = uuid.uuid4().hex[:10]
 WEAVIATE_TEST_SHORT_ID = f"weaviate-test-{TEST_SESSION_ID}"
-WEAVIATE_TEST_ID = WEAVIATE_TEST_SHORT_ID
 
 
 async def get_shared_service(

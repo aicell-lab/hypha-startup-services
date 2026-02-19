@@ -1,6 +1,7 @@
 """Common utilities for Weaviate tests."""
 
 import logging
+import os
 from dataclasses import dataclass
 from enum import Enum
 from typing import TypedDict
@@ -16,6 +17,13 @@ USER1_APP_ID = "User1App"
 USER2_APP_ID = "User2App"
 USER3_APP_ID = "User3App"
 SHARED_APP_ID = "SharedApp"
+EMBEDDING_ENV_VAR = "WEAVIATE_TEST_ENABLE_EMBEDDING"
+
+
+def embedding_enabled() -> bool:
+    """Return True when embedding-dependent tests/config are enabled."""
+    value = os.getenv(EMBEDDING_ENV_VAR, "false").strip().lower()
+    return value in {"1", "true", "yes", "on"}
 
 
 @dataclass(frozen=True)
@@ -211,37 +219,38 @@ async def create_test_collection(weaviate_service: RemoteService) -> CollectionC
         logger.exception("Error deleting collection")
 
     class_obj = MOVIE_COLLECTION_CONFIG.copy()
-    # Add vector configurations
-    class_obj["vectorConfig"] = {
-        "title_vector": {
-            "vectorizer": {
-                "text2vec-ollama": {
-                    "model": ollama_model,
-                    "apiEndpoint": ollama_endpoint,
+    if embedding_enabled():
+        # Add vector configurations only when explicitly enabled.
+        class_obj["vectorConfig"] = {
+            "title_vector": {
+                "vectorizer": {
+                    "text2vec-ollama": {
+                        "model": ollama_model,
+                        "apiEndpoint": ollama_endpoint,
+                    },
                 },
+                "sourceProperties": ["title"],
+                "vectorIndexType": "hnsw",
+                "vectorIndexConfig": {"distance": "cosine"},
             },
-            "sourceProperties": ["title"],
-            "vectorIndexType": "hnsw",
-            "vectorIndexConfig": {"distance": "cosine"},
-        },
-        "description_vector": {
-            "vectorizer": {
-                "text2vec-ollama": {
-                    "model": ollama_model,
-                    "apiEndpoint": ollama_endpoint,
+            "description_vector": {
+                "vectorizer": {
+                    "text2vec-ollama": {
+                        "model": ollama_model,
+                        "apiEndpoint": ollama_endpoint,
+                    },
                 },
+                "sourceProperties": ["description"],
+                "vectorIndexType": "hnsw",
+                "vectorIndexConfig": {"distance": "cosine"},
             },
-            "sourceProperties": ["description"],
-            "vectorIndexType": "hnsw",
-            "vectorIndexConfig": {"distance": "cosine"},
-        },
-    }
-    class_obj["moduleConfig"] = {
-        "generative-ollama": {
-            "model": ollama_model,
-            "apiEndpoint": ollama_endpoint,
-        },
-    }
+        }
+        class_obj["moduleConfig"] = {
+            "generative-ollama": {
+                "model": ollama_model,
+                "apiEndpoint": ollama_endpoint,
+            },
+        }
 
     return await weaviate_service.collections.create(class_obj)
 
