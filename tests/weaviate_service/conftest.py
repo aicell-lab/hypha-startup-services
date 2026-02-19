@@ -102,7 +102,35 @@ async def shared_weaviate_service_id() -> AsyncGenerator[str, None]:
     """Register one shared, session-unique Weaviate service."""
     server = await get_user_server("PERSONAL_TOKEN")
     register_test_codecs(server)
-    await register_weaviate(server, WEAVIATE_TEST_SERVICE_ID)
+
+    # Use the app setup to register the service
+    # Ideally we would install the app, but for these tests we can just run the setup
+    # which simulates the app loader.
+    # We need to add the app directory to sys.path or just import the logic.
+    # Since app.py just calls functions from hypha_startup_services, we can use those directly
+    # OR import app properly. Let's import app using importlib due to the path.
+    import importlib.util
+    import os
+    import sys
+
+    app_path = os.path.join(
+        os.path.dirname(__file__), "../../weaviate-app/app.py"
+    )
+    spec = importlib.util.spec_from_file_location("weaviate_app", app_path)
+    if spec and spec.loader:
+        weaviate_app = importlib.util.module_from_spec(spec)
+        sys.modules["weaviate_app"] = weaviate_app
+        spec.loader.exec_module(weaviate_app)
+        
+        # Override service ID via env var
+        os.environ["WEAVIATE_SERVICE_ID"] = WEAVIATE_TEST_SERVICE_ID
+        
+        # Run setup
+        await weaviate_app.setup(server)
+    else:
+        # Fallback if app import fails (shouldn't happen)
+        await register_weaviate(server, WEAVIATE_TEST_SERVICE_ID)
+
     full_service_id = (
         f"{server.config.workspace}/{server.config.client_id}:"
         f"{WEAVIATE_TEST_SERVICE_ID}"

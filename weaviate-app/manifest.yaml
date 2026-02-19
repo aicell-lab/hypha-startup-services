@@ -1,0 +1,30 @@
+name: Weaviate Service App
+description: A Hypha app that provides the Weaviate service interface.
+tags:
+  - weaviate
+  - service
+  - database
+
+docs:
+  entry_point: app.py
+
+format_version: 0.2.0
+version: 0.1.0
+maintainers:
+  - name: AICell Lab
+    email: contact@aicell.io
+
+runtime:
+  environment:
+    conda_env:
+      dependencies:
+        - python=3.11
+        - pip
+        - pip:
+            - hypha-rpc
+            - weaviate-client>=4.11.2
+            # We need hypha-startup-services for shared logic
+            # In dev/prod this will be overridden to point to the correct branch/tag
+            - git+https://github.com/aicell-lab/hypha-startup-services.git@main
+
+entry_point: app.py
