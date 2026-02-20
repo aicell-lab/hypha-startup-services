@@ -33,6 +33,21 @@ def _genre_from_result_object(result_object: object) -> str:
     return str(genre)
 
 
+def _title_from_result_object(result_object: object) -> str:
+    """Extract title value from query result object across response shapes."""
+    object_dict = result_object if isinstance(result_object, dict) else {}
+    properties = object_dict.get("properties", {})
+    if isinstance(properties, dict):
+        return str(properties.get("title", ""))
+
+    value = getattr(properties, "value", None)
+    if value is None:
+        return ""
+
+    title = getattr(value, "title", "")
+    return str(title)
+
+
 @pytest.mark.asyncio
 async def test_collection_query_fetch_objects(weaviate_service: RemoteService) -> None:
     """Test fetching objects from a collection using kwargs."""
@@ -162,7 +177,7 @@ async def test_collection_query_near_text(weaviate_service: RemoteService) -> No
     assert len(result["objects"]) <= len(test_objects)  # Should respect the limit
 
     # Results should be relevant to the query - Interstellar should be included
-    titles = [obj["properties"].value.title for obj in result["objects"]]
+    titles = [_title_from_result_object(obj) for obj in result["objects"]]
     assert "Interstellar" in titles
 
 
