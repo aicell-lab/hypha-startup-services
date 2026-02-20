@@ -3,6 +3,7 @@
 import asyncio
 import uuid as uuid_class
 from collections.abc import Sequence
+from dataclasses import asdict
 from typing import TYPE_CHECKING, Any, TypedDict, TypeVar, cast
 
 from weaviate import WeaviateAsyncClient
@@ -76,11 +77,49 @@ def acquire_collection(
 
 def objects_part_coll_name(
     objects: Sequence[Object[P, R] | GenerativeObject[P, R]],
-) -> Sequence[Object[P, R] | GenerativeObject[P, R]]:
-    """Shorten collection names in object IDs."""
+) -> list[dict[str, object]]:
+    """Convert Weaviate objects into plain JSON-serializable dictionaries."""
+    normalized_objects: list[dict[str, object]] = []
     for obj in objects:
-        obj.collection = get_short_name(obj.collection)
-    return objects
+        normalized_objects.append(_normalize_query_object(obj))
+    return normalized_objects
+
+
+def _normalize_query_object(
+    obj: Object[P, R] | GenerativeObject[P, R],
+) -> dict[str, object]:
+    """Normalize a Weaviate query object into a plain dictionary."""
+    metadata = obj.metadata
+    normalized_metadata = asdict(metadata) if metadata is not None else None
+    return {
+        "uuid": str(obj.uuid),
+        "vector": cast("object", obj.vector),
+        "properties": _normalize_properties(obj.properties),
+        "metadata": normalized_metadata,
+        "collection": get_short_name(obj.collection),
+    }
+
+
+def _normalize_properties(properties: object) -> dict[str, object]:
+    """Normalize object properties to a plain dictionary."""
+    if isinstance(properties, dict):
+        return {str(key): value for key, value in properties.items()}
+
+    value = getattr(properties, "value", None)
+    if isinstance(value, dict):
+        return {str(key): item for key, item in value.items()}
+
+    if hasattr(properties, "items"):
+        try:
+            items = cast("object", properties).items()
+            return {
+                str(key): value_item
+                for key, value_item in cast("Any", items)
+            }
+        except (TypeError, ValueError):
+            return {}
+
+    return {}
 
 
 def create_application_filter(application_id: str) -> _Filters:
