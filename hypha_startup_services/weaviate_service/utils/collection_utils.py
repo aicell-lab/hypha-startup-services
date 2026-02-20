@@ -91,13 +91,29 @@ def _normalize_query_object(
     """Normalize a Weaviate query object into a plain dictionary."""
     metadata = obj.metadata
     normalized_metadata = asdict(metadata) if metadata is not None else None
+    normalized_uuid = _normalize_uuid(obj.uuid)
     return {
-        "uuid": str(obj.uuid),
+        "uuid": normalized_uuid,
         "vector": cast("object", obj.vector),
         "properties": _normalize_properties(obj.properties),
         "metadata": normalized_metadata,
         "collection": get_short_name(obj.collection),
     }
+
+
+def _normalize_uuid(raw_uuid: object) -> str:
+    """Normalize UUID values to the service's hex-string wire format."""
+    if isinstance(raw_uuid, uuid_class.UUID):
+        return raw_uuid.hex
+
+    if isinstance(raw_uuid, str):
+        with_hyphens = raw_uuid
+        without_hyphens = with_hyphens.replace("-", "")
+        if len(without_hyphens) == 32:
+            return without_hyphens
+        return with_hyphens
+
+    return str(raw_uuid)
 
 
 def _normalize_properties(properties: object) -> dict[str, object]:
