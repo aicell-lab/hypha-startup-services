@@ -30,6 +30,7 @@ jobs:
           USER1_WS: ${{ vars.USER1_WS }}
           USER2_WS: ${{ vars.USER2_WS }}
           USER3_WS: ${{ vars.USER3_WS }}
+          WEAVIATE_TEST_NAMESPACE: noembed-${{ github.run_id }}-${{ github.run_attempt }}
           WEAVIATE_TEST_ENABLE_EMBEDDING: "false"
         run: |
           python scripts/validate_weaviate_ci_env.py
@@ -43,11 +44,13 @@ jobs:
           USER2_WS: ${{ vars.USER2_WS }}
           USER3_WS: ${{ vars.USER3_WS }}
           HYPHA_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
+          WEAVIATE_TEST_NAMESPACE: noembed-${{ github.run_id }}-${{ github.run_attempt }}
           WEAVIATE_TEST_ENABLE_EMBEDDING: "false"
         run: |
           pytest tests/weaviate_service -v
 
   weaviate_service_tests_embedding_guarded:
+    needs: weaviate_service_tests_no_embedding
     runs-on: ubuntu-latest
 
     steps:
@@ -73,6 +76,7 @@ jobs:
           USER1_WS: ${{ vars.USER1_WS }}
           USER2_WS: ${{ vars.USER2_WS }}
           USER3_WS: ${{ vars.USER3_WS }}
+          WEAVIATE_TEST_NAMESPACE: embed-${{ github.run_id }}-${{ github.run_attempt }}
           WEAVIATE_TEST_ENABLE_EMBEDDING: "true"
         run: |
           python scripts/validate_weaviate_ci_env.py
@@ -86,6 +90,7 @@ jobs:
           USER2_WS: ${{ vars.USER2_WS }}
           USER3_WS: ${{ vars.USER3_WS }}
           HYPHA_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
+          WEAVIATE_TEST_NAMESPACE: embed-${{ github.run_id }}-${{ github.run_attempt }}
           WEAVIATE_TEST_ENABLE_EMBEDDING: "true"
         run: |
           python scripts/run_weaviate_embedding_tests_guarded.py \
