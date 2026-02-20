@@ -28,11 +28,16 @@ TEST_SESSION_ID = uuid.uuid4().hex[:10]
 WEAVIATE_TEST_SERVICE_ID = f"weaviate-test-{TEST_SESSION_ID}"
 SERVICE_LOOKUP_RETRIES = 60
 SERVICE_LOOKUP_SLEEP_SECONDS = 1.0
+SERVICE_REGISTRATION_RETRIES = 5
+REGISTRATION_LOOKUP_RETRIES = 20
+REGISTRATION_LOOKUP_SLEEP_SECONDS = 0.5
 
 
 async def wait_for_service(
     server: RemoteService,
     service_id: str,
+    retries: int = SERVICE_LOOKUP_RETRIES,
+    sleep_seconds: float = SERVICE_LOOKUP_SLEEP_SECONDS,
 ) -> RemoteService:
     """Poll until a service can be resolved."""
     query_candidates = [service_id]
@@ -42,11 +47,11 @@ async def wait_for_service(
         query_candidates.append(f"{workspace}/*:{service_name}")
         query_candidates.append(service_name)
 
-    for _ in range(SERVICE_LOOKUP_RETRIES):
+    for _ in range(retries):
         for query in query_candidates:
             with contextlib.suppress(RemoteException):
                 return await server.get_service(query)
-        await asyncio.sleep(SERVICE_LOOKUP_SLEEP_SECONDS)
+        await asyncio.sleep(sleep_seconds)
 
     for query in query_candidates:
         with contextlib.suppress(RemoteException):
@@ -103,12 +108,40 @@ async def shared_weaviate_service_id() -> AsyncGenerator[str, None]:
     """Register one shared, session-unique Weaviate service."""
     server = await get_user_server("PERSONAL_TOKEN")
     register_test_codecs(server)
-    await register_weaviate(server, WEAVIATE_TEST_SERVICE_ID)
-    full_service_id = (
-        f"{server.config.workspace}/{server.config.client_id}:"
-        f"{WEAVIATE_TEST_SERVICE_ID}"
-    )
-    await wait_for_service(server, full_service_id)
+    last_error: RemoteException | RuntimeError | None = None
+    full_service_id = ""
+    service_id_base = f"{WEAVIATE_TEST_SERVICE_ID}-{uuid.uuid4().hex[:8]}"
+
+    for retry_index in range(SERVICE_REGISTRATION_RETRIES):
+        service_id_candidate = (
+            f"{service_id_base}-{retry_index}"
+            if retry_index > 0
+            else service_id_base
+        )
+        await register_weaviate(server, service_id_candidate)
+        full_service_id = (
+            f"{server.config.workspace}/{server.config.client_id}:"
+            f"{service_id_candidate}"
+        )
+        try:
+            await wait_for_service(
+                server,
+                full_service_id,
+                retries=REGISTRATION_LOOKUP_RETRIES,
+                sleep_seconds=REGISTRATION_LOOKUP_SLEEP_SECONDS,
+            )
+        except RemoteException as error:
+            last_error = error
+            await asyncio.sleep(REGISTRATION_LOOKUP_SLEEP_SECONDS)
+            continue
+        else:
+            break
+    else:
+        if last_error is not None:
+            raise last_error
+        error_msg = "Failed to register and resolve shared Weaviate test service"
+        raise RuntimeError(error_msg)
+
     try:
         yield full_service_id
     finally:

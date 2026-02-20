@@ -6,10 +6,12 @@ handling collections, data operations, and query functionality with user isolati
 
 from __future__ import annotations
 
+import asyncio
 import logging
+from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any, cast
 
-from hypha_rpc.rpc import RemoteService
+from hypha_rpc.rpc import RemoteException, RemoteService
 from weaviate.classes.query import MetadataQuery
 
 from hypha_startup_services.common.artifacts import (
@@ -78,6 +80,10 @@ if TYPE_CHECKING:
     from weaviate.collections.classes.types import WeaviateField
 
 logger = logging.getLogger(__name__)
+APPLICATION_CREATE_RETRIES = 5
+APPLICATION_CREATE_SLEEP_SECONDS = 1.0
+SCHEMA_OPERATION_RETRIES = 5
+SCHEMA_OPERATION_SLEEP_SECONDS = 1.0
 
 if TYPE_CHECKING:
     from .utils.models import (
@@ -88,6 +94,75 @@ if TYPE_CHECKING:
         PermissionMap,
         ServiceQueryReturn,
     )
+
+
+def _is_missing_parent_artifact_error(error_message: str) -> bool:
+    """Return True if application creation failed due to missing parent artifact."""
+    return (
+        "artifact with id" in error_message
+        and "shared__delim__" in error_message
+        and "does not exist" in error_message
+    )
+
+
+def _is_transient_schema_error(error_message: str) -> bool:
+    """Return True for known transient schema propagation failures."""
+    return (
+        "configuration could not be retrieved" in error_message
+        or "unexpected status code: 404" in error_message
+        or "could not find class" in error_message
+        or "does not exist in collection" in error_message
+    )
+
+
+async def _run_with_schema_retry(
+    operation: Callable[[], Awaitable[Any]],
+) -> Any:
+    """Run an async operation with bounded retries for transient schema errors."""
+    for _ in range(SCHEMA_OPERATION_RETRIES):
+        try:
+            return await operation()
+        except Exception as error:  # noqa: BLE001
+            error_message = str(error).lower()
+            if not _is_transient_schema_error(error_message):
+                raise
+            await asyncio.sleep(SCHEMA_OPERATION_SLEEP_SECONDS)
+
+    return await operation()
+
+
+async def _wait_for_collection_artifact(
+    artifact_id: str,
+    server: RemoteService | None,
+) -> None:
+    """Wait until the collection artifact is visible in artifact manager."""
+    for _ in range(APPLICATION_CREATE_RETRIES):
+        if await artifact_exists(artifact_id, server=server):
+            return
+        await asyncio.sleep(APPLICATION_CREATE_SLEEP_SECONDS)
+
+    error_msg = f"Collection artifact '{artifact_id}' was not available in time."
+    raise ValueError(error_msg)
+
+
+async def _ensure_collection_artifact_exists(
+    client: WeaviateAsyncClient,
+    collection_name: str,
+    server: RemoteService | None,
+) -> None:
+    """Ensure the collection artifact exists, creating it when missing."""
+    full_collection_name = get_full_collection_name(collection_name)
+    artifact_id = full_collection_name
+    if server is not None:
+        artifact_id = f"{server.config.workspace}/{full_collection_name}"
+
+    if await artifact_exists(artifact_id, server=server):
+        return
+
+    collection_obj = client.collections.get(full_collection_name)
+    collection_config = await collection_to_config_dict(collection_obj)
+    await create_collection_artifact(collection_config, server=server)
+    await _wait_for_collection_artifact(artifact_id, server=server)
 
 
 async def collections_exists(
@@ -315,33 +390,45 @@ async def applications_create(
     if user_ws is None:
         user_ws = caller_ws
 
-    await prepare_application_creation(client, collection_name, user_ws)
-
-    # Ensure collection artifact exists
-    full_collection_name = get_full_collection_name(collection_name)
-    collection_artifact_id = full_collection_name
-    if server is not None:
-        collection_artifact_id = (
-            f"{server.config.workspace}/{full_collection_name}"
-        )
-
-    if not await artifact_exists(collection_artifact_id, server=server):
-        logger.info(
-            "Collection artifact for '%s' missing, creating it.",
-            collection_name,
-        )
-        collection_obj = client.collections.get(full_collection_name)
-        collection_config = await collection_to_config_dict(collection_obj)
-        await create_collection_artifact(collection_config, server=server)
-
-    result = await create_application_artifact(
-        collection_name,
-        application_id,
-        description,
-        user_ws,
-        caller_ws=caller_ws,
-        server=server,
+    await _run_with_schema_retry(
+        lambda: prepare_application_creation(client, collection_name, user_ws),
     )
+
+    await _ensure_collection_artifact_exists(client, collection_name, server)
+
+    for _ in range(APPLICATION_CREATE_RETRIES):
+        try:
+            result = await create_application_artifact(
+                collection_name,
+                application_id,
+                description,
+                user_ws,
+                caller_ws=caller_ws,
+                server=server,
+            )
+        except RemoteException as error:
+            error_message = str(error).lower()
+            if not _is_missing_parent_artifact_error(error_message):
+                raise
+            logger.warning(
+                "Transient missing parent artifact while creating application "
+                "'%s'. Retrying.",
+                application_id,
+            )
+            await _ensure_collection_artifact_exists(client, collection_name, server)
+            await asyncio.sleep(APPLICATION_CREATE_SLEEP_SECONDS)
+            continue
+        else:
+            break
+    else:
+        result = await create_application_artifact(
+            collection_name,
+            application_id,
+            description,
+            user_ws,
+            caller_ws=caller_ws,
+            server=server,
+        )
 
     return cast(
         "ApplicationReturn",
@@ -692,8 +779,11 @@ async def data_insert_many(
     app_objects = add_app_id(processed_objects, application_id)
     data_objects = [to_data_object(obj) for obj in app_objects]
 
-    response: BatchObjectReturn = await tenant_collection.data.insert_many(
-        objects=data_objects,
+    response = cast(
+        "BatchObjectReturn",
+        await _run_with_schema_retry(
+            lambda: tenant_collection.data.insert_many(objects=data_objects),
+        ),
     )
 
     return InsertManyReturn(
@@ -778,7 +868,12 @@ async def data_insert(
     app_properties = cast("dict[str, WeaviateField]", properties).copy()
     app_properties["application_id"] = application_id
 
-    return await tenant_collection.data.insert(app_properties, **kwargs)
+    return cast(
+        "uuid_class.UUID",
+        await _run_with_schema_retry(
+            lambda: tenant_collection.data.insert(app_properties, **kwargs),
+        ),
+    )
 
 
 async def query_near_vector(
@@ -827,7 +922,9 @@ async def query_near_vector(
 
     response = cast(
         "QueryReturn[object, object]",  # NOSONAR (S1192) Repeated literal necessary
-        await tenant_collection.query.near_vector(**kwargs),
+        await _run_with_schema_retry(
+            lambda: tenant_collection.query.near_vector(**kwargs),
+        ),
     )
 
     return {
@@ -882,7 +979,9 @@ async def query_fetch_objects(
 
     response = cast(
         "QueryReturn[object, object]",  # NOSONAR (S1192) Repeated literal necessary
-        await tenant_collection.query.fetch_objects(**kwargs),
+        await _run_with_schema_retry(
+            lambda: tenant_collection.query.fetch_objects(**kwargs),
+        ),
     )
 
     return {
@@ -938,7 +1037,9 @@ async def query_hybrid(
 
     response = cast(
         "QueryReturn[object, object]",
-        await tenant_collection.query.hybrid(**kwargs),
+        await _run_with_schema_retry(
+            lambda: tenant_collection.query.hybrid(**kwargs),
+        ),
     )
 
     return {

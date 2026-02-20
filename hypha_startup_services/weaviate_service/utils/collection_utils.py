@@ -1,5 +1,6 @@
 """Utility functions for managing Weaviate collections."""
 
+import asyncio
 import uuid as uuid_class
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, TypedDict, TypeVar, cast
@@ -30,6 +31,8 @@ if TYPE_CHECKING:
 
 P = TypeVar("P")
 R = TypeVar("R")
+COLLECTION_CONFIG_RETRIES = 5
+COLLECTION_CONFIG_SLEEP_SECONDS = 1.0
 
 
 class InsertManyReturn(TypedDict):
@@ -111,13 +114,35 @@ def format_tenant_name(tenant_name: str) -> str:
     return tenant_name.lower().replace("|", "_")
 
 
+def _is_collection_config_transient_error(error_message: str) -> bool:
+    """Return True for transient collection config retrieval errors."""
+    return (
+        "configuration could not be retrieved" in error_message
+        or "unexpected status code: 404" in error_message
+    )
+
+
+async def _get_collection_config_with_retry(collection: CollectionAsync) -> object:
+    """Get collection config with bounded retries for transient 404 errors."""
+    for _ in range(COLLECTION_CONFIG_RETRIES):
+        try:
+            return await collection.config.get()
+        except Exception as error:  # noqa: BLE001
+            error_message = str(error).lower()
+            if not _is_collection_config_transient_error(error_message):
+                raise
+            await asyncio.sleep(COLLECTION_CONFIG_SLEEP_SECONDS)
+
+    return await collection.config.get()
+
+
 async def is_multitenancy_enabled(
     client: WeaviateAsyncClient,
     collection_name: str,
 ) -> bool:
     """Check if multitenancy is enabled for the collection."""
     collection = acquire_collection(client, collection_name)
-    collection_config = await collection.config.get()
+    collection_config = await _get_collection_config_with_retry(collection)
     return collection_config.multi_tenancy_config.enabled
 
 
