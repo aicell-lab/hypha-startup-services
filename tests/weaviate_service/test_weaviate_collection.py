@@ -5,6 +5,7 @@ from typing import cast
 import pytest
 from hypha_rpc.rpc import RemoteException, RemoteService
 
+from hypha_startup_services.common.utils import get_full_collection_name
 from tests.weaviate_service.utils import create_test_collection
 
 
@@ -92,7 +93,7 @@ async def test_collection_get_artifact(weaviate_service: RemoteService) -> None:
     assert artifact_name is not None
     assert isinstance(artifact_name, str)
     # The artifact name should be the full collection name with workspace prefix
-    assert artifact_name == "Shared__DELIM__Movie"
+    assert artifact_name == get_full_collection_name("Movie")
 
     # Clean up
     await weaviate_service.collections.delete("Movie")

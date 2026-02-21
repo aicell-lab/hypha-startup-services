@@ -1,5 +1,6 @@
 """Common utilities for Weaviate tests."""
 
+import asyncio
 import logging
 import os
 from dataclasses import dataclass
@@ -18,6 +19,10 @@ USER2_APP_ID = "User2App"
 USER3_APP_ID = "User3App"
 SHARED_APP_ID = "SharedApp"
 EMBEDDING_ENV_VAR = "WEAVIATE_TEST_ENABLE_EMBEDDING"
+COLLECTION_SETUP_RETRIES = 5
+COLLECTION_SETUP_SLEEP_SECONDS = 1.0
+TEST_COLLECTION_NAME = "Movie"
+APPLICATION_SETUP_RETRIES = 3
 
 
 def embedding_enabled() -> bool:
@@ -205,6 +210,152 @@ MOVIE_COLLECTION_CONFIG: MovieCollectionConfig = {
 
 
 # Common test helpers
+async def _wait_for_collection_state(
+    weaviate_service: RemoteService,
+    collection_name: str,
+    *,
+    should_exist: bool,
+) -> None:
+    """Wait until a collection reaches the expected existence state."""
+    last_error: RemoteException | None = None
+    for _ in range(COLLECTION_SETUP_RETRIES):
+        try:
+            collection_exists = await weaviate_service.collections.exists(
+                collection_name,
+            )
+        except RemoteException as error:
+            last_error = error
+            await asyncio.sleep(COLLECTION_SETUP_SLEEP_SECONDS)
+            continue
+
+        if collection_exists == should_exist:
+            return
+
+        last_error = None
+        await asyncio.sleep(COLLECTION_SETUP_SLEEP_SECONDS)
+
+    if last_error is not None:
+        raise last_error
+
+    target_state = "exist" if should_exist else "be deleted"
+    error_message = (
+        f"Collection '{collection_name}' did not {target_state} within "
+        f"{COLLECTION_SETUP_RETRIES} retries"
+    )
+    raise ValueError(error_message)
+
+
+async def _delete_collection_for_test_setup(
+    weaviate_service: RemoteService,
+    collection_name: str,
+) -> None:
+    """Delete a test collection and wait until it is absent."""
+    last_error: RemoteException | ValueError | None = None
+    for _ in range(COLLECTION_SETUP_RETRIES):
+        try:
+            await weaviate_service.collections.delete(collection_name)
+        except (RemoteException, ValueError) as error:
+            last_error = error
+
+        try:
+            await _wait_for_collection_state(
+                weaviate_service,
+                collection_name,
+                should_exist=False,
+            )
+        except (RemoteException, ValueError) as error:
+            last_error = error
+        else:
+            return
+
+    if last_error is not None:
+        raise last_error
+
+
+async def _wait_for_collection_artifact(
+    weaviate_service: RemoteService,
+    collection_name: str,
+) -> None:
+    """Wait until the collection artifact can be resolved."""
+    last_error: RemoteException | ValueError | None = None
+    for _ in range(COLLECTION_SETUP_RETRIES):
+        try:
+            await weaviate_service.collections.get_artifact(collection_name)
+        except (RemoteException, ValueError) as error:
+            last_error = error
+            await asyncio.sleep(COLLECTION_SETUP_SLEEP_SECONDS)
+            continue
+
+        return
+
+    if last_error is not None:
+        raise last_error
+
+
+async def _wait_for_collection_ready(
+    weaviate_service: RemoteService,
+    collection_name: str,
+) -> None:
+    """Wait until collection configuration is readable."""
+    last_error: RemoteException | ValueError | None = None
+    for _ in range(COLLECTION_SETUP_RETRIES):
+        try:
+            await weaviate_service.collections.get(collection_name)
+        except (RemoteException, ValueError) as error:
+            last_error = error
+            await asyncio.sleep(COLLECTION_SETUP_SLEEP_SECONDS)
+            continue
+
+        return
+
+    if last_error is not None:
+        raise last_error
+
+
+async def _wait_for_application_exists(
+    weaviate_service: RemoteService,
+    collection_name: str,
+    application_id: str,
+) -> None:
+    """Wait until an application can be resolved as existing."""
+    last_error: RemoteException | None = None
+    for _ in range(COLLECTION_SETUP_RETRIES):
+        try:
+            application_exists = await weaviate_service.applications.exists(
+                collection_name=collection_name,
+                application_id=application_id,
+            )
+        except RemoteException as error:
+            last_error = error
+            await asyncio.sleep(COLLECTION_SETUP_SLEEP_SECONDS)
+            continue
+
+        if application_exists:
+            return
+
+        last_error = None
+        await asyncio.sleep(COLLECTION_SETUP_SLEEP_SECONDS)
+
+    if last_error is not None:
+        raise last_error
+
+    error_message = (
+        f"Application '{application_id}' in collection "
+        f"'{collection_name}' did not become available within "
+        f"{COLLECTION_SETUP_RETRIES} retries"
+    )
+    raise ValueError(error_message)
+
+
+def _is_collection_not_ready_error(error_message: str) -> bool:
+    """Return True for known collection-readiness race errors."""
+    return (
+        "collection 'movie' does not exist" in error_message
+        or "configuration could not be retrieved" in error_message
+        or "unexpected status code: 404" in error_message
+    )
+
+
 async def create_test_collection(weaviate_service: RemoteService) -> CollectionConfig:
     """Create a test collection for Weaviate tests."""
     ollama_endpoint = "https://hypha-ollama.scilifelab-2-dev.sys.kth.se"
@@ -212,11 +363,13 @@ async def create_test_collection(weaviate_service: RemoteService) -> CollectionC
         "mxbai-embed-large:latest"  # For embeddings - using an available model
     )
 
-    # Try to delete if it exists - ignore errors
     try:
-        await weaviate_service.collections.delete("Movie")
-    except RemoteException:
-        logger.exception("Error deleting collection")
+        await _delete_collection_for_test_setup(
+            weaviate_service,
+            TEST_COLLECTION_NAME,
+        )
+    except (RemoteException, ValueError):
+        logger.warning("Collection delete pre-cleanup failed")
 
     class_obj = MOVIE_COLLECTION_CONFIG.copy()
     if embedding_enabled():
@@ -252,24 +405,103 @@ async def create_test_collection(weaviate_service: RemoteService) -> CollectionC
             },
         }
 
-    return await weaviate_service.collections.create(class_obj)
+    for _ in range(COLLECTION_SETUP_RETRIES):
+        try:
+            created_collection = await weaviate_service.collections.create(class_obj)
+            await _wait_for_collection_ready(
+                weaviate_service,
+                TEST_COLLECTION_NAME,
+            )
+            await _wait_for_collection_artifact(
+                weaviate_service,
+                TEST_COLLECTION_NAME,
+            )
+        except (RemoteException, ValueError) as error:
+            logger.warning("Collection create attempt failed: %s", error)
+            try:
+                await _wait_for_collection_state(
+                    weaviate_service,
+                    TEST_COLLECTION_NAME,
+                    should_exist=True,
+                )
+                await _wait_for_collection_ready(
+                    weaviate_service,
+                    TEST_COLLECTION_NAME,
+                )
+                await _wait_for_collection_artifact(
+                    weaviate_service,
+                    TEST_COLLECTION_NAME,
+                )
+            except (RemoteException, ValueError):
+                await _delete_collection_for_test_setup(
+                    weaviate_service,
+                    TEST_COLLECTION_NAME,
+                )
+                continue
+
+            if await weaviate_service.collections.exists(TEST_COLLECTION_NAME):
+                return class_obj
+
+            raise
+        else:
+            return created_collection
+
+    created_collection = await weaviate_service.collections.create(class_obj)
+    await _wait_for_collection_ready(
+        weaviate_service,
+        TEST_COLLECTION_NAME,
+    )
+    await _wait_for_collection_artifact(
+        weaviate_service,
+        TEST_COLLECTION_NAME,
+    )
+    return created_collection
 
 
 async def create_test_application(weaviate_service: RemoteService) -> None:
     """Create a test application for Weaviate tests."""
-    await create_test_collection(weaviate_service)
-    if await weaviate_service.applications.exists(
-        collection_name="Movie",
-        application_id=APP_ID,
-    ):
-        # If the application already exists, delete it first
-        await weaviate_service.applications.delete(
-            collection_name="Movie",
-            application_id=APP_ID,
-        )
+    for _ in range(APPLICATION_SETUP_RETRIES):
+        await create_test_collection(weaviate_service)
 
-    await weaviate_service.applications.create(
-        application_id=APP_ID,
-        collection_name="Movie",
-        description="An application for movie data",
+        try:
+            application_exists = await weaviate_service.applications.exists(
+                collection_name=TEST_COLLECTION_NAME,
+                application_id=APP_ID,
+            )
+        except RemoteException:
+            application_exists = False
+
+        if application_exists:
+            try:
+                await weaviate_service.applications.delete(
+                    collection_name=TEST_COLLECTION_NAME,
+                    application_id=APP_ID,
+                )
+            except RemoteException:
+                logger.warning("Application delete pre-cleanup failed")
+
+        try:
+            await weaviate_service.applications.create(
+                application_id=APP_ID,
+                collection_name=TEST_COLLECTION_NAME,
+                description="An application for movie data",
+            )
+        except RemoteException as error:
+            error_message = str(error).lower()
+            if _is_collection_not_ready_error(error_message):
+                await asyncio.sleep(COLLECTION_SETUP_SLEEP_SECONDS)
+                continue
+            raise
+        else:
+            await _wait_for_application_exists(
+                weaviate_service,
+                TEST_COLLECTION_NAME,
+                APP_ID,
+            )
+            return
+
+    error_message = (
+        f"Failed to create application '{APP_ID}' after "
+        f"{APPLICATION_SETUP_RETRIES} retries"
     )
+    raise ValueError(error_message)

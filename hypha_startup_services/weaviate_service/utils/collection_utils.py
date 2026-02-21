@@ -1,7 +1,9 @@
 """Utility functions for managing Weaviate collections."""
 
+import asyncio
 import uuid as uuid_class
 from collections.abc import Sequence
+from dataclasses import asdict
 from typing import TYPE_CHECKING, Any, TypedDict, TypeVar, cast
 
 from weaviate import WeaviateAsyncClient
@@ -30,6 +32,8 @@ if TYPE_CHECKING:
 
 P = TypeVar("P")
 R = TypeVar("R")
+COLLECTION_CONFIG_RETRIES = 5
+COLLECTION_CONFIG_SLEEP_SECONDS = 1.0
 
 
 class InsertManyReturn(TypedDict):
@@ -73,11 +77,65 @@ def acquire_collection(
 
 def objects_part_coll_name(
     objects: Sequence[Object[P, R] | GenerativeObject[P, R]],
-) -> Sequence[Object[P, R] | GenerativeObject[P, R]]:
-    """Shorten collection names in object IDs."""
+) -> list[dict[str, object]]:
+    """Convert Weaviate objects into plain JSON-serializable dictionaries."""
+    normalized_objects: list[dict[str, object]] = []
     for obj in objects:
-        obj.collection = get_short_name(obj.collection)
-    return objects
+        normalized_objects.append(_normalize_query_object(obj))
+    return normalized_objects
+
+
+def _normalize_query_object(
+    obj: Object[P, R] | GenerativeObject[P, R],
+) -> dict[str, object]:
+    """Normalize a Weaviate query object into a plain dictionary."""
+    metadata = obj.metadata
+    normalized_metadata = asdict(metadata) if metadata is not None else None
+    normalized_uuid = _normalize_uuid(obj.uuid)
+    return {
+        "uuid": normalized_uuid,
+        "vector": cast("object", obj.vector),
+        "properties": _normalize_properties(obj.properties),
+        "metadata": normalized_metadata,
+        "collection": get_short_name(obj.collection),
+    }
+
+
+def _normalize_uuid(raw_uuid: object) -> str:
+    """Normalize UUID values to the service's hex-string wire format."""
+    if isinstance(raw_uuid, uuid_class.UUID):
+        return raw_uuid.hex
+
+    if isinstance(raw_uuid, str):
+        with_hyphens = raw_uuid
+        without_hyphens = with_hyphens.replace("-", "")
+        if len(without_hyphens) == 32:
+            return without_hyphens
+        return with_hyphens
+
+    return str(raw_uuid)
+
+
+def _normalize_properties(properties: object) -> dict[str, object]:
+    """Normalize object properties to a plain dictionary."""
+    if isinstance(properties, dict):
+        return {str(key): value for key, value in properties.items()}
+
+    value = getattr(properties, "value", None)
+    if isinstance(value, dict):
+        return {str(key): item for key, item in value.items()}
+
+    if hasattr(properties, "items"):
+        try:
+            items = cast("object", properties).items()
+            return {
+                str(key): value_item
+                for key, value_item in cast("Any", items)
+            }
+        except (TypeError, ValueError):
+            return {}
+
+    return {}
 
 
 def create_application_filter(application_id: str) -> _Filters:
@@ -111,13 +169,35 @@ def format_tenant_name(tenant_name: str) -> str:
     return tenant_name.lower().replace("|", "_")
 
 
+def _is_collection_config_transient_error(error_message: str) -> bool:
+    """Return True for transient collection config retrieval errors."""
+    return (
+        "configuration could not be retrieved" in error_message
+        or "unexpected status code: 404" in error_message
+    )
+
+
+async def _get_collection_config_with_retry(collection: CollectionAsync) -> object:
+    """Get collection config with bounded retries for transient 404 errors."""
+    for _ in range(COLLECTION_CONFIG_RETRIES):
+        try:
+            return await collection.config.get()
+        except Exception as error:  # noqa: BLE001
+            error_message = str(error).lower()
+            if not _is_collection_config_transient_error(error_message):
+                raise
+            await asyncio.sleep(COLLECTION_CONFIG_SLEEP_SECONDS)
+
+    return await collection.config.get()
+
+
 async def is_multitenancy_enabled(
     client: WeaviateAsyncClient,
     collection_name: str,
 ) -> bool:
     """Check if multitenancy is enabled for the collection."""
     collection = acquire_collection(client, collection_name)
-    collection_config = await collection.config.get()
+    collection_config = await _get_collection_config_with_retry(collection)
     return collection_config.multi_tenancy_config.enabled
 
 

@@ -5,7 +5,10 @@ from typing import TYPE_CHECKING, Protocol, TypeVar, cast
 from weaviate.collections import CollectionAsync
 
 from hypha_startup_services.common.constants import COLLECTION_DELIMITER
-from hypha_startup_services.common.utils import get_full_collection_name
+from hypha_startup_services.common.utils import (
+    get_collection_namespace_suffix,
+    get_full_collection_name,
+)
 
 if TYPE_CHECKING:
     from .models import CollectionConfig
@@ -25,8 +28,16 @@ def get_short_name(collection_name: str) -> str:
     If the collection name contains the workspace delimiter, returns the part after it.
     Otherwise, returns the original collection name.
     """
+    short_name = collection_name
     if COLLECTION_DELIMITER in collection_name:
-        return collection_name.split(COLLECTION_DELIMITER)[1]
+        short_name = collection_name.split(COLLECTION_DELIMITER)[1]
+
+    namespace_suffix = get_collection_namespace_suffix()
+    if namespace_suffix and short_name.endswith(namespace_suffix):
+        return short_name[: -len(namespace_suffix)]
+
+    if COLLECTION_DELIMITER in collection_name:
+        return short_name
     return collection_name
 
 

@@ -1,5 +1,7 @@
 """Common utility functions shared between services."""
 
+import os
+import re
 from collections.abc import Mapping
 from typing import Any, TypeVar
 
@@ -12,6 +14,8 @@ from .constants import (
 )
 
 T = TypeVar("T")
+COLLECTION_NAMESPACE_ENV_VAR = "WEAVIATE_TEST_NAMESPACE"
+NAMESPACE_SANITIZE_PATTERN = r"\W+"
 
 
 def proxy_to_dict(proxy: dict[str, object] | ObjectProxy) -> dict[str, object]:
@@ -61,9 +65,24 @@ def assert_valid_collection_name(collection_name: str) -> None:
         raise ValueError(error_msg)
 
 
+def get_collection_namespace_suffix() -> str:
+    """Get optional collection namespace suffix from environment."""
+    raw_namespace = os.getenv(COLLECTION_NAMESPACE_ENV_VAR, "").strip()
+    if not raw_namespace:
+        return ""
+
+    sanitized_namespace = re.sub(NAMESPACE_SANITIZE_PATTERN, "_", raw_namespace)
+    sanitized_namespace = sanitized_namespace.strip("_")
+    if not sanitized_namespace:
+        return ""
+
+    return f"_{sanitized_namespace}"
+
+
 def get_full_collection_name(short_name: str) -> str:
     """Create a full collection name with workspace prefix for a single collection."""
     assert_valid_collection_name(short_name)
 
     workspace_formatted = format_workspace(SHARED_WORKSPACE)
-    return f"{workspace_formatted}{COLLECTION_DELIMITER}{short_name}"
+    namespace_suffix = get_collection_namespace_suffix()
+    return f"{workspace_formatted}{COLLECTION_DELIMITER}{short_name}{namespace_suffix}"

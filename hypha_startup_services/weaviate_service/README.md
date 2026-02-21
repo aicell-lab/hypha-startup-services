@@ -402,6 +402,41 @@ exists = await weaviate.data.exists(
 
 ## Query Methods
 
+### Query response shape
+
+All query and generate endpoints return `objects` as plain dictionaries.
+Each object uses the same shape:
+
+```python
+{
+    "uuid": "<uuid-string>",
+    "collection": "Movie",  # short collection name
+    "properties": {"title": "Interstellar", "genre": "Science Fiction"},
+    "metadata": {...} | None,
+    "vector": [...] | {"title_vector": [...], "description_vector": [...]} | None,
+}
+```
+
+This avoids transport-specific wrapper differences and keeps client behavior
+stable across embedding and non-embedding modes.
+
+### Compound filters
+
+Filter composition follows Weaviate `Filter` semantics and supports
+compound expressions with `&` (AND), `|` (OR), and `~` (NOT).
+
+```python
+from weaviate.classes.query import Filter
+
+compound_filter = (
+    Filter.by_property("genre").equal("Science Fiction")
+    | Filter.by_property("year").greater_than(2010)
+) & ~Filter.by_property("title").like("*Batman*")
+```
+
+When passed to this service, your filter is automatically ANDed with the
+service's internal `application_id` filter.
+
 ### `query.fetch_objects(collection_name: str, application_id: str, filters: Filter = None, limit: int = 100, **kwargs)`
 
 Fetch objects with optional filters (internally constrained by application).
@@ -428,6 +463,18 @@ result = await weaviate.query.fetch_objects(
     limit=10,
 )
 print(len(result["objects"]))
+
+# Compound filter example:
+compound_filter = (
+    Filter.by_property("genre").equal("Sci-Fi")
+    | Filter.by_property("year").greater_than(2010)
+) & Filter.by_property("title").like("*star*")
+
+result = await weaviate.query.fetch_objects(
+    collection_name="Movie",
+    application_id="movie-recommender",
+    filters=compound_filter,
+)
 ```
 
 ### `query.hybrid(collection_name: str, application_id: str, query: str, filters: Filter = None, limit: int = 10, **kwargs)`
