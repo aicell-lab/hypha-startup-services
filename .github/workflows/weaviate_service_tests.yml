@@ -4,7 +4,7 @@ on:
   push:
 
 jobs:
-  weaviate_service_tests:
+  weaviate_service_tests_no_embedding:
     runs-on: ubuntu-latest
 
     steps:
@@ -14,7 +14,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install dependencies
         run: |
@@ -22,39 +22,76 @@ jobs:
           pip install -e .
           pip install -r requirements_test.txt
 
-      - name: Check required tokens
-        id: token_check
+      - name: Validate CI test environment
         env:
           PERSONAL_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
           PERSONAL_TOKEN2: ${{ secrets.PERSONAL_TOKEN2 }}
           PERSONAL_TOKEN3: ${{ secrets.PERSONAL_TOKEN3 }}
+          USER1_WS: ${{ vars.USER1_WS }}
+          USER2_WS: ${{ vars.USER2_WS }}
+          USER3_WS: ${{ vars.USER3_WS }}
+          WEAVIATE_TEST_NAMESPACE: noembed-${{ github.run_id }}-${{ github.run_attempt }}
+          WEAVIATE_TEST_ENABLE_EMBEDDING: "false"
         run: |
-          missing=0
-          for token_name in PERSONAL_TOKEN PERSONAL_TOKEN2 PERSONAL_TOKEN3; do
-            if [ -z "${!token_name}" ]; then
-              echo "Missing secret: $token_name"
-              missing=1
-            fi
-          done
-
-          if [ "$missing" -eq 1 ]; then
-            echo "run_tests=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "run_tests=true" >> "$GITHUB_OUTPUT"
-          fi
+          python scripts/validate_weaviate_ci_env.py
 
       - name: Run weaviate_service test suite
-        if: steps.token_check.outputs.run_tests == 'true'
         env:
           PERSONAL_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
           PERSONAL_TOKEN2: ${{ secrets.PERSONAL_TOKEN2 }}
           PERSONAL_TOKEN3: ${{ secrets.PERSONAL_TOKEN3 }}
+          USER1_WS: ${{ vars.USER1_WS }}
+          USER2_WS: ${{ vars.USER2_WS }}
+          USER3_WS: ${{ vars.USER3_WS }}
           HYPHA_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
-          WEAVIATE_TEST_ENABLE_EMBEDDING: "true"
+          WEAVIATE_TEST_NAMESPACE: noembed-${{ github.run_id }}-${{ github.run_attempt }}
+          WEAVIATE_TEST_ENABLE_EMBEDDING: "false"
         run: |
           pytest tests/weaviate_service -v
 
-      - name: Skip summary
-        if: steps.token_check.outputs.run_tests != 'true'
+  weaviate_service_tests_embedding_guarded:
+    needs: weaviate_service_tests_no_embedding
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
         run: |
-          echo "Skipping weaviate_service tests because required secrets are missing."
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install -r requirements_test.txt
+
+      - name: Validate CI embedding test environment
+        env:
+          PERSONAL_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
+          PERSONAL_TOKEN2: ${{ secrets.PERSONAL_TOKEN2 }}
+          PERSONAL_TOKEN3: ${{ secrets.PERSONAL_TOKEN3 }}
+          USER1_WS: ${{ vars.USER1_WS }}
+          USER2_WS: ${{ vars.USER2_WS }}
+          USER3_WS: ${{ vars.USER3_WS }}
+          WEAVIATE_TEST_NAMESPACE: embed-${{ github.run_id }}-${{ github.run_attempt }}
+          WEAVIATE_TEST_ENABLE_EMBEDDING: "true"
+        run: |
+          python scripts/validate_weaviate_ci_env.py
+
+      - name: Run guarded embedding test suite
+        env:
+          PERSONAL_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
+          PERSONAL_TOKEN2: ${{ secrets.PERSONAL_TOKEN2 }}
+          PERSONAL_TOKEN3: ${{ secrets.PERSONAL_TOKEN3 }}
+          USER1_WS: ${{ vars.USER1_WS }}
+          USER2_WS: ${{ vars.USER2_WS }}
+          USER3_WS: ${{ vars.USER3_WS }}
+          HYPHA_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
+          WEAVIATE_TEST_NAMESPACE: embed-${{ github.run_id }}-${{ github.run_attempt }}
+          WEAVIATE_TEST_ENABLE_EMBEDDING: "true"
+        run: |
+          python scripts/run_weaviate_embedding_tests_guarded.py \
+            --tests-path tests/weaviate_service
