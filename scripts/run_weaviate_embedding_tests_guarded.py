@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import subprocess
 import sys
 import time
 from dataclasses import dataclass
@@ -34,6 +35,9 @@ OOM_FAILURE_MARKERS = (
     "llama runner process has terminated",
     "connection to ollama api failed",
 )
+EXIT_SUCCESS = 0
+EXIT_FAILURE = 1
+EXIT_OOM_WARNING = 42
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +60,14 @@ class OllamaProbeConfig:
 
     endpoint: str
     model: str
+
+
+@dataclass(frozen=True)
+class TestRunResult:
+    """Represent a single test execution result."""
+
+    exit_code: int
+    is_oom_failure: bool
 
 
 def _collect_test_node_ids(tests_path: str) -> list[str]:
@@ -149,10 +161,92 @@ def _wait_for_ollama_capacity(
     raise TimeoutError(error_msg)
 
 
-def _run_single_test(node_id: str) -> int:
-    """Run a single pytest node and return process-like exit code."""
-    exit_code = pytest.main(["-v", node_id])
-    return int(exit_code)
+def _contains_oom_marker(output_text: str) -> bool:
+    """Return True when output includes known OOM/capacity signals."""
+    lowered_text = output_text.lower()
+    return any(marker in lowered_text for marker in OOM_FAILURE_MARKERS)
+
+
+def _run_single_test(node_id: str) -> TestRunResult:
+    """Run one pytest node in subprocess and detect OOM markers."""
+    completed_process = subprocess.run(
+        [sys.executable, "-m", "pytest", "-v", node_id],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    combined_output = (
+        f"{completed_process.stdout}\n{completed_process.stderr}"
+    )
+    has_oom_marker = _contains_oom_marker(combined_output)
+    is_oom_failure = completed_process.returncode != 0 and has_oom_marker
+    return TestRunResult(
+        exit_code=completed_process.returncode,
+        is_oom_failure=is_oom_failure,
+    )
+
+
+def _wait_for_capacity_or_mark_oom(
+    node_id: str,
+    probe_config: OllamaProbeConfig,
+    max_wait_seconds: int,
+    probe_interval_seconds: int,
+) -> bool:
+    """Wait for capacity and return False when timeout should be OOM-only."""
+    try:
+        _wait_for_ollama_capacity(
+            config=probe_config,
+            max_wait_seconds=max_wait_seconds,
+            probe_interval_seconds=probe_interval_seconds,
+        )
+        return True
+    except TimeoutError:
+        logger.warning(
+            "Skipping %s due to embedding backend capacity timeout",
+            node_id,
+        )
+        return False
+
+
+def _run_node_with_retries(
+    node_id: str,
+    probe_config: OllamaProbeConfig,
+    max_wait_seconds: int,
+    probe_interval_seconds: int,
+    max_oom_retries: int,
+) -> str:
+    """Run one node with OOM-aware retries.
+
+    Returns one of: "passed", "oom", "failed".
+    """
+    attempts = max(max_oom_retries, 0) + 1
+    for attempt_index in range(attempts):
+        run_result = _run_single_test(node_id)
+        if run_result.exit_code == 0:
+            return "passed"
+
+        if not run_result.is_oom_failure:
+            return "failed"
+
+        is_last_attempt = attempt_index == (attempts - 1)
+        if is_last_attempt:
+            return "oom"
+
+        logger.warning("OOM detected for %s, retrying...", node_id)
+        has_capacity = _wait_for_capacity_or_mark_oom(
+            node_id=node_id,
+            probe_config=probe_config,
+            max_wait_seconds=max_wait_seconds,
+            probe_interval_seconds=probe_interval_seconds,
+        )
+        if not has_capacity:
+            logger.warning(
+                "OOM retry wait timed out for %s, marking as OOM-only",
+                node_id,
+            )
+            return "oom"
+
+    return "failed"
 
 
 def _run_guarded_tests(
@@ -163,39 +257,57 @@ def _run_guarded_tests(
     max_oom_retries: int,
 ) -> int:
     """Run tests sequentially with Ollama readiness checks."""
-    failed_node_ids: list[str] = []
+    oom_only_failed_node_ids: list[str] = []
+    non_oom_failed_node_ids: list[str] = []
+
     for index, node_id in enumerate(node_ids, start=1):
         logger.info("[%s/%s] Running %s", index, len(node_ids), node_id)
-        _wait_for_ollama_capacity(
-            config=probe_config,
+        has_capacity = _wait_for_capacity_or_mark_oom(
+            node_id=node_id,
+            probe_config=probe_config,
             max_wait_seconds=max_wait_seconds,
             probe_interval_seconds=probe_interval_seconds,
         )
+        if not has_capacity:
+            oom_only_failed_node_ids.append(node_id)
+            continue
 
-        attempts = max(max_oom_retries, 0) + 1
-        for _ in range(attempts):
-            return_code = _run_single_test(node_id)
-            if return_code == 0:
-                break
-            _wait_for_ollama_capacity(
-                config=probe_config,
-                max_wait_seconds=max_wait_seconds,
-                probe_interval_seconds=probe_interval_seconds,
-            )
-        else:
-            failed_node_ids.append(node_id)
-
-    if failed_node_ids:
-        logger.error(
-            "Guarded embedding run failed for %s test(s):",
-            len(failed_node_ids),
+        node_outcome = _run_node_with_retries(
+            node_id=node_id,
+            probe_config=probe_config,
+            max_wait_seconds=max_wait_seconds,
+            probe_interval_seconds=probe_interval_seconds,
+            max_oom_retries=max_oom_retries,
         )
-        for node_id in failed_node_ids:
+        if node_outcome == "passed":
+            continue
+        if node_outcome == "oom":
+            oom_only_failed_node_ids.append(node_id)
+            continue
+        if node_outcome == "failed":
+            non_oom_failed_node_ids.append(node_id)
+
+    if non_oom_failed_node_ids:
+        logger.error(
+            "Guarded embedding run failed (non-OOM) for %s test(s):",
+            len(non_oom_failed_node_ids),
+        )
+        for node_id in non_oom_failed_node_ids:
             logger.error("- %s", node_id)
-        return 1
+        return EXIT_FAILURE
+
+    if oom_only_failed_node_ids:
+        logger.warning(
+            "Guarded embedding run encountered OOM/capacity failures for "
+            "%s test(s):",
+            len(oom_only_failed_node_ids),
+        )
+        for node_id in oom_only_failed_node_ids:
+            logger.warning("- %s", node_id)
+        return EXIT_OOM_WARNING
 
     logger.info("Guarded embedding run passed for %s test(s)", len(node_ids))
-    return 0
+    return EXIT_SUCCESS
 
 
 def main() -> int:
