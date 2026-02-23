@@ -123,26 +123,25 @@ async def shared_weaviate_service_id() -> AsyncGenerator[str, None]:
     # Since app.py just calls functions from hypha_startup_services, we can use those directly
     # OR import app properly. Let's import app using importlib due to the path.
     app_path = os.path.join(
-        os.path.dirname(__file__), "../../weaviate-app/app.py"
+        os.path.dirname(__file__),
+        "../../weaviate-app/app.py",
     )
 
     for retry_index in range(SERVICE_REGISTRATION_RETRIES):
         service_id_candidate = (
-            f"{service_id_base}-{retry_index}"
-            if retry_index > 0
-            else service_id_base
+            f"{service_id_base}-{retry_index}" if retry_index > 0 else service_id_base
         )
-        
+
         try:
             spec = importlib.util.spec_from_file_location("weaviate_app", app_path)
             if spec and spec.loader:
                 weaviate_app = importlib.util.module_from_spec(spec)
                 sys.modules["weaviate_app"] = weaviate_app
                 spec.loader.exec_module(weaviate_app)
-                
+
                 # Override service ID via env var
                 os.environ["WEAVIATE_SERVICE_ID"] = service_id_candidate
-                
+
                 # Run setup
                 await weaviate_app.setup(server)
 
@@ -151,7 +150,7 @@ async def shared_weaviate_service_id() -> AsyncGenerator[str, None]:
                     f"{service_id_candidate}"
                 )
             else:
-                 # Fallback if app import fails (shouldn't happen)
+                # Fallback if app import fails (shouldn't happen)
                 await register_weaviate(server, service_id_candidate)
                 full_service_id = (
                     f"{server.config.workspace}/{server.config.client_id}:"
@@ -164,7 +163,6 @@ async def shared_weaviate_service_id() -> AsyncGenerator[str, None]:
             # print(f"Registration failed for {service_id_candidate}: {e}")
             await asyncio.sleep(REGISTRATION_LOOKUP_SLEEP_SECONDS)
             continue
-
 
         try:
             await wait_for_service(
@@ -181,7 +179,7 @@ async def shared_weaviate_service_id() -> AsyncGenerator[str, None]:
             break
     else:
         if last_error is not None:
-             raise last_error
+            raise last_error
         error_msg = "Failed to register and resolve shared Weaviate test service"
         raise RuntimeError(error_msg)
 

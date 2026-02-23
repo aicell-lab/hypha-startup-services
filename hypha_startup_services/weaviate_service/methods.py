@@ -62,7 +62,6 @@ from .utils.service_utils import (
     get_permitted_collection,
     prepare_application_creation,
     prepare_tenant_collection,
-    ws_app_exists,
 )
 
 if TYPE_CHECKING:
@@ -122,7 +121,7 @@ async def _run_with_schema_retry(
     for _ in range(SCHEMA_OPERATION_RETRIES):
         try:
             return await operation()
-        except Exception as error:  # noqa: BLE001
+        except Exception as error:
             error_message = str(error).lower()
             if not _is_transient_schema_error(error_message):
                 raise
@@ -502,7 +501,9 @@ async def applications_delete(
 
     full_collection_name = get_full_collection_name(collection_name)
     caller_ws = ws_from_context(context)
-    await delete_application_artifact(full_collection_name, application_id, caller_ws, server=server)
+    await delete_application_artifact(
+        full_collection_name, application_id, caller_ws, server=server
+    )
 
     return result
 
@@ -706,7 +707,6 @@ async def applications_set_permissions(
         config={"permissions": updated_permissions},
         server=server,
     )
-
 
 
 async def data_insert_many(

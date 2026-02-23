@@ -135,8 +135,7 @@ async def test_collection_query_hybrid(weaviate_service: RemoteService) -> None:
 
     # Results should be relevant to the query
     assert any(
-        "Science Fiction" in _genre_from_result_object(obj)
-        for obj in result["objects"]
+        "Science Fiction" in _genre_from_result_object(obj) for obj in result["objects"]
     )
 
 
@@ -224,10 +223,7 @@ async def test_collection_query_near_vector(weaviate_service: RemoteService) -> 
 
     if embedding_enabled():
         assert all(
-            (
-                "description_vector" in obj["vector"]
-                and "title_vector" in obj["vector"]
-            )
+            ("description_vector" in obj["vector"] and "title_vector" in obj["vector"])
             for obj in result["objects"]
         )
     else:

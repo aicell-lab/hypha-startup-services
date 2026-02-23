@@ -129,9 +129,7 @@ def _probe_ollama_embedding(config: OllamaProbeConfig) -> tuple[bool, str]:
     response_text = raw_response_body.lower()
     has_oom_marker = any(marker in response_text for marker in OOM_FAILURE_MARKERS)
     status_code = int(response.status)
-    is_success_status = (
-        HTTP_SUCCESS_STATUS_MIN <= status_code < HTTP_SUCCESS_STATUS_MAX
-    )
+    is_success_status = HTTP_SUCCESS_STATUS_MIN <= status_code < HTTP_SUCCESS_STATUS_MAX
     if is_success_status and not has_oom_marker:
         return True, "Embedding backend probe succeeded"
 
@@ -175,9 +173,7 @@ def _run_single_test(node_id: str) -> TestRunResult:
         text=True,
         check=False,
     )
-    combined_output = (
-        f"{completed_process.stdout}\n{completed_process.stderr}"
-    )
+    combined_output = f"{completed_process.stdout}\n{completed_process.stderr}"
     has_oom_marker = _contains_oom_marker(combined_output)
     is_oom_failure = completed_process.returncode != 0 and has_oom_marker
     return TestRunResult(
