@@ -22,8 +22,7 @@ from hypha_startup_services.weaviate_service.service_codecs import (
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-DEFAULT_DEV_SERVICE_ID = "weaviate-dev"
-DEV_SERVICE_PREFIX = "weaviate-dev-"
+LOCAL_DEV_SERVICE_ID = "weaviate-dev-local"
 
 if TYPE_CHECKING:
     from hypha_rpc.rpc import RemoteService
@@ -34,36 +33,28 @@ class _HyphaApiProtocol(Protocol):
         """Export app methods to Hypha."""
 
 
-def _extract_dev_service_id_from_app_id(app_id: str) -> str | None:
-    """Extract branch-specific dev service id from a qualified app id."""
-    normalized_app_id = app_id.strip()
-    if not normalized_app_id:
-        return None
-
-    if "/" in normalized_app_id:
-        normalized_app_id = normalized_app_id.rsplit("/", maxsplit=1)[1]
-
-    if ":" in normalized_app_id:
-        normalized_app_id = normalized_app_id.rsplit(":", maxsplit=1)[1]
-
-    if normalized_app_id.startswith(DEV_SERVICE_PREFIX):
-        return normalized_app_id
-    return None
-
-
 def _resolve_dev_service_id() -> str:
     """Resolve a dev service id without interfering with production."""
     configured_service_id = os.environ.get("WEAVIATE_SERVICE_ID")
     if configured_service_id:
+        if configured_service_id == "weaviate-dev":
+            logger.warning(
+                "WEAVIATE_SERVICE_ID should not be bare 'weaviate-dev'; "
+                "using %s instead.",
+                LOCAL_DEV_SERVICE_ID,
+            )
+            return LOCAL_DEV_SERVICE_ID
         return configured_service_id
 
     app_id = os.environ.get("HYPHA_APP_ID")
     if app_id:
-        extracted_service_id = _extract_dev_service_id_from_app_id(app_id)
-        if extracted_service_id:
-            return extracted_service_id
+        return app_id
 
-    return DEFAULT_DEV_SERVICE_ID
+    logger.warning(
+        "HYPHA_APP_ID is missing in dev app runtime; falling back to %s.",
+        LOCAL_DEV_SERVICE_ID,
+    )
+    return LOCAL_DEV_SERVICE_ID
 
 
 async def setup(server: RemoteService) -> None:
