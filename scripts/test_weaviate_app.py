@@ -3,7 +3,10 @@ import asyncio
 import sys
 from collections.abc import Sequence
 
-from scripts.hypha_connection import connect_with_fallback
+try:
+    from scripts.hypha_connection import connect_with_fallback
+except ModuleNotFoundError:
+    from hypha_connection import connect_with_fallback
 
 
 def _build_candidate_service_ids(

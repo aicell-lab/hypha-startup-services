@@ -6,7 +6,10 @@ import os
 from pathlib import Path
 from typing import Mapping
 
-from scripts.hypha_connection import connect_with_fallback
+try:
+    from scripts.hypha_connection import connect_with_fallback
+except ModuleNotFoundError:
+    from hypha_connection import connect_with_fallback
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)

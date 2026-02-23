@@ -16,7 +16,10 @@ from dataclasses import dataclass
 from http.client import HTTPSConnection
 from urllib.parse import urlparse
 
-from scripts.hypha_connection import connect_with_fallback
+try:
+    from scripts.hypha_connection import connect_with_fallback
+except ModuleNotFoundError:
+    from hypha_connection import connect_with_fallback
 
 DEFAULT_SERVER_URL = "https://hypha.aicell.io"
 SERVER_URL_ENV_VAR = "HYPHA_SERVER_URL"
