@@ -1,0 +1,83 @@
+name: Weaviate App Cleanup
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  cleanup-dev-app:
+    runs-on: ubuntu-latest
+    env:
+      HYPHA_SERVER_URL: ${{ secrets.HYPHA_SERVER_URL }}
+      HYPHA_WORKSPACE: ${{ secrets.HYPHA_WORKSPACE || 'hypha-agents' }}
+      HYPHA_TOKEN: ${{ secrets.HYPHA_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install hypha-rpc
+
+      - name: Calculate App ID
+        id: app_id
+        run: |
+          # Same logic as dev deploy to find the correct ID
+          # We need app_utils so checkout is required
+          BRANCH_SLUG=$(python3 -c "from scripts.app_utils import get_branch_slug; import os; print(get_branch_slug('${{ github.head_ref }}'))")
+          echo "app_id=weaviate-dev-$BRANCH_SLUG" >> $GITHUB_OUTPUT
+
+      - name: Uninstall Dev App
+        continue-on-error: true
+        shell: python
+        run: |
+            import asyncio
+            import os
+            import sys
+            import logging
+            from hypha_rpc import connect_to_server
+
+            # Setup basic logging
+            logging.basicConfig(level=logging.INFO)
+            logger = logging.getLogger(__name__)
+
+            async def main():
+                server_url = os.environ.get("HYPHA_SERVER_URL")
+                token = os.environ.get("HYPHA_TOKEN")
+                app_id = "${{ steps.app_id.outputs.app_id }}"
+                
+                if not server_url or not token:
+                    logger.error("Missing HYPHA_SERVER_URL or HYPHA_TOKEN")
+                    sys.exit(1)
+
+                try:
+                    client = await connect_to_server({"server_url": server_url, "token": token})
+                    server_apps = await client.get_service("public/server-apps")
+                    
+                    logger.info(f"Stopping app {app_id}...")
+                    try:
+                        await server_apps.stop(app_id)
+                        logger.info(f"App {app_id} stopped.")
+                    except Exception as e:
+                        logger.warning(f"Could not stop app {app_id}: {e}")
+
+                    logger.info(f"Uninstalling app {app_id}...")
+                    try:
+                        await server_apps.uninstall(app_id)
+                        logger.info(f"App {app_id} uninstalled.")
+                    except Exception as e:
+                         # If it fails, maybe it wasn't installed
+                        logger.warning(f"Could not uninstall app {app_id}: {e}")
+
+                except Exception as e:
+                    logger.error(f"Failed to connect or perform cleanup: {e}")
+                    # Non-fatal - we don't fail the workflow for cleanup
+                    sys.exit(0)
+
+            if __name__ == "__main__":
+                asyncio.run(main())
