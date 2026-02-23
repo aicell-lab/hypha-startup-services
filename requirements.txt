@@ -3,7 +3,7 @@ pydantic==2.12.3
 weaviate-client==4.19.4
 setuptools==80.9.0
 hypha==0.21.29
-hypha-rpc==0.20.86
+hypha-rpc==0.21.15
 python-dotenv==1.1.1
 markdownify==1.2.0
 redis==7.1.0
