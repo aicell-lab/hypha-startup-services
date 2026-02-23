@@ -22,17 +22,24 @@ def _build_candidate_service_ids(
 async def _get_first_resolvable_service(
     client,
     candidate_service_ids: Sequence[str],
+    *,
+    retries: int,
+    sleep_seconds: float,
 ):
     """Resolve and return the first service id that exists."""
     last_error: Exception | None = None
-    for service_id in candidate_service_ids:
-        try:
-            service = await client.get_service(service_id)
-        except Exception as error:  # noqa: BLE001
-            last_error = error
-            continue
-        print(f"Service {service_id} found.")
-        return service
+    for retry_index in range(retries):
+        for service_id in candidate_service_ids:
+            try:
+                service = await client.get_service(service_id)
+            except Exception as error:  # noqa: BLE001
+                last_error = error
+                continue
+            print(f"Service {service_id} found.")
+            return service
+
+        if retry_index < retries - 1:
+            await asyncio.sleep(sleep_seconds)
 
     if last_error is not None:
         raise last_error
@@ -44,6 +51,9 @@ async def main(
     app_id: str,
     token: str | None,
     service_ids: Sequence[str],
+    *,
+    retries: int,
+    sleep_seconds: float,
 ) -> None:
     try:
         client = await connect_with_fallback(server_url=server_url, token=token)
@@ -54,7 +64,12 @@ async def main(
     candidate_service_ids = _build_candidate_service_ids(app_id, service_ids)
     print(f"Checking candidate services: {candidate_service_ids}")
     try:
-        svc = await _get_first_resolvable_service(client, candidate_service_ids)
+        svc = await _get_first_resolvable_service(
+            client,
+            candidate_service_ids,
+            retries=retries,
+            sleep_seconds=sleep_seconds,
+        )
 
         # Check basic method
         if hasattr(svc.collections, "list_all"):
@@ -81,6 +96,18 @@ if __name__ == "__main__":
         default=[],
         help="Additional service id candidates to check.",
     )
+    parser.add_argument(
+        "--retries",
+        type=int,
+        default=30,
+        help="Number of retries when resolving service.",
+    )
+    parser.add_argument(
+        "--sleep-seconds",
+        type=float,
+        default=2.0,
+        help="Delay between service-resolution retries.",
+    )
     args = parser.parse_args()
 
     asyncio.run(
@@ -89,5 +116,7 @@ if __name__ == "__main__":
             args.app_id,
             args.token,
             args.service_id,
+            retries=args.retries,
+            sleep_seconds=args.sleep_seconds,
         ),
     )

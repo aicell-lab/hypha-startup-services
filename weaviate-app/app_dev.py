@@ -34,6 +34,23 @@ class _HyphaApiProtocol(Protocol):
         """Export app methods to Hypha."""
 
 
+def _extract_dev_service_id_from_app_id(app_id: str) -> str | None:
+    """Extract branch-specific dev service id from a qualified app id."""
+    normalized_app_id = app_id.strip()
+    if not normalized_app_id:
+        return None
+
+    if "/" in normalized_app_id:
+        normalized_app_id = normalized_app_id.rsplit("/", maxsplit=1)[1]
+
+    if ":" in normalized_app_id:
+        normalized_app_id = normalized_app_id.rsplit(":", maxsplit=1)[1]
+
+    if normalized_app_id.startswith(DEV_SERVICE_PREFIX):
+        return normalized_app_id
+    return None
+
+
 def _resolve_dev_service_id() -> str:
     """Resolve a dev service id without interfering with production."""
     configured_service_id = os.environ.get("WEAVIATE_SERVICE_ID")
@@ -41,8 +58,10 @@ def _resolve_dev_service_id() -> str:
         return configured_service_id
 
     app_id = os.environ.get("HYPHA_APP_ID")
-    if app_id and app_id.startswith(DEV_SERVICE_PREFIX):
-        return app_id
+    if app_id:
+        extracted_service_id = _extract_dev_service_id_from_app_id(app_id)
+        if extracted_service_id:
+            return extracted_service_id
 
     return DEFAULT_DEV_SERVICE_ID
 

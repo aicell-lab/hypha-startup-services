@@ -58,7 +58,8 @@ jobs:
             --token "$HYPHA_TOKEN" \
             --app-id "${{ steps.app_id.outputs.app_id }}" \
             --service-id "${{ steps.app_id.outputs.app_id }}" \
-            --service-id "weaviate-dev"
+            --retries 30 \
+            --sleep-seconds 2
 
       - name: Notify Slack on Failure
         if: failure()
