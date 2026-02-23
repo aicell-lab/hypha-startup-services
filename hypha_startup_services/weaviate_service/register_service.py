@@ -62,7 +62,7 @@ async def register_weaviate(
     await register_weaviate_service(server, client, service_id)
 
 
-async def get_weaviate_service_def(
+def get_weaviate_service_def(
     server: RemoteService,
     client: WeaviateAsyncClient,
     service_id: str,
@@ -89,7 +89,11 @@ async def get_weaviate_service_def(
             "get": partial(applications_get, client, server=server),
             "exists": partial(applications_exists, client, server=server),
             "get_artifact": partial(applications_get_artifact, client, server=server),
-            "set_permissions": partial(applications_set_permissions, client, server=server),
+            "set_permissions": partial(
+                applications_set_permissions,
+                client,
+                server=server,
+            ),
         },
         "data": {
             "insert_many": partial(data_insert_many, client, server=server),
@@ -119,7 +123,7 @@ async def register_weaviate_service(
 
     Sets up all service endpoints for collections, data operations, and queries.
     """
-    service_def = await get_weaviate_service_def(server, client, service_id)
+    service_def = get_weaviate_service_def(server, client, service_id)
     await server.register_service(service_def)
 
     logger.info(

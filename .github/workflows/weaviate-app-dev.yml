@@ -45,7 +45,7 @@ jobs:
             --server-url "$HYPHA_SERVER_URL" \
             --token "$HYPHA_TOKEN" \
             --app-id "${{ steps.app_id.outputs.app_id }}" \
-            --source "weaviate-app/app.py" \
+            --source "weaviate-app/app_dev.py" \
             --manifest "weaviate-app/manifest.yaml" \
             --non-fatal-start
 
@@ -56,7 +56,9 @@ jobs:
           python3 scripts/test_weaviate_app.py \
             --server-url "$HYPHA_SERVER_URL" \
             --token "$HYPHA_TOKEN" \
-            --app-id "${{ steps.app_id.outputs.app_id }}"
+            --app-id "${{ steps.app_id.outputs.app_id }}" \
+            --service-id "${{ steps.app_id.outputs.app_id }}" \
+            --service-id "weaviate-dev"
 
       - name: Notify Slack on Failure
         if: failure()

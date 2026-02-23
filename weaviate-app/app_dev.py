@@ -1,4 +1,4 @@
-"""Hypha app entrypoint for the production Weaviate service."""
+"""Hypha app entrypoint for development Weaviate services."""
 
 from __future__ import annotations
 
@@ -19,11 +19,11 @@ from hypha_startup_services.weaviate_service.service_codecs import (
     register_weaviate_codecs,
 )
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-DEFAULT_PROD_SERVICE_ID = "weaviate"
+DEFAULT_DEV_SERVICE_ID = "weaviate-dev"
+DEV_SERVICE_PREFIX = "weaviate-dev-"
 
 if TYPE_CHECKING:
     from hypha_rpc.rpc import RemoteService
@@ -34,18 +34,23 @@ class _HyphaApiProtocol(Protocol):
         """Export app methods to Hypha."""
 
 
-def _resolve_service_id(*, default_service_id: str) -> str:
-    """Resolve service id from environment with a stable default."""
+def _resolve_dev_service_id() -> str:
+    """Resolve a dev service id without interfering with production."""
     configured_service_id = os.environ.get("WEAVIATE_SERVICE_ID")
     if configured_service_id:
         return configured_service_id
-    return default_service_id
+
+    app_id = os.environ.get("HYPHA_APP_ID")
+    if app_id and app_id.startswith(DEV_SERVICE_PREFIX):
+        return app_id
+
+    return DEFAULT_DEV_SERVICE_ID
 
 
 async def setup(server: RemoteService) -> None:
-    """Run the Weaviate service app setup."""
-    service_id = _resolve_service_id(default_service_id=DEFAULT_PROD_SERVICE_ID)
-    logger.info("Setting up Weaviate service app with ID: %s", service_id)
+    """Run the Weaviate service app setup for development deployments."""
+    service_id = _resolve_dev_service_id()
+    logger.info("Setting up dev Weaviate service app with ID: %s", service_id)
 
     register_weaviate_codecs(server)
     logger.info("Registered Weaviate codecs")
@@ -55,7 +60,7 @@ async def setup(server: RemoteService) -> None:
 
     service_def = get_weaviate_service_def(server, client, service_id)
     await server.register_service(service_def)
-    logger.info("Registered Weaviate service with ID: %s", service_id)
+    logger.info("Registered dev Weaviate service with ID: %s", service_id)
 
 
 if hypha_api is not None:
@@ -63,7 +68,7 @@ if hypha_api is not None:
     typed_hypha_api.export(
         {
             "id": "weaviate-app-loader",
-            "name": "Weaviate App Loader",
+            "name": "Weaviate App Loader (Dev)",
             "setup": setup,
         },
     )
