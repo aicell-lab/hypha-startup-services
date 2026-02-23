@@ -1,9 +1,10 @@
 
-import os
-import sys
 import argparse
 import asyncio
 import logging
+import os
+from pathlib import Path
+
 from hypha_rpc import connect_to_server
 
 # Setup logging
@@ -21,6 +22,12 @@ async def deploy_app(server_url, token, app_id, source_path, manifest_path):
     import yaml
     with open(manifest_path, "r") as f:
         manifest_data = yaml.safe_load(f)
+
+    if not manifest_data.get("type"):
+        manifest_data["type"] = "hypha"
+
+    source_entry_point = Path(source_path).name
+    manifest_data["entry_point"] = source_entry_point
 
     # Inject current git branch if in CI
     # This ensures the app uses the code from the PR/branch being tested

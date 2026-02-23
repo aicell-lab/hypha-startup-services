@@ -9,6 +9,7 @@ docs:
   entry_point: app.py
 
 format_version: 0.2.0
+type: hypha
 version: 0.1.0
 maintainers:
   - name: AICell Lab

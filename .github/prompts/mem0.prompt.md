@@ -5,11 +5,7 @@ with Weaviate as the backend storage and Hypha RPC as the out-facing API.
 The first use case is to store and query the EuroBioImaging nodes and technologies data.
 
 # Running tests
-- Before running the tests, if the weaviate server is not running, use `docker compose up`:
-```bash
-docker compose -f docker/docker-compose.yaml up
-```
-- Then start the Hypha RPC service:
+- Start the Hypha RPC service:
 ```bash
 python -m hypha_startup_services [mem0, mem0-bioimage, weaviate, weaviate-bioimage] --local
 ```
@@ -41,7 +37,6 @@ python -m hypha_startup_services [mem0, mem0-bioimage, weaviate, weaviate-bioima
 - - mem0_client has configuration for the mem0_client
 - - methods are the methods for the mem0 service Hypha RPC API
 - - register_service defines the Hypha RPC service API
-- docker/docker-compose.yaml defines the Docker Compose setup for the Weaviate store
 - examples/*.py contains example scripts to ingest BioImaging data into the Mem0
 - examples/ebi-nodes.json contains the EuroBioImaging nodes data
 - examples/ebi-tech.json contains the EuroBioImaging technologies data
@@ -59,8 +54,6 @@ python -m hypha_startup_services [mem0, mem0-bioimage, weaviate, weaviate-bioima
 
 # Documentation
 - Weaviate documentation: https://weaviate.io/developers/weaviate
-- - In particular:
-1. [Docker compose](https://weaviate.io/developers/weaviate/installation/docker-compose)
 - Hypha RPC documentation: https://docs.amun.ai/#/hypha-rpc
 - - Also, its artifact manager: https://docs.amun.ai/#/artifact-manager
 - Mem0 documentation: https://docs.mem0.ai/open-source/quickstart

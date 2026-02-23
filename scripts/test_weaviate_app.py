@@ -1,10 +1,10 @@
-
 import argparse
 import asyncio
 import sys
 from collections.abc import Sequence
 
 from hypha_rpc import connect_to_server
+
 
 def _build_candidate_service_ids(
     app_id: str,
@@ -55,19 +55,20 @@ async def main(
     print(f"Checking candidate services: {candidate_service_ids}")
     try:
         svc = await _get_first_resolvable_service(client, candidate_service_ids)
-        
+
         # Check basic method
-        if hasattr(svc.collections, 'list_all'):
+        if hasattr(svc.collections, "list_all"):
             colls = await svc.collections.list_all()
             print(f"Collections list: {colls}")
         else:
             print("Warning: collections.list_all method not found.")
-            
+
         print("Health check passed.")
-        
+
     except Exception as e:
         print(f"Health check failed: {e}")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

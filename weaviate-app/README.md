@@ -4,7 +4,7 @@ This application provides the Weaviate service interface for the Hypha RPC frame
 
 ## Prerequisites
 
-- A running Weaviate instance (e.g., via Docker Compose)
+- A running Weaviate instance
 - Hypha server access
 
 ## Configuration
@@ -24,21 +24,17 @@ The application expects the following environment variables to be set in the run
 
 To run the app locally:
 
-1. Start Weaviate:
-   ```bash
-   cd ../docker
-   docker-compose up -d
-   ```
+1. Run the app loader (simulating Hypha environment):
 
-2. Run the app loader (simulating Hypha environment):
-   ```bash
-   # Make sure dependencies are installed
-   pip install -r ../requirements.txt
-   
-   # Run app
-   python app.py
-   ```
-   *Note: Running `python app.py` directly won't register the service with a remote Hypha server unless you wrap it with a Hypha client connection script. See `scripts/deploy_weaviate_app.py` for deployment.*
+  ```bash
+  # Make sure dependencies are installed
+  pip install -r ../requirements.txt
+
+  # Run app
+  python app.py
+  ```
+
+  *Note: Running `python app.py` directly won't register the service with a remote Hypha server unless you wrap it with a Hypha client connection script. See `scripts/deploy_weaviate_app.py` for deployment.*
 
 ## Deployment
 

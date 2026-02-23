@@ -56,7 +56,7 @@ Use the `values-combined.yaml` for a custom Helm chart that manages everything t
 
 ### Image Configuration
 
-Both services use the same Docker image but with different startup commands:
+Both services use the same container image but with different startup commands:
 
 - **Weaviate Service**: `hypha-startup-services weaviate remote --server-url=https://hypha.aicell.io --service-id=weaviate-production`
 - **Mem0 Service**: `hypha-startup-services mem0 remote --server-url=https://hypha.aicell.io --service-id=mem0-production`
