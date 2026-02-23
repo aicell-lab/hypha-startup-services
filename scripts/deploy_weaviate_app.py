@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 from typing import Mapping
 
-from hypha_rpc import connect_to_server
+from scripts.hypha_connection import connect_with_fallback
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -145,7 +145,10 @@ async def deploy_app(
     *,
     non_fatal_start: bool,
 ) -> None:
-    client = await connect_to_server({"server_url": server_url, "token": token})
+    client = await connect_with_fallback(
+        server_url=server_url,
+        token=token,
+    )
     
     # Read source
     with open(source_path, "r") as f:

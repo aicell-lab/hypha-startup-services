@@ -3,7 +3,7 @@ import asyncio
 import sys
 from collections.abc import Sequence
 
-from hypha_rpc import connect_to_server
+from scripts.hypha_connection import connect_with_fallback
 
 
 def _build_candidate_service_ids(
@@ -43,10 +43,7 @@ async def main(
     service_ids: Sequence[str],
 ) -> None:
     try:
-        if token:
-            client = await connect_to_server({"server_url": server_url, "token": token})
-        else:
-            client = await connect_to_server({"server_url": server_url})
+        client = await connect_with_fallback(server_url=server_url, token=token)
     except Exception as e:
         print(f"Failed to connect to server: {e}")
         sys.exit(1)

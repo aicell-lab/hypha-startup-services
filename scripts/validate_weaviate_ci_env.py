@@ -16,9 +16,10 @@ from dataclasses import dataclass
 from http.client import HTTPSConnection
 from urllib.parse import urlparse
 
-from hypha_rpc import connect_to_server
+from scripts.hypha_connection import connect_with_fallback
 
-SERVER_URL = "https://hypha.aicell.io"
+DEFAULT_SERVER_URL = "https://hypha.aicell.io"
+SERVER_URL_ENV_VAR = "HYPHA_SERVER_URL"
 EMBEDDING_ENV_VAR = "WEAVIATE_TEST_ENABLE_EMBEDDING"
 OLLAMA_ENDPOINT = "https://hypha-ollama.scilifelab-2-dev.sys.kth.se"
 REQUEST_TIMEOUT_SECONDS = 10
@@ -80,7 +81,8 @@ def _check_ollama_reachability() -> tuple[bool, str]:
 
 async def _resolve_workspace_for_token(token: str) -> str:
     """Resolve workspace ID from a Hypha token by connecting to the server."""
-    server = await connect_to_server({"server_url": SERVER_URL, "token": token})
+    server_url = os.environ.get(SERVER_URL_ENV_VAR, DEFAULT_SERVER_URL)
+    server = await connect_with_fallback(server_url=server_url, token=token)
     try:
         return str(server.config.workspace)
     finally:
