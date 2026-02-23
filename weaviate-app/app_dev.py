@@ -77,7 +77,6 @@ if hypha_api is not None:
     typed_hypha_api: _HyphaApiProtocol = hypha_api
     typed_hypha_api.export(
         {
-            "id": "weaviate-app-loader",
             "name": "Weaviate App Loader (Dev)",
             "setup": setup,
         },
