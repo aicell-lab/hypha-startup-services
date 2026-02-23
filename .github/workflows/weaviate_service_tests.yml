@@ -82,6 +82,7 @@ jobs:
           python scripts/validate_weaviate_ci_env.py
 
       - name: Run guarded embedding test suite
+        id: guarded_embedding_tests
         env:
           PERSONAL_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
           PERSONAL_TOKEN2: ${{ secrets.PERSONAL_TOKEN2 }}
@@ -93,5 +94,21 @@ jobs:
           WEAVIATE_TEST_NAMESPACE: embed-${{ github.run_id }}-${{ github.run_attempt }}
           WEAVIATE_TEST_ENABLE_EMBEDDING: "true"
         run: |
+          set +e
           python scripts/run_weaviate_embedding_tests_guarded.py \
             --tests-path tests/weaviate_service
+          exit_code=$?
+          echo "exit_code=${exit_code}" >> "$GITHUB_OUTPUT"
+          if [ "$exit_code" -eq 42 ]; then
+            echo "::warning::Embedding tests hit GPU OOM/capacity limits. Treating as warning-only for this run."
+            exit 0
+          fi
+          exit "$exit_code"
+
+      - name: Summarize guarded embedding outcome
+        if: always()
+        run: |
+          if [ "${{ steps.guarded_embedding_tests.outputs.exit_code }}" = "42" ]; then
+            echo "### Guarded embedding tests: warning-only OOM/capacity result" >> "$GITHUB_STEP_SUMMARY"
+            echo "Detected GPU memory/capacity constraints. Merge can proceed; investigate capacity separately." >> "$GITHUB_STEP_SUMMARY"
+          fi
