@@ -51,12 +51,12 @@ jobs:
 
       - name: Health Check
         run: |
-          # Wait a bit for startup
-          sleep 10
           python3 scripts/test_weaviate_app.py \
             --server-url "$HYPHA_SERVER_URL" \
             --token "$HYPHA_TOKEN" \
-            --app-id "default@${{ steps.app_id.outputs.app_id }}"
+            --app-id "default@${{ steps.app_id.outputs.app_id }}" \
+            --wait-seconds 180 \
+            --poll-seconds 6
 
       - name: Notify Slack on Failure
         if: failure()

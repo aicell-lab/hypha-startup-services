@@ -22,7 +22,7 @@ from hypha_startup_services.weaviate_service.service_codecs import (
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-LOCAL_DEV_SERVICE_ID = "weaviate-dev-local"
+DEFAULT_DEV_SERVICE_ID = "default"
 
 if TYPE_CHECKING:
     from hypha_rpc.rpc import RemoteService
@@ -34,33 +34,30 @@ class _HyphaApiProtocol(Protocol):
 
 
 def _resolve_dev_service_id() -> str:
-    """Resolve a dev service id without interfering with production."""
+    """Resolve the app-scoped dev service id."""
     configured_service_id = os.environ.get("WEAVIATE_SERVICE_ID")
     if configured_service_id:
         if configured_service_id == "weaviate-dev":
             logger.warning(
                 "WEAVIATE_SERVICE_ID should not be bare 'weaviate-dev'; "
-                "using %s instead.",
-                LOCAL_DEV_SERVICE_ID,
+                "using app-scoped '%s' instead.",
+                DEFAULT_DEV_SERVICE_ID,
             )
-            return LOCAL_DEV_SERVICE_ID
+            return DEFAULT_DEV_SERVICE_ID
         return configured_service_id
 
-    app_id = os.environ.get("HYPHA_APP_ID")
-    if app_id:
-        return app_id
-
-    logger.warning(
-        "HYPHA_APP_ID is missing in dev app runtime; falling back to %s.",
-        LOCAL_DEV_SERVICE_ID,
-    )
-    return LOCAL_DEV_SERVICE_ID
+    return DEFAULT_DEV_SERVICE_ID
 
 
 async def setup(server: RemoteService) -> None:
     """Run the Weaviate service app setup for development deployments."""
     service_id = _resolve_dev_service_id()
-    logger.info("Setting up dev Weaviate service app with ID: %s", service_id)
+    app_id = os.environ.get("HYPHA_APP_ID", "unknown-app")
+    logger.info(
+        "Setting up dev Weaviate service with ID: %s for app %s",
+        service_id,
+        app_id,
+    )
 
     register_weaviate_codecs(server)
     logger.info("Registered Weaviate codecs")

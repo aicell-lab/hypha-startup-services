@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import sys
+import time
 from collections.abc import Sequence
 
 try:
@@ -22,28 +23,44 @@ def _build_candidate_service_ids(
 async def _get_first_resolvable_service(
     client,
     candidate_service_ids: Sequence[str],
-    *,
-    retries: int,
-    sleep_seconds: float,
 ):
     """Resolve and return the first service id that exists."""
     last_error: Exception | None = None
-    for retry_index in range(retries):
-        for service_id in candidate_service_ids:
-            try:
-                service = await client.get_service(service_id)
-            except Exception as error:  # noqa: BLE001
-                last_error = error
-                continue
-            print(f"Service {service_id} found.")
-            return service
-
-        if retry_index < retries - 1:
-            await asyncio.sleep(sleep_seconds)
+    for service_id in candidate_service_ids:
+        try:
+            service = await client.get_service(service_id)
+        except Exception as error:  # noqa: BLE001
+            last_error = error
+            continue
+        print(f"Service {service_id} found.")
+        return service
 
     if last_error is not None:
         raise last_error
     raise RuntimeError("No candidate service ids provided.")
+
+
+async def _wait_for_service(
+    client,
+    candidate_service_ids: Sequence[str],
+    *,
+    wait_seconds: float,
+    poll_seconds: float,
+):
+    """Poll for service resolution until timeout."""
+    deadline = time.monotonic() + wait_seconds
+    last_error: Exception | None = None
+
+    while time.monotonic() < deadline:
+        try:
+            return await _get_first_resolvable_service(client, candidate_service_ids)
+        except Exception as error:  # noqa: BLE001
+            last_error = error
+            await asyncio.sleep(poll_seconds)
+
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError("Timed out while waiting for service resolution.")
 
 
 async def main(
@@ -51,9 +68,8 @@ async def main(
     app_id: str,
     token: str | None,
     service_ids: Sequence[str],
-    *,
-    retries: int,
-    sleep_seconds: float,
+    wait_seconds: float,
+    poll_seconds: float,
 ) -> None:
     try:
         client = await connect_with_fallback(server_url=server_url, token=token)
@@ -64,11 +80,11 @@ async def main(
     candidate_service_ids = _build_candidate_service_ids(app_id, service_ids)
     print(f"Checking candidate services: {candidate_service_ids}")
     try:
-        svc = await _get_first_resolvable_service(
+        svc = await _wait_for_service(
             client,
             candidate_service_ids,
-            retries=retries,
-            sleep_seconds=sleep_seconds,
+            wait_seconds=wait_seconds,
+            poll_seconds=poll_seconds,
         )
 
         # Check basic method
@@ -97,16 +113,16 @@ if __name__ == "__main__":
         help="Additional service id candidates to check.",
     )
     parser.add_argument(
-        "--retries",
-        type=int,
-        default=30,
-        help="Number of retries when resolving service.",
+        "--wait-seconds",
+        type=float,
+        default=120.0,
+        help="Maximum time to wait for service registration.",
     )
     parser.add_argument(
-        "--sleep-seconds",
+        "--poll-seconds",
         type=float,
-        default=2.0,
-        help="Delay between service-resolution retries.",
+        default=5.0,
+        help="Polling interval while waiting for service registration.",
     )
     args = parser.parse_args()
 
@@ -116,7 +132,7 @@ if __name__ == "__main__":
             args.app_id,
             args.token,
             args.service_id,
-            retries=args.retries,
-            sleep_seconds=args.sleep_seconds,
+            args.wait_seconds,
+            args.poll_seconds,
         ),
     )
