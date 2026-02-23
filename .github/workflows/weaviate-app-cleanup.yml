@@ -8,8 +8,8 @@ jobs:
     cleanup-dev-app:
         runs-on: ubuntu-latest
         env:
-            HYPHA_SERVER_URL: ${{ secrets.HYPHA_SERVER_URL }}
-            HYPHA_WORKSPACE: ${{ secrets.HYPHA_WORKSPACE || 'hypha-agents' }}
+            HYPHA_SERVER_URL: ${{ vars.HYPHA_SERVER_URL }}
+            HYPHA_WORKSPACE: ${{ vars.HYPHA_WORKSPACE || 'hypha-agents' }}
             HYPHA_TOKEN: ${{ secrets.HYPHA_TOKEN }}
         steps:
             - uses: actions/checkout@v4
