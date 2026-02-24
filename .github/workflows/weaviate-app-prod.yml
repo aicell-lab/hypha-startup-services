@@ -1,0 +1,64 @@
+name: Weaviate App CI (Prod)
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy-prod:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    env:
+      HYPHA_SERVER_URL: ${{ vars.HYPHA_SERVER_URL }}
+      HYPHA_WORKSPACE: ${{ vars.HYPHA_WORKSPACE || 'hypha-agents' }}
+      HYPHA_TOKEN: ${{ secrets.HYPHA_AGENTS_TOKEN }}
+      PROD_APP_ID: weaviate
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install hypha-rpc python-dotenv pyyaml
+          chmod +x scripts/*.py
+
+      - name: Deploy Prod App
+        id: deploy_prod
+        # continue-on-error: true # Removed to fail the job and trigger potential notifications
+        run: |
+          python3 scripts/deploy_weaviate_app.py \
+            --server-url "$HYPHA_SERVER_URL" \
+            --token "$HYPHA_TOKEN" \
+            --app-id "$PROD_APP_ID" \
+            --source "weaviate-app/app.py" \
+            --manifest "weaviate-app/manifest.yaml" \
+            --non-fatal-start
+
+      - name: Health Check
+        run: |
+          sleep 15
+          python3 scripts/test_weaviate_app.py \
+            --server-url "$HYPHA_SERVER_URL" \
+            --token "$HYPHA_TOKEN" \
+            --app-id "$PROD_APP_ID"
+
+      - name: Notify Slack on Failure
+        if: failure()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          if [ -n "$SLACK_WEBHOOK_URL" ]; then
+            curl -X POST -H 'Content-type: application/json' --data '{"text":"🚨 *Deployment Failed* for Weaviate App (Prod)!\nRepository: '"$GITHUB_REPOSITORY"'\nRef: '"$GITHUB_REF"'\n<'"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"'|View Run>"}' "$SLACK_WEBHOOK_URL"
+          else
+            echo "SLACK_WEBHOOK_URL not set, skipping notification."
+          fi

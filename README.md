@@ -8,6 +8,7 @@ This repository contains four main services:
 
 ### Core Services
 - **[Weaviate Service](./hypha_startup_services/weaviate_service/README.md)** - General-purpose vector database service with multi-tenant support
+  - 🆕 **[Weaviate App](./weaviate-app)** - The recommended way to deploy Weaviate service.
 - **[Mem0 Service](./hypha_startup_services/mem0_service/README.md)** - AI memory management service with persistent storage
 
 ### BioImage-Specific Services

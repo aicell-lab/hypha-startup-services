@@ -1,5 +1,6 @@
 """Instantiate and connect to Weaviate client."""
 
+import os
 from dotenv import load_dotenv
 from weaviate import WeaviateAsyncClient
 from weaviate.classes.init import AdditionalConfig
@@ -12,12 +13,20 @@ async def instantiate_and_connect() -> WeaviateAsyncClient:
     """Instantiate and connect to Weaviate client."""
     client = WeaviateAsyncClient(
         connection_params=ConnectionParams.from_params(
-            http_host="hypha-weaviate.scilifelab-2-dev.sys.kth.se",
-            http_port=443,
-            http_secure=True,
-            grpc_host="hypha-weaviate-grpc.scilifelab-2-dev.sys.kth.se",
-            grpc_port=443,
-            grpc_secure=True,
+            http_host=os.environ.get(
+                "WEAVIATE_HTTP_HOST",
+                "hypha-weaviate.scilifelab-2-dev.sys.kth.se",
+            ),
+            http_port=int(os.environ.get("WEAVIATE_HTTP_PORT", 443)),
+            http_secure=os.environ.get("WEAVIATE_HTTP_SECURE", "true").lower()
+            == "true",
+            grpc_host=os.environ.get(
+                "WEAVIATE_GRPC_HOST",
+                "hypha-weaviate-grpc.scilifelab-2-dev.sys.kth.se",
+            ),
+            grpc_port=int(os.environ.get("WEAVIATE_GRPC_PORT", 443)),
+            grpc_secure=os.environ.get("WEAVIATE_GRPC_SECURE", "true").lower()
+            == "true",
         ),
         additional_config=AdditionalConfig(
             timeout=(60, 180),  # (connection_timeout_sec, request_timeout_sec)
