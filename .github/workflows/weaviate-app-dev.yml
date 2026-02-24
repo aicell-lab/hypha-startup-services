@@ -65,13 +65,3 @@ jobs:
             --wait-seconds 180 \
             --poll-seconds 6
 
-      - name: Notify Slack on Failure
-        if: failure()
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        run: |
-          if [ -n "$SLACK_WEBHOOK_URL" ]; then
-            curl -X POST -H 'Content-type: application/json' --data '{"text":"🚨 *Deployment Failed* for Weaviate App (Dev)!\nRepository: '"$GITHUB_REPOSITORY"'\nRef: '"$GITHUB_REF"'\n<'"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"'|View Run>"}' "$SLACK_WEBHOOK_URL"
-          else
-            echo "SLACK_WEBHOOK_URL not set, skipping notification."
-          fi

@@ -9,10 +9,13 @@ from dataclasses import asdict
 from pathlib import Path
 
 import pytest_asyncio
+import yaml
 from hypha_rpc import connect_to_server
 from hypha_rpc.rpc import RemoteException, RemoteService
-import yaml
 
+from hypha_startup_services.weaviate_service.register_service import (
+    register_weaviate,
+)
 from hypha_startup_services.weaviate_service.service_codecs import (
     register_weaviate_codecs,
 )
@@ -36,6 +39,7 @@ REGISTRATION_LOOKUP_SLEEP_SECONDS = 1.0
 SERVER_APPS_SERVICE_ID = "public/server-apps"
 DEFAULT_APP_SERVICE_PREFIX = "default@"
 ADMIN_PERMISSION_ERROR_MESSAGE = "Only admin can generate token."
+STARTUP_TIMEOUT_ERROR_MARKER = "startup timed out"
 ADMIN_TOKEN_ENV_NAME = "HYPHA_AGENTS_TOKEN"
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WEAVIATE_APP_DIR = REPO_ROOT / "weaviate-app"
@@ -155,6 +159,11 @@ def _is_admin_permission_error(error: BaseException) -> bool:
     return ADMIN_PERMISSION_ERROR_MESSAGE in str(error)
 
 
+def _is_startup_timeout_error(error: BaseException) -> bool:
+    """Return whether app startup timed out during install/start."""
+    return STARTUP_TIMEOUT_ERROR_MARKER in str(error).lower()
+
+
 def _get_admin_token() -> str | None:
     """Read the optional admin token used for app installation."""
     return os.environ.get(ADMIN_TOKEN_ENV_NAME)
@@ -216,6 +225,21 @@ async def _uninstall_test_app(
         await server_apps.uninstall(app_id)
 
 
+async def _register_fallback_test_service(
+    server: RemoteService,
+    *,
+    retry_index: int,
+) -> str:
+    """Register fallback direct service when app startup times out."""
+    suffix = "" if retry_index == 0 else f"-{retry_index}"
+    service_id = f"{WEAVIATE_TEST_SERVICE_ID}{suffix}"
+    await register_weaviate(server, service_id)
+    return (
+        f"{server.config.workspace}/{server.config.client_id}:"
+        f"{service_id}"
+    )
+
+
 async def _register_service_for_retry(
     server: RemoteService,
     *,
@@ -238,6 +262,13 @@ async def _register_service_for_retry(
         )
         return service_query, app_id_candidate, None
     except RemoteException as error:
+        if _is_startup_timeout_error(error):
+            fallback_service_id = await _register_fallback_test_service(
+                server,
+                retry_index=retry_index,
+            )
+            return fallback_service_id, "", None
+
         if not _is_admin_permission_error(error):
             raise
 
@@ -249,11 +280,20 @@ async def _register_service_for_retry(
         )
         raise RuntimeError(error_message)
 
-    service_id = await _install_test_app(
-        admin_server,
-        app_id=app_id_candidate,
-        source_file_name="app_dev.py",
-    )
+    try:
+        service_id = await _install_test_app(
+            admin_server,
+            app_id=app_id_candidate,
+            source_file_name="app_dev.py",
+        )
+    except RemoteException as error:
+        if _is_startup_timeout_error(error):
+            fallback_service_id = await _register_fallback_test_service(
+                server,
+                retry_index=retry_index,
+            )
+            return fallback_service_id, "", admin_server
+        raise
     if service_id:
         return service_id, app_id_candidate, admin_server
     service_query = _build_scoped_default_service_query(

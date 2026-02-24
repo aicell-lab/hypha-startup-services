@@ -1,10 +1,9 @@
-
 import argparse
 import asyncio
 import logging
 import os
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Mapping
 
 try:
     from scripts.hypha_connection import connect_with_fallback
@@ -20,6 +19,8 @@ TRANSIENT_ERROR_MARKERS = (
     "timeout registering service built-in",
 )
 INSTALL_MAX_ATTEMPTS = 2
+APP_STARTUP_TIMEOUT_SECONDS = 300
+NON_FATAL_STARTUP_TIMEOUT_SECONDS = 60
 
 
 def _is_transient_install_error(error: Exception) -> bool:
@@ -93,51 +94,41 @@ async def _install_app(
         "source": source_code,
         "manifest": dict(manifest_data),
         "overwrite": True,
+        "wait_for_service": "default",
+        "timeout": (
+            NON_FATAL_STARTUP_TIMEOUT_SECONDS
+            if non_fatal_start
+            else APP_STARTUP_TIMEOUT_SECONDS
+        ),
     }
-    if non_fatal_start:
-        install_kwargs["wait_for_service"] = False
+    max_attempts = 1 if non_fatal_start else INSTALL_MAX_ATTEMPTS
 
-    for attempt_index in range(INSTALL_MAX_ATTEMPTS):
+    for attempt_index in range(max_attempts):
         try:
             await server_apps.install(**install_kwargs)
             return
-        except Exception as error:  # noqa: BLE001
-            is_last_attempt = attempt_index == INSTALL_MAX_ATTEMPTS - 1
-            if is_last_attempt or not _is_transient_install_error(error):
+        except Exception as error:
+            is_last_attempt = attempt_index == max_attempts - 1
+            if is_last_attempt:
+                if non_fatal_start and _is_transient_install_error(error):
+                    logger.warning(
+                        "Non-fatal install error for %s: %s",
+                        app_id,
+                        error,
+                    )
+                    return
+                raise
+            if not _is_transient_install_error(error):
                 raise
             logger.warning(
                 "Transient install failure for %s (attempt %s/%s): %s",
                 app_id,
                 attempt_index + 1,
-                INSTALL_MAX_ATTEMPTS,
+                max_attempts,
                 error,
             )
             await asyncio.sleep(2)
 
-
-async def _start_app(
-    server_apps,
-    *,
-    app_id: str,
-    non_fatal_start: bool,
-) -> None:
-    """Start app and optionally tolerate startup wait timeout in non-fatal mode."""
-    logger.info("Starting app %s...", app_id)
-    start_kwargs = {"app_id": app_id}
-    if non_fatal_start:
-        start_kwargs["wait_for_service"] = False
-
-    try:
-        await server_apps.start(**start_kwargs)
-        logger.info("App %s started.", app_id)
-    except Exception as error:  # noqa: BLE001
-        if not non_fatal_start:
-            raise
-        logger.warning(
-            "Non-fatal start error for %s: %s. Proceeding to health checks.",
-            app_id,
-            error,
-        )
 
 async def deploy_app(
     server_url: str,
@@ -152,20 +143,21 @@ async def deploy_app(
         server_url=server_url,
         token=token,
     )
-    
+
     # Read source
-    with open(source_path, "r") as f:
+    with open(source_path) as f:
         source_code = f.read()
-            
+
     # Prepare manifest
     import yaml
-    with open(manifest_path, "r") as f:
+
+    with open(manifest_path) as f:
         manifest_data = yaml.safe_load(f)
     prepared_manifest_data = _prepare_manifest_data(
         manifest_data,
         source_path=source_path,
     )
-        
+
     server_apps = await client.get_service("public/server-apps")
 
     await _install_app(
@@ -178,11 +170,12 @@ async def deploy_app(
 
     logger.info("App %s installed.", app_id)
 
-    await _start_app(
-        server_apps,
-        app_id=app_id,
-        non_fatal_start=non_fatal_start,
-    )
+    if non_fatal_start:
+        logger.info(
+            "Install completed with non-fatal mode enabled; "
+            "no separate start call is needed.",
+        )
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -191,10 +184,14 @@ if __name__ == "__main__":
     parser.add_argument("--app-id", required=True)
     parser.add_argument("--source", required=True)
     parser.add_argument("--manifest", required=True)
-    parser.add_argument("--non-fatal-start", action="store_true", help="Don't fail if start times out (start async)")
+    parser.add_argument(
+        "--non-fatal-start",
+        action="store_true",
+        help="Don't fail if start times out (start async)",
+    )
 
     args = parser.parse_args()
-    
+
     asyncio.run(
         deploy_app(
             args.server_url,
