@@ -45,23 +45,12 @@ jobs:
           BRANCH_SLUG=$(python3 -c "from scripts.app_utils import get_branch_slug; import os; print(get_branch_slug('${{ github.ref_name }}'))")
           echo "app_id=weaviate-dev-$BRANCH_SLUG" >> $GITHUB_OUTPUT
 
-      - name: Deploy Dev App
+      - name: Deploy and Health Check
         run: |
-          # Using custom script instead of CLI for now to handle specific env logic if needed
-          python3 scripts/deploy_weaviate_app.py \
+          bash scripts/run_dev_deploy_smoke.sh \
             --server-url "$HYPHA_SERVER_URL" \
             --token "$HYPHA_TOKEN" \
             --app-id "${{ steps.app_id.outputs.app_id }}" \
-            --source "weaviate-app/app_dev.py" \
-            --manifest "weaviate-app/manifest.yaml" \
-            --non-fatal-start
-
-      - name: Health Check
-        run: |
-          python3 scripts/test_weaviate_app.py \
-            --server-url "$HYPHA_SERVER_URL" \
-            --token "$HYPHA_TOKEN" \
-            --app-id "default@${{ steps.app_id.outputs.app_id }}" \
             --wait-seconds 180 \
             --poll-seconds 6
 

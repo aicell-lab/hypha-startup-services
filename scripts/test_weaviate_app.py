@@ -96,20 +96,6 @@ async def _wait_for_service(
     raise RuntimeError("Timed out while waiting for service resolution.")
 
 
-async def _app_exists(client, app_id: str) -> bool:
-    """Return whether app metadata can be resolved via server-apps API."""
-    app_alias = _extract_app_alias(app_id)
-    if app_alias is None:
-        return False
-
-    try:
-        server_apps = await client.get_service("public/server-apps")
-        await server_apps.get_app_info(app_alias)
-        return True
-    except Exception:
-        return False
-
-
 async def main(
     server_url: str,
     app_id: str,
@@ -151,12 +137,6 @@ async def main(
         print("Health check passed.")
 
     except Exception as e:
-        if await _app_exists(client, app_id):
-            print(
-                "Service lookup failed, but app metadata exists. "
-                "Treating health check as passed.",
-            )
-            return
         print(f"Health check failed: {e}")
         sys.exit(1)
 

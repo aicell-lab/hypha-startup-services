@@ -87,7 +87,7 @@ async def _install_app(
     source_code: str,
     manifest_data: Mapping[str, object],
     non_fatal_start: bool,
-) -> None:
+) -> bool:
     """Install app with retry for transient startup registration timeouts."""
     install_kwargs = {
         "app_id": app_id,
@@ -106,7 +106,7 @@ async def _install_app(
     for attempt_index in range(max_attempts):
         try:
             await server_apps.install(**install_kwargs)
-            return
+            return True
         except Exception as error:
             is_last_attempt = attempt_index == max_attempts - 1
             if is_last_attempt:
@@ -116,7 +116,7 @@ async def _install_app(
                         app_id,
                         error,
                     )
-                    return
+                    return False
                 raise
             if not _is_transient_install_error(error):
                 raise
@@ -128,6 +128,17 @@ async def _install_app(
                 error,
             )
             await asyncio.sleep(2)
+
+    return False
+
+
+async def _app_exists(server_apps, *, app_id: str) -> bool:
+    """Return whether app metadata exists after install."""
+    try:
+        await server_apps.get_app_info(app_id)
+        return True
+    except Exception:
+        return False
 
 
 async def deploy_app(
@@ -160,13 +171,20 @@ async def deploy_app(
 
     server_apps = await client.get_service("public/server-apps")
 
-    await _install_app(
+    install_completed = await _install_app(
         server_apps,
         app_id=app_id,
         source_code=source_code,
         manifest_data=prepared_manifest_data,
         non_fatal_start=non_fatal_start,
     )
+
+    if not install_completed and not await _app_exists(server_apps, app_id=app_id):
+        error_message = (
+            "App install did not complete and app metadata is missing: "
+            f"{app_id}"
+        )
+        raise RuntimeError(error_message)
 
     logger.info("App %s installed.", app_id)
 
