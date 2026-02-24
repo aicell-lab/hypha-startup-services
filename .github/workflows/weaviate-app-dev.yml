@@ -12,7 +12,7 @@ jobs:
     env:
       HYPHA_SERVER_URL: ${{ vars.HYPHA_SERVER_URL }}
       HYPHA_WORKSPACE: ${{ vars.HYPHA_WORKSPACE || 'hypha-agents' }}
-      HYPHA_TOKEN: ${{ secrets.HYPHA_AGENT_TOKEN || secrets.HYPHA_AGENTS_TOKEN }}
+      HYPHA_TOKEN: ${{ secrets.HYPHA_AGENTS_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
@@ -33,7 +33,7 @@ jobs:
       - name: Validate Hypha token
         run: |
           if [ -z "$HYPHA_TOKEN" ]; then
-            echo "HYPHA token is empty. Set repository secret HYPHA_AGENT_TOKEN (or HYPHA_AGENTS_TOKEN)."
+            echo "HYPHA token is empty. Set repository secret HYPHA_AGENTS_TOKEN."
             exit 1
           fi
 

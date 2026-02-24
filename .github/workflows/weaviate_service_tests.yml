@@ -43,8 +43,8 @@ jobs:
           USER1_WS: ${{ vars.USER1_WS }}
           USER2_WS: ${{ vars.USER2_WS }}
           USER3_WS: ${{ vars.USER3_WS }}
-          HYPHA_TOKEN: ${{ secrets.HYPHA_AGENT_TOKEN || secrets.HYPHA_AGENTS_TOKEN }}
-          HYPHA_AGENTS_TOKEN: ${{ secrets.HYPHA_AGENT_TOKEN || secrets.HYPHA_AGENTS_TOKEN }}
+          HYPHA_TOKEN: ${{ secrets.HYPHA_AGENTS_TOKEN }}
+          HYPHA_AGENTS_TOKEN: ${{ secrets.HYPHA_AGENTS_TOKEN }}
           WEAVIATE_TEST_NAMESPACE: noembed-${{ github.run_id }}-${{ github.run_attempt }}
           WEAVIATE_TEST_ENABLE_EMBEDDING: "false"
         run: |
@@ -91,8 +91,8 @@ jobs:
           USER1_WS: ${{ vars.USER1_WS }}
           USER2_WS: ${{ vars.USER2_WS }}
           USER3_WS: ${{ vars.USER3_WS }}
-          HYPHA_TOKEN: ${{ secrets.HYPHA_AGENT_TOKEN || secrets.HYPHA_AGENTS_TOKEN }}
-          HYPHA_AGENTS_TOKEN: ${{ secrets.HYPHA_AGENT_TOKEN || secrets.HYPHA_AGENTS_TOKEN }}
+          HYPHA_TOKEN: ${{ secrets.HYPHA_AGENTS_TOKEN }}
+          HYPHA_AGENTS_TOKEN: ${{ secrets.HYPHA_AGENTS_TOKEN }}
           WEAVIATE_TEST_NAMESPACE: embed-${{ github.run_id }}-${{ github.run_attempt }}
           WEAVIATE_TEST_ENABLE_EMBEDDING: "true"
         run: |
