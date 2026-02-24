@@ -14,7 +14,7 @@ jobs:
     env:
       HYPHA_SERVER_URL: ${{ vars.HYPHA_SERVER_URL }}
       HYPHA_WORKSPACE: ${{ vars.HYPHA_WORKSPACE || 'hypha-agents' }}
-      HYPHA_TOKEN: ${{ secrets.HYPHA_TOKEN }}
+      HYPHA_TOKEN: ${{ secrets.HYPHA_AGENT_TOKEN }}
       PROD_APP_ID: weaviate
     steps:
       - uses: actions/checkout@v4
