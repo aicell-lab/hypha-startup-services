@@ -2,22 +2,21 @@
 
 import asyncio
 import contextlib
+import os
 import uuid
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Mapping
 from dataclasses import asdict
 from pathlib import Path
 
 import pytest_asyncio
+from hypha_rpc import connect_to_server
 from hypha_rpc.rpc import RemoteException, RemoteService
 import yaml
 
-from hypha_startup_services.weaviate_service.register_service import (
-    register_weaviate,
-)
 from hypha_startup_services.weaviate_service.service_codecs import (
     register_weaviate_codecs,
 )
-from tests.conftest import get_user_server
+from tests.conftest import SERVER_URL, get_user_server
 from tests.weaviate_service.utils import (
     APP_ID,
     SHARED_APP_ID,
@@ -37,6 +36,7 @@ REGISTRATION_LOOKUP_SLEEP_SECONDS = 1.0
 SERVER_APPS_SERVICE_ID = "public/server-apps"
 DEFAULT_APP_SERVICE_PREFIX = "default@"
 ADMIN_PERMISSION_ERROR_MESSAGE = "Only admin can generate token."
+ADMIN_TOKEN_ENV_NAME = "HYPHA_AGENTS_TOKEN"
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WEAVIATE_APP_DIR = REPO_ROOT / "weaviate-app"
 WEAVIATE_APP_MANIFEST_PATH = WEAVIATE_APP_DIR / "manifest.yaml"
@@ -138,11 +138,16 @@ def _build_default_service_query(app_id: str) -> str:
     return f"{DEFAULT_APP_SERVICE_PREFIX}{app_id}"
 
 
-def _build_direct_service_id(*, retry_index: int) -> str:
-    """Build a session-unique direct service id for fallback registration."""
-    if retry_index == 0:
-        return WEAVIATE_TEST_SERVICE_ID
-    return f"{WEAVIATE_TEST_SERVICE_ID}-{retry_index}"
+def _build_scoped_default_service_query(
+    server: RemoteService,
+    *,
+    app_id: str,
+) -> str:
+    """Build workspace-scoped query for the app default service."""
+    return (
+        f"{server.config.workspace}/*:"
+        f"{_build_default_service_query(app_id)}"
+    )
 
 
 def _is_admin_permission_error(error: BaseException) -> bool:
@@ -150,12 +155,30 @@ def _is_admin_permission_error(error: BaseException) -> bool:
     return ADMIN_PERMISSION_ERROR_MESSAGE in str(error)
 
 
+def _get_admin_token() -> str | None:
+    """Read the optional admin token used for app installation."""
+    return os.environ.get(ADMIN_TOKEN_ENV_NAME)
+
+
+async def _connect_admin_server() -> RemoteService | None:
+    """Connect with an admin token when available."""
+    admin_token = _get_admin_token()
+    if not admin_token:
+        return None
+    return await connect_to_server(
+        {
+            "server_url": SERVER_URL,
+            "token": admin_token,
+        },
+    )
+
+
 async def _install_test_app(
     server: RemoteService,
     *,
     app_id: str,
     source_file_name: str,
-) -> None:
+) -> str:
     """Install and start a Weaviate test app instance."""
     source_path = WEAVIATE_APP_DIR / source_file_name
     source_code = source_path.read_text(encoding="utf-8")
@@ -169,7 +192,15 @@ async def _install_test_app(
         overwrite=True,
         wait_for_service=False,
     )
-    await server_apps.start(app_id, wait_for_service=False)
+    start_result = await server_apps.start(
+        app_id,
+        wait_for_service="default",
+    )
+    if isinstance(start_result, Mapping):
+        service_id = start_result.get("service_id")
+        if isinstance(service_id, str):
+            return service_id
+    return ""
 
 
 async def _uninstall_test_app(
@@ -185,43 +216,103 @@ async def _uninstall_test_app(
         await server_apps.uninstall(app_id)
 
 
-async def _register_fallback_test_service(
-    server: RemoteService,
-    *,
-    service_id: str,
-) -> str:
-    """Register service directly when app install is not permitted."""
-    await register_weaviate(server, service_id)
-    return (
-        f"{server.config.workspace}/{server.config.client_id}:"
-        f"{service_id}"
-    )
-
-
 async def _register_service_for_retry(
     server: RemoteService,
     *,
     retry_index: int,
-) -> tuple[str, str]:
-    """Register either app-based or direct fallback service for one retry."""
+) -> tuple[str, str, RemoteService | None]:
+    """Register an app service, optionally using admin token if required."""
     app_id_candidate = _build_test_app_id(retry_index=retry_index)
-    fallback_service_id = _build_direct_service_id(retry_index=retry_index)
 
     try:
-        await _install_test_app(
+        service_id = await _install_test_app(
             server,
             app_id=app_id_candidate,
             source_file_name="app_dev.py",
         )
-        return _build_default_service_query(app_id_candidate), app_id_candidate
+        if service_id:
+            return service_id, app_id_candidate, None
+        service_query = _build_scoped_default_service_query(
+            server,
+            app_id=app_id_candidate,
+        )
+        return service_query, app_id_candidate, None
     except RemoteException as error:
         if not _is_admin_permission_error(error):
             raise
-    fallback_full_service_id = await _register_fallback_test_service(
-        server,
-        service_id=fallback_service_id,
+
+    admin_server = await _connect_admin_server()
+    if admin_server is None:
+        error_message = (
+            "App install requires admin privileges for token generation. "
+            f"Set {ADMIN_TOKEN_ENV_NAME} to run these integration tests."
+        )
+        raise RuntimeError(error_message)
+
+    service_id = await _install_test_app(
+        admin_server,
+        app_id=app_id_candidate,
+        source_file_name="app_dev.py",
     )
-    return fallback_full_service_id, ""
+    if service_id:
+        return service_id, app_id_candidate, admin_server
+    service_query = _build_scoped_default_service_query(
+        admin_server,
+        app_id=app_id_candidate,
+    )
+    return service_query, app_id_candidate, admin_server
+
+
+async def _resolve_shared_service_registration(
+    server: RemoteService,
+) -> tuple[str, str, RemoteService, RemoteService | None]:
+    """Resolve one shared app service ID with retry and permission handling."""
+    last_error: Exception | None = None
+    installer_server: RemoteService = server
+    admin_server: RemoteService | None = None
+
+    for retry_index in range(SERVICE_REGISTRATION_RETRIES):
+        try:
+            (
+                full_service_id,
+                installed_app_id,
+                connected_admin_server,
+            ) = await _register_service_for_retry(
+                server,
+                retry_index=retry_index,
+            )
+            if connected_admin_server is not None:
+                admin_server = connected_admin_server
+                installer_server = connected_admin_server
+            else:
+                installer_server = server
+
+            await wait_for_service(
+                server,
+                full_service_id,
+                retries=REGISTRATION_LOOKUP_RETRIES,
+                sleep_seconds=REGISTRATION_LOOKUP_SLEEP_SECONDS,
+            )
+            return (
+                full_service_id,
+                installed_app_id,
+                installer_server,
+                admin_server,
+            )
+        except Exception as error:
+            last_error = error
+            with contextlib.suppress(RemoteException):
+                if "installed_app_id" in locals() and installed_app_id:
+                    await _uninstall_test_app(
+                        installer_server,
+                        app_id=installed_app_id,
+                    )
+            await asyncio.sleep(REGISTRATION_LOOKUP_SLEEP_SECONDS)
+
+    if last_error is not None:
+        raise last_error
+    error_msg = "Failed to register and resolve shared Weaviate test service"
+    raise RuntimeError(error_msg)
 
 
 @pytest_asyncio.fixture
@@ -229,49 +320,20 @@ async def shared_weaviate_service_id() -> AsyncGenerator[str, None]:
     """Install one shared, session-unique Weaviate app and return its service."""
     server = await get_user_server("PERSONAL_TOKEN")
     register_test_codecs(server)
-
-    last_error: Exception | None = None
-    full_service_id = ""
-    installed_app_id = ""
-
-    for retry_index in range(SERVICE_REGISTRATION_RETRIES):
-        try:
-            full_service_id, installed_app_id = await _register_service_for_retry(
-                server,
-                retry_index=retry_index,
-            )
-        except Exception as error:
-            last_error = error
-            await asyncio.sleep(REGISTRATION_LOOKUP_SLEEP_SECONDS)
-            continue
-
-        try:
-            await wait_for_service(
-                server,
-                full_service_id,
-                retries=REGISTRATION_LOOKUP_RETRIES,
-                sleep_seconds=REGISTRATION_LOOKUP_SLEEP_SECONDS,
-            )
-        except Exception as error:
-            last_error = error
-            if installed_app_id:
-                await _uninstall_test_app(server, app_id=installed_app_id)
-            installed_app_id = ""
-            await asyncio.sleep(REGISTRATION_LOOKUP_SLEEP_SECONDS)
-            continue
-        else:
-            break
-    else:
-        if last_error is not None:
-            raise last_error
-        error_msg = "Failed to register and resolve shared Weaviate test service"
-        raise RuntimeError(error_msg)
+    (
+        full_service_id,
+        installed_app_id,
+        installer_server,
+        admin_server,
+    ) = await _resolve_shared_service_registration(server)
 
     try:
         yield full_service_id
     finally:
         if installed_app_id:
-            await _uninstall_test_app(server, app_id=installed_app_id)
+            await _uninstall_test_app(installer_server, app_id=installed_app_id)
+        if admin_server is not None:
+            await admin_server.disconnect()
         await server.disconnect()
 
 
