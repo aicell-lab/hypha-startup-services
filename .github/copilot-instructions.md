@@ -4,6 +4,19 @@ Follow this coding style for Python code, and equivalent rules for other languag
 2. Use descriptive names for variables and functions
 - Don't be afraid of long names if they improve clarity. Never use abbreviations unless they are very common and well-known.
 - Never ever use single-letter variable names.
+ 
+## Repository-specific operational guidance (Weaviate app)
+
+- Dev deployments must always use branch-scoped app IDs.
+    Never use a shared generic ID such as `weaviate-dev` in dev flows.
+- Prefer app lifecycle APIs through `public/server-apps`
+    (`install`, `start`, `stop`, `uninstall`) for deploy/test flows.
+- Integration tests should create session-unique app instances and
+    tear them down on fixture cleanup.
+- If app install is blocked by admin-only permissions, tests may use a
+    direct service registration fallback with a session-unique service ID.
+- Treat WebSocket pathing as environment-dependent.
+    Keep connection logic compatible with base-path variants when needed.
 3. Add docstrings to functions.
 - Public API functions, and always those decorated with @schema_function or @schema_method should have extensive docstrings explaining their purpose, parameters, and return values.
 - Smaller helper functions should have brief docstrings.

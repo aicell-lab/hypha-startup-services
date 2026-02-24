@@ -2,15 +2,14 @@
 
 import asyncio
 import contextlib
-import importlib.util
-import os
-import sys
 import uuid
 from collections.abc import AsyncGenerator
 from dataclasses import asdict
+from pathlib import Path
 
 import pytest_asyncio
 from hypha_rpc.rpc import RemoteException, RemoteService
+import yaml
 
 from hypha_startup_services.weaviate_service.register_service import (
     register_weaviate,
@@ -29,11 +28,18 @@ from tests.weaviate_service.utils import (
 
 TEST_SESSION_ID = uuid.uuid4().hex[:10]
 WEAVIATE_TEST_SERVICE_ID = f"weaviate-test-{TEST_SESSION_ID}"
+WEAVIATE_TEST_APP_ID = f"weaviate-test-app-{TEST_SESSION_ID}"
 SERVICE_LOOKUP_RETRIES = 40
 SERVICE_LOOKUP_SLEEP_SECONDS = 0.5
 SERVICE_REGISTRATION_RETRIES = 2
 REGISTRATION_LOOKUP_RETRIES = 30
 REGISTRATION_LOOKUP_SLEEP_SECONDS = 1.0
+SERVER_APPS_SERVICE_ID = "public/server-apps"
+DEFAULT_APP_SERVICE_PREFIX = "default@"
+ADMIN_PERMISSION_ERROR_MESSAGE = "Only admin can generate token."
+REPO_ROOT = Path(__file__).resolve().parents[2]
+WEAVIATE_APP_DIR = REPO_ROOT / "weaviate-app"
+WEAVIATE_APP_MANIFEST_PATH = WEAVIATE_APP_DIR / "manifest.yaml"
 
 
 async def wait_for_service(
@@ -106,61 +112,136 @@ def register_test_codecs(server: RemoteService) -> None:
     )
 
 
+def _load_manifest_data() -> dict[str, object]:
+    """Load base app manifest for test deployments."""
+    with WEAVIATE_APP_MANIFEST_PATH.open("r", encoding="utf-8") as manifest_file:
+        return dict(yaml.safe_load(manifest_file))
+
+
+def _build_test_manifest(source_file_name: str) -> dict[str, object]:
+    """Prepare app manifest for a test-specific source file."""
+    manifest_data = _load_manifest_data()
+    manifest_data["type"] = "hypha"
+    manifest_data["entry_point"] = source_file_name
+    return manifest_data
+
+
+def _build_test_app_id(*, retry_index: int) -> str:
+    """Build unique branch/session-safe app id for integration tests."""
+    if retry_index == 0:
+        return WEAVIATE_TEST_APP_ID
+    return f"{WEAVIATE_TEST_APP_ID}-{retry_index}"
+
+
+def _build_default_service_query(app_id: str) -> str:
+    """Build default service query for a specific app instance."""
+    return f"{DEFAULT_APP_SERVICE_PREFIX}{app_id}"
+
+
+def _build_direct_service_id(*, retry_index: int) -> str:
+    """Build a session-unique direct service id for fallback registration."""
+    if retry_index == 0:
+        return WEAVIATE_TEST_SERVICE_ID
+    return f"{WEAVIATE_TEST_SERVICE_ID}-{retry_index}"
+
+
+def _is_admin_permission_error(error: BaseException) -> bool:
+    """Return whether failure is caused by missing admin token privileges."""
+    return ADMIN_PERMISSION_ERROR_MESSAGE in str(error)
+
+
+async def _install_test_app(
+    server: RemoteService,
+    *,
+    app_id: str,
+    source_file_name: str,
+) -> None:
+    """Install and start a Weaviate test app instance."""
+    source_path = WEAVIATE_APP_DIR / source_file_name
+    source_code = source_path.read_text(encoding="utf-8")
+    manifest_data = _build_test_manifest(source_file_name)
+
+    server_apps = await server.get_service(SERVER_APPS_SERVICE_ID)
+    await server_apps.install(
+        app_id=app_id,
+        source=source_code,
+        manifest=manifest_data,
+        overwrite=True,
+        wait_for_service=False,
+    )
+    await server_apps.start(app_id, wait_for_service=False)
+
+
+async def _uninstall_test_app(
+    server: RemoteService,
+    *,
+    app_id: str,
+) -> None:
+    """Stop and uninstall a Weaviate test app instance."""
+    server_apps = await server.get_service(SERVER_APPS_SERVICE_ID)
+    with contextlib.suppress(RemoteException):
+        await server_apps.stop(app_id)
+    with contextlib.suppress(RemoteException):
+        await server_apps.uninstall(app_id)
+
+
+async def _register_fallback_test_service(
+    server: RemoteService,
+    *,
+    service_id: str,
+) -> str:
+    """Register service directly when app install is not permitted."""
+    await register_weaviate(server, service_id)
+    return (
+        f"{server.config.workspace}/{server.config.client_id}:"
+        f"{service_id}"
+    )
+
+
+async def _register_service_for_retry(
+    server: RemoteService,
+    *,
+    retry_index: int,
+) -> tuple[str, str]:
+    """Register either app-based or direct fallback service for one retry."""
+    app_id_candidate = _build_test_app_id(retry_index=retry_index)
+    fallback_service_id = _build_direct_service_id(retry_index=retry_index)
+
+    try:
+        await _install_test_app(
+            server,
+            app_id=app_id_candidate,
+            source_file_name="app_dev.py",
+        )
+        return _build_default_service_query(app_id_candidate), app_id_candidate
+    except RemoteException as error:
+        if not _is_admin_permission_error(error):
+            raise
+    fallback_full_service_id = await _register_fallback_test_service(
+        server,
+        service_id=fallback_service_id,
+    )
+    return fallback_full_service_id, ""
+
+
 @pytest_asyncio.fixture
 async def shared_weaviate_service_id() -> AsyncGenerator[str, None]:
-    """Register one shared, session-unique Weaviate service."""
+    """Install one shared, session-unique Weaviate app and return its service."""
     server = await get_user_server("PERSONAL_TOKEN")
     register_test_codecs(server)
 
-    last_error: RemoteException | RuntimeError | None = None
+    last_error: Exception | None = None
     full_service_id = ""
-    service_id_base = f"{WEAVIATE_TEST_SERVICE_ID}-{uuid.uuid4().hex[:8]}"
-
-    # Use the app setup to register the service
-    # Ideally we would install the app, but for these tests we can just run the setup
-    # which simulates the app loader.
-    # We need to add the app directory to sys.path or just import the logic.
-    # Since app.py just calls functions from hypha_startup_services, we can use those directly
-    # OR import app properly. Let's import app using importlib due to the path.
-    app_path = os.path.join(
-        os.path.dirname(__file__),
-        "../../weaviate-app/app.py",
-    )
+    installed_app_id = ""
 
     for retry_index in range(SERVICE_REGISTRATION_RETRIES):
-        service_id_candidate = (
-            f"{service_id_base}-{retry_index}" if retry_index > 0 else service_id_base
-        )
-
         try:
-            spec = importlib.util.spec_from_file_location("weaviate_app", app_path)
-            if spec and spec.loader:
-                weaviate_app = importlib.util.module_from_spec(spec)
-                sys.modules["weaviate_app"] = weaviate_app
-                spec.loader.exec_module(weaviate_app)
-
-                # Override service ID via env var
-                os.environ["WEAVIATE_SERVICE_ID"] = service_id_candidate
-
-                # Run setup
-                await weaviate_app.setup(server)
-
-                full_service_id = (
-                    f"{server.config.workspace}/{server.config.client_id}:"
-                    f"{service_id_candidate}"
-                )
-            else:
-                # Fallback if app import fails (shouldn't happen)
-                await register_weaviate(server, service_id_candidate)
-                full_service_id = (
-                    f"{server.config.workspace}/{server.config.client_id}:"
-                    f"{service_id_candidate}"
-                )
-        except Exception as e:
-            # If registration itself fails
-            last_error = e
-            # Log the error for debugging if needed, but we rely on the loop for retries.
-            # print(f"Registration failed for {service_id_candidate}: {e}")
+            full_service_id, installed_app_id = await _register_service_for_retry(
+                server,
+                retry_index=retry_index,
+            )
+        except Exception as error:
+            last_error = error
             await asyncio.sleep(REGISTRATION_LOOKUP_SLEEP_SECONDS)
             continue
 
@@ -171,8 +252,11 @@ async def shared_weaviate_service_id() -> AsyncGenerator[str, None]:
                 retries=REGISTRATION_LOOKUP_RETRIES,
                 sleep_seconds=REGISTRATION_LOOKUP_SLEEP_SECONDS,
             )
-        except RemoteException as error:
+        except Exception as error:
             last_error = error
+            if installed_app_id:
+                await _uninstall_test_app(server, app_id=installed_app_id)
+            installed_app_id = ""
             await asyncio.sleep(REGISTRATION_LOOKUP_SLEEP_SECONDS)
             continue
         else:
@@ -186,6 +270,8 @@ async def shared_weaviate_service_id() -> AsyncGenerator[str, None]:
     try:
         yield full_service_id
     finally:
+        if installed_app_id:
+            await _uninstall_test_app(server, app_id=installed_app_id)
         await server.disconnect()
 
 
