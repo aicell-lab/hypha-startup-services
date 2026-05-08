@@ -1,4 +1,4 @@
-mem0ai==1.0.4
+mem0ai==2.0.0b2
 pydantic==2.12.3
 weaviate-client==4.19.4
 setuptools==80.9.0
